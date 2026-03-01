@@ -140,6 +140,47 @@ function invalidateCache(key) {
 
 loadFromLocalStorage();
 
+// ======================================================
+// TAB DOM CACHING SYSTEM
+// Saves/restores rendered tab DOM to avoid Firestore re-reads.
+// Parent Feedback & Messaging are excluded (always fetch fresh).
+// Click "Refresh" inside any tab to force a fresh fetch.
+// ======================================================
+const _tabDomCache = {};
+let _currentNavId = null;
+const _tabCacheExclude = new Set(['navParentFeedback', 'navMessaging']);
+
+function switchToTabCached(navId, renderFn) {
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+
+    // Save current tab's live DOM nodes (preserves event listeners)
+    if (_currentNavId && !_tabCacheExclude.has(_currentNavId)) {
+        const fragment = document.createDocumentFragment();
+        while (mainContent.firstChild) {
+            fragment.appendChild(mainContent.firstChild);
+        }
+        _tabDomCache[_currentNavId] = fragment;
+    }
+
+    // Clear container
+    mainContent.innerHTML = '';
+
+    // Restore cached DOM or render fresh
+    if (_tabDomCache[navId] && !_tabCacheExclude.has(navId)) {
+        mainContent.appendChild(_tabDomCache[navId]);
+        _currentNavId = navId;
+    } else {
+        _currentNavId = navId;
+        renderFn(mainContent);
+    }
+}
+
+// Call this from any tab's Refresh button to force re-render
+window.invalidateTabCache = function(navId) {
+    delete _tabDomCache[navId];
+};
+
 let payAdviceGifts = {};
 let currentPayData = [];
 let reportsLastVisible = null;
@@ -1335,7 +1376,6 @@ async function logStudentEvent(studentId, eventType, changes = {}, description =
             description,
             metadata
         });
-        console.log(`Student event logged: ${eventType} for ${studentId}`);
     } catch (e) {
         console.error("Error logging student event:", e);
     }
@@ -2003,7 +2043,6 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
             parentDetails: parentDetails  // Store all parent info
         });
         
-        console.log("Group created with ID:", groupRef.id);
         
         const updatePromises = studentFees.map(async (sf) => {
             const studentDoc = await getDoc(doc(db, "students", sf.studentId));
@@ -2829,7 +2868,6 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             getDocs(collection(db, "groupClasses"))
         ]);
         
-        console.log(`Fetched: ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students`);
         
         const allTutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         const activeTutors = allTutors.filter(t => !t.status || t.status === 'active');
@@ -5980,86 +6018,6 @@ async function resetParentBalance(parentUid, currentEarnings) {
 // SUBSECTION 5.1: Tutor Reports Panel
 // ======================================================
 
-// ======================================================
-// GLOBAL TUTOR REPORTS: Cache & Export Helpers
-// These must live outside renderTutorReportsPanel so that
-// inline onclick handlers in dynamically generated HTML
-// can find them via the window object.
-// ======================================================
-
-// Cache that stores tutor-grouped report arrays by tutor name key.
-// Populated each time the report list renders, consumed by
-// zipAndDownloadTutorReports so we never need giant JSON in onclick attrs.
-window._tutorReportsCache = {};
-
-// Holds the currently visible (filtered) reports array so CSV export
-// can access it from the global scope.
-window._filteredTutorReports = [];
-
-// Global CSV export – called from the Export CSV button's event listener.
-window.exportReportsToCSV = function () {
-    try {
-        const reports = window._filteredTutorReports || [];
-        if (reports.length === 0) {
-            alert('No reports to export.');
-            return;
-        }
-        const csvData = window.convertReportsToCSV(reports);
-        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const startDate = document.getElementById('reports-start-date')?.value || 'start';
-        const endDate = document.getElementById('reports-end-date')?.value || 'end';
-        link.href = URL.createObjectURL(blob);
-        link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-    } catch (error) {
-        console.error('Error exporting CSV:', error);
-        alert('Failed to export CSV. Please try again.');
-    }
-};
-
-// Global CSV converter – includes ALL report fields.
-window.convertReportsToCSV = function (reports) {
-    const headers = [
-        'Tutor Name', 'Tutor Email', 'Student Name', 'Parent Name',
-        'Parent Phone', 'Grade', 'Submission Date', 'Introduction',
-        'Topics Covered', 'Progress', 'Strengths & Weaknesses',
-        'Recommendations', 'General Comments'
-    ];
-
-    const csvEscape = (val) => {
-        const str = String(val || 'N/A');
-        return `"${str.replace(/"/g, '""')}"`;
-    };
-
-    const rows = reports.map(report => {
-        const submissionDate = report.submittedAt
-            ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString()
-            : 'N/A';
-
-        return [
-            csvEscape(report.tutorName),
-            csvEscape(report.tutorEmail),
-            csvEscape(report.studentName),
-            csvEscape(report.parentName),
-            csvEscape(report.parentPhone),
-            csvEscape(report.grade),
-            csvEscape(submissionDate),
-            csvEscape(report.introduction),
-            csvEscape(report.topics),
-            csvEscape(report.progress),
-            csvEscape(report.strengthsWeaknesses),
-            csvEscape(report.recommendations),
-            csvEscape(report.generalComments)
-        ];
-    });
-
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-};
-
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -6191,7 +6149,7 @@ async function renderTutorReportsPanel(container) {
 
     const exportBtn = document.getElementById('export-reports-csv-btn');
     if (exportBtn) {
-        exportBtn.addEventListener('click', window.exportReportsToCSV);
+        exportBtn.addEventListener('click', exportReportsToCSV);
     }
 
     handleDateChange();
@@ -6222,10 +6180,49 @@ async function renderTutorReportsPanel(container) {
         renderTutorReportsFromCache();
     }
 
-    // exportReportsToCSV and convertReportsToCSV are now global (window.*) — see above renderTutorReportsPanel
+    async function exportReportsToCSV() {
+        try {
+            const csvData = convertReportsToCSV(filteredReports);
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const startDate = document.getElementById('reports-start-date').value;
+            const endDate = document.getElementById('reports-end-date').value;
+            link.href = URL.createObjectURL(blob);
+            link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
+            link.click();
+        } catch (error) {
+            console.error('Error exporting CSV:', error);
+            alert('Failed to export CSV. Please try again.');
+        }
+    }
 
-    // Expose for the inline "Try Again" button in error states
-    window._fetchAndRenderTutorReports = fetchAndRenderTutorReports;
+    function convertReportsToCSV(reports) {
+        const headers = [
+            'Tutor Name', 'Tutor Email', 'Student Name', 'Parent Name', 'Grade',
+            'Submission Date', 'Topics Covered', 'Progress', 'Strengths & Weaknesses',
+            'Recommendations'
+        ];
+
+        const rows = reports.map(report => {
+            const submissionDate = report.submittedAt ? 
+                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
+            
+            return [
+                `"${report.tutorName || 'N/A'}"`,
+                `"${report.tutorEmail || 'N/A'}"`,
+                `"${report.studentName || 'N/A'}"`,
+                `"${report.parentName || 'N/A'}"`,
+                `"${report.grade || 'N/A'}"`,
+                `"${submissionDate}"`,
+                `"${(report.topics || 'N/A').replace(/"/g, '""')}"`,
+                `"${(report.progress || 'N/A').replace(/"/g, '""')}"`,
+                `"${(report.strengthsWeaknesses || 'N/A').replace(/"/g, '""')}"`,
+                `"${(report.recommendations || 'N/A').replace(/"/g, '""')}"`
+            ];
+        });
+
+        return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    }
 
     async function fetchAndRenderTutorReports() {
         const reportsListContainer = document.getElementById('tutor-reports-list');
@@ -6288,7 +6285,7 @@ async function renderTutorReportsPanel(container) {
                 <div class="text-center py-10 text-red-600">
                     <p class="font-semibold">Failed to load reports</p>
                     <p class="text-sm mt-2">${error.message}</p>
-                    <button onclick="window._fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    <button onclick="fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                         Try Again
                     </button>
                 </div>
@@ -6313,11 +6310,6 @@ async function renderTutorReportsPanel(container) {
     function renderTutorReportsFromCache() {
         const reportsListContainer = document.getElementById('tutor-reports-list');
         if (!reportsListContainer) return;
-
-        // Sync to global so CSV export and other global functions can access
-        window._filteredTutorReports = filteredReports;
-        // Clear the tutor cache for this render cycle
-        window._tutorReportsCache = {};
 
         if (filteredReports.length === 0) {
             reportsListContainer.innerHTML = `
@@ -6351,11 +6343,6 @@ async function renderTutorReportsPanel(container) {
         let html = '';
         
         Object.values(reportsByTutor).forEach(tutorData => {
-            // Store this tutor's reports in the global cache so the ZIP
-            // button can retrieve them without giant inline JSON.
-            const cacheKey = (tutorData.name || 'unknown').replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-            window._tutorReportsCache[cacheKey] = tutorData.reports;
-
             const reportsByStudent = {};
             tutorData.reports.forEach(report => {
                 if (!reportsByStudent[report.studentName]) {
@@ -6404,7 +6391,7 @@ async function renderTutorReportsPanel(container) {
 
             const zipButtonHTML = canDownload ? `
                 <div class="p-4 border-t bg-blue-50">
-                    <button onclick="zipAndDownloadTutorReports('${cacheKey}', '${tutorData.name.replace(/'/g, "\\'")}', this)" 
+                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports).replace(/"/g, '&quot;')}, '${tutorData.name.replace(/'/g, "\\'")}', this)" 
                             class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
@@ -6523,7 +6510,6 @@ function checkLibraries(libs) {
 async function checkTutorAssignments(enrollmentId, studentNames = []) {
     try {
         const assignments = [];
-        console.log(`Checking assignments for Enrollment: ${enrollmentId}`);
 
         // Fetch from 'students' collection
         const studentsQuery = query(
@@ -8216,9 +8202,10 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         delete sessionCache.pendingStudents;
         // No need to delete students cache because we didn't create any students
 
-        // Refresh the view
+        // Refresh the view (invalidate cache since data changed)
         const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
         const mainContent = document.getElementById('main-content');
+        if (currentNavId) invalidateTabCache(currentNavId);
         if (currentNavId && allNavItems[currentNavId] && mainContent) {
             allNavItems[currentNavId].fn(mainContent);
         } else {
@@ -8512,7 +8499,6 @@ async function renderSummerBreakPanel(container) {
 }
 
 function switchTab(tab) {
-    console.log("🔄 Switching to tab:", tab);
     
     const breakTab = document.getElementById('break-tab');
     const recallTab = document.getElementById('recall-tab');
@@ -8526,7 +8512,6 @@ function switchTab(tab) {
         recallTab.classList.add('text-gray-500');
         breakView.classList.remove('hidden');
         recallView.classList.add('hidden');
-        console.log("✅ Switched to Break tab");
     } else {
         recallTab.classList.add('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
         recallTab.classList.remove('text-gray-500');
@@ -8534,15 +8519,12 @@ function switchTab(tab) {
         breakTab.classList.add('text-gray-500');
         recallView.classList.remove('hidden');
         breakView.classList.add('hidden');
-        console.log("✅ Switched to Recall tab");
         
         // Force refresh of recall requests when switching to recall tab
         setTimeout(() => {
             if (!window.sessionCache.recallRequests || window.sessionCache.recallRequests.length === 0) {
-                console.log("📥 No cached recall requests, fetching fresh data...");
                 fetchRecallRequests(true);
             } else {
-                console.log("📊 Using cached recall requests:", window.sessionCache.recallRequests.length);
                 renderRecallRequests(window.sessionCache.recallRequests);
             }
         }, 100);
@@ -8561,7 +8543,6 @@ function handleBreakSearch(searchTerm) {
 }
 
 async function fetchRecallRequests(forceRefresh = false) {
-    console.log("🔄 fetchRecallRequests called");
     
     try {
         // Check if Firestore is properly initialized
@@ -8580,10 +8561,8 @@ async function fetchRecallRequests(forceRefresh = false) {
         
         // Query the recall_requests collection
         const recallQuery = query(collection(db, "recall_requests"), where("status", "==", "pending"));
-        console.log("📋 Querying recall_requests collection...");
         
         const snapshot = await getDocs(recallQuery);
-        console.log("✅ Query complete, found", snapshot.size, "documents");
         
         const requests = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -8610,7 +8589,6 @@ async function fetchRecallRequests(forceRefresh = false) {
             };
         });
         
-        console.log("📊 Processed requests:", requests);
         
         // Sort by most recent
         requests.sort((a, b) => b.requestDate - a.requestDate);
@@ -8621,17 +8599,14 @@ async function fetchRecallRequests(forceRefresh = false) {
         const countElement = document.getElementById('recall-requests-count');
         if (countElement) {
             countElement.textContent = requests.length;
-            console.log("📈 Updated recall count to:", requests.length);
         }
         
         // Check if recall tab is active
         const recallView = document.getElementById('recall-requests-view');
         const isRecallTabActive = recallView && !recallView.classList.contains('hidden');
         
-        console.log("🎯 Recall tab active?", isRecallTabActive);
         
         if (isRecallTabActive) {
-            console.log("🎨 Rendering recall requests...");
             renderRecallRequests(requests);
         }
         
@@ -8650,7 +8625,7 @@ async function fetchRecallRequests(forceRefresh = false) {
                         <button onclick="fetchRecallRequests(true)" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                             Try Again
                         </button>
-                        <button onclick="console.log('Current cache:', window.sessionCache)" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                        <button onclick="void(0)" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700" style="display:none;">
                             Debug Cache
                         </button>
                     </div>
@@ -8661,7 +8636,6 @@ async function fetchRecallRequests(forceRefresh = false) {
 }
 
 function renderRecallRequests(requests) {
-    console.log("🎨 renderRecallRequests called with", requests?.length, "requests");
     
     const container = document.getElementById('recall-requests-list');
     if (!container) {
@@ -8670,7 +8644,6 @@ function renderRecallRequests(requests) {
     }
     
     if (!requests || requests.length === 0) {
-        console.log("📭 No recall requests to display");
         container.innerHTML = `
             <div class="text-center py-10">
                 <i class="fas fa-inbox text-purple-400 text-4xl mb-4"></i>
@@ -8684,7 +8657,6 @@ function renderRecallRequests(requests) {
         return;
     }
     
-    console.log("🎯 Rendering", requests.length, "recall requests");
     
     let html = '';
     
@@ -8744,24 +8716,20 @@ function renderRecallRequests(requests) {
     });
     
     container.innerHTML = html;
-    console.log("✅ HTML rendered successfully");
     
     // Add event listeners
     const approveBtns = document.querySelectorAll('.approve-recall-btn');
     const rejectBtns = document.querySelectorAll('.reject-recall-btn');
     
-    console.log("🔗 Found", approveBtns.length, "approve buttons and", rejectBtns.length, "reject buttons");
     
     approveBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            console.log("✅ Approve button clicked for request:", e.currentTarget.dataset.requestId);
             handleRecallRequest(e.currentTarget, 'approve');
         });
     });
     
     rejectBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            console.log("❌ Reject button clicked for request:", e.currentTarget.dataset.requestId);
             handleRecallRequest(e.currentTarget, 'reject');
         });
     });
@@ -9145,34 +9113,23 @@ function renderBreakStudentsFromCache(searchTerm = '', filterValue = 'all') {
 
 // And add this test function:
 async function testRecallRequests() {
-    console.log("🧪 Testing recall requests...");
     
     try {
         // Test 1: Check Firestore connection
-        console.log("🔍 Testing Firestore connection...");
-        console.log("Firestore db:", db);
         
         // Test 2: Check if collection exists by trying to get count
         const testQuery = query(collection(db, "recall_requests"));
         const testSnapshot = await getDocs(testQuery);
-        console.log("📊 Total recall_requests documents:", testSnapshot.size);
         
         // Test 3: Show all documents
         testSnapshot.forEach(doc => {
-            console.log("📄 Document ID:", doc.id, "Data:", doc.data());
         });
         
         // Test 4: Try the actual query
-        console.log("🔍 Running actual query...");
         const pendingQuery = query(collection(db, "recall_requests"), where("status", "==", "pending"));
         const pendingSnapshot = await getDocs(pendingQuery);
-        console.log("✅ Pending recall requests:", pendingSnapshot.size);
         
         if (pendingSnapshot.size === 0) {
-            console.log("📭 No pending recall requests found. Check if:");
-            console.log("1. The collection exists");
-            console.log("2. Documents have 'status' field set to 'pending'");
-            console.log("3. The tutor actually submitted a recall request");
         }
         
     } catch (error) {
@@ -9692,6 +9649,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             
             const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
             const mainContent = document.getElementById('main-content');
+            if (currentNavId) invalidateTabCache(currentNavId);
             if (currentNavId && allNavItems[currentNavId] && mainContent) {
                 allNavItems[currentNavId].fn(mainContent);
             }
@@ -10425,11 +10383,15 @@ window.viewStudentTutorHistory = function(studentId) {
     });
 };
 
+// ======================================================
+// BULLETPROOF PDF GENERATION ENGINE
+// ======================================================
+
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
     const reportData = reportDoc.data();
-
+    
     const reportSections = {
         "INTRODUCTION": reportData.introduction,
         "TOPICS & REMARKS": reportData.topics,
@@ -10439,172 +10401,112 @@ async function generateReportHTML(reportId) {
         "GENERAL TUTOR'S COMMENTS": reportData.generalComments
     };
 
-    // Only include sections that have actual content
-    const sectionsHTML = Object.entries(reportSections)
-        .filter(([, content]) => content && String(content).trim() !== '')
-        .map(([title, content]) => {
-            const sanitizedContent = String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const displayContent = sanitizedContent.replace(/\n/g, '<br>');
-            return `<div class="report-section"><h2>${title}</h2><p>${displayContent}</p></div>`;
-        }).join('');
-
-    const reportDate = reportData.submittedAt
-        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
-        : 'N/A';
+    // Use inline styles to ensure html2pdf doesn't strip them
+    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
+        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
+        return `
+            <div style="page-break-inside: avoid; margin-bottom: 20px; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background-color: #fff;">
+                <h2 style="font-size: 18px; font-weight: bold; color: #16a34a; margin-top: 0; padding-bottom: 8px; border-bottom: 2px solid #d1fae5;">${title}</h2>
+                <p style="line-height: 1.6; white-space: pre-wrap; margin-top: 0; color: #333;">${displayContent}</p>
+            </div>
+        `;
+    }).join('');
 
     const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+    const reportDate = reportData.submittedAt ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
 
-    // CRITICAL FIX: Template has ZERO top margin/padding on body + first element.
-    // html2pdf + html2canvas computes content height incorrectly when there is any
-    // top margin, producing a blank first page. All spacing is handled by html2pdf
-    // margin option + internal element padding only.
-    const reportTemplate = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Report - ${reportData.studentName || 'Student'}</title>
-<style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-        margin: 0 !important; padding: 0 !important;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-size: 12px; line-height: 1.4; color: #333;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        background: #fff;
-    }
-    .report-container {
-        width: 100%; max-width: 720px;
-        margin: 0 auto; padding: 0 8px;
-    }
-    .header {
-        display: flex; align-items: center; justify-content: center; gap: 10px;
-        padding: 8px 0 6px 0;
-        border-bottom: 2px solid #16a34a;
-        margin-bottom: 8px;
-    }
-    .header img { height: 48px; flex-shrink: 0; }
-    .header-text { text-align: center; }
-    .header-text .company-name { color: #15803d; font-size: 16px; font-weight: bold; margin: 0; }
-    .header-text .report-title { color: #166534; font-size: 13px; font-weight: bold; margin: 2px 0 0 0; }
-    .header-date { font-size: 11px; color: #555; text-align: right; white-space: nowrap; }
-    .student-info-table {
-        width: 100%; border-collapse: collapse;
-        margin-bottom: 8px; background: #f9fafb;
-        border: 1px solid #e5e7eb; font-size: 11.5px;
-    }
-    .student-info-table td {
-        padding: 4px 10px; border-bottom: 1px solid #f0f0f0;
-    }
-    .student-info-table td strong { color: #374151; }
-    .report-section {
-        page-break-inside: avoid;
-        margin-bottom: 7px;
-        border: 1px solid #e5e7eb;
-        border-left: 3px solid #16a34a;
-        padding: 6px 10px;
-    }
-    .report-section h2 {
-        font-size: 11.5px; font-weight: bold;
-        color: #16a34a; margin: 0 0 3px 0;
-        padding-bottom: 2px;
-        border-bottom: 1px solid #d1fae5;
-        text-transform: uppercase;
-    }
-    .report-section p {
-        line-height: 1.45; white-space: pre-wrap;
-        margin: 0; font-size: 11px;
-    }
-    .footer {
-        text-align: right; margin-top: 12px;
-        padding-top: 6px; border-top: 1px solid #e5e7eb;
-    }
-    .footer p { margin: 1px 0; font-size: 11px; }
-    @media print {
-        body { margin: 0.4in !important; }
-        .report-container { padding: 0; }
-    }
-</style>
-</head>
-<body>
-<div class="report-container">
-    <div class="header">
-        <img src="${logoUrl}" alt="Blooming Kids House" onerror="this.style.display='none'">
-        <div class="header-text">
-            <div class="company-name">Blooming Kids House</div>
-            <div class="report-title">MONTHLY LEARNING REPORT</div>
+    // Swapped CSS Grid for a stable HTML Table layout (html2canvas renders tables flawlessly)
+    const reportTemplate = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; max-width: 800px; margin: auto; padding: 20px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <img src="${logoUrl}" crossorigin="anonymous" alt="Company Logo" style="height: 80px; width: auto; display: inline-block;">
+                <h2 style="color: #15803d; margin: 10px 0; font-size: 28px;">Blooming Kids House</h2>
+                <h1 style="color: #166534; margin: 0; font-size: 24px;">MONTHLY LEARNING REPORT</h1>
+                <p style="margin: 5px 0; color: #555;">Date: ${reportDate}</p>
+            </div>
+            
+            <div style="margin-bottom: 30px; background-color: #f9f9f9; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
+                    <tr>
+                        <td style="padding: 5px 0; width: 50%;"><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</td>
+                        <td style="padding: 5px 0; width: 50%;"><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
+                        <td style="padding: 5px 0;"><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+            
+            ${sectionsHTML}
+            
+            <div style="text-align: right; margin-top: 40px;">
+                <p style="margin-bottom: 5px;">Best regards,</p>
+                <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+            </div>
         </div>
-        <div class="header-date">Date:<br>${reportDate}</div>
-    </div>
-    <table class="student-info-table">
-        <tr>
-            <td style="width:50%"><strong>Student:</strong> ${reportData.studentName || 'N/A'}</td>
-            <td><strong>Parent:</strong> ${reportData.parentName || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td><strong>Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
-            <td><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td colspan="2"><strong>Tutor:</strong> ${reportData.tutorName || 'N/A'}</td>
-        </tr>
-    </table>
-    ${sectionsHTML}
-    <div class="footer">
-        <p>Best regards,</p>
-        <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
-    </div>
-</div>
-</body>
-</html>`;
+    `;
+
     return { html: reportTemplate, reportData: reportData };
-}
-
-// ======================================================
-// HELPER: Render HTML into off-screen DOM element for html2pdf.
-// html2pdf produces a blank first page when given an HTML *string*
-// because its temp container has no explicit width. By creating a
-// real, width-constrained element we guarantee html2canvas measures
-// the content correctly.
-// ======================================================
-function createPdfContainer(htmlString) {
-    const wrapper = document.createElement('div');
-    // 794px = A4 width at 96 DPI. Position off-screen so it's invisible.
-    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;';
-    wrapper.innerHTML = htmlString;
-    document.body.appendChild(wrapper);
-    return wrapper;
-}
-
-function removePdfContainer(el) {
-    if (el && el.parentNode) el.parentNode.removeChild(el);
 }
 
 window.previewReport = async function(reportId) {
     try {
         const { html } = await generateReportHTML(reportId);
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-            newWindow.document.write(html);
-            newWindow.document.close();
-        } else {
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank') || alert('Pop-ups are blocked. Please allow pop-ups for this site and try again.');
-        }
+        const newWindow = window.open();
+        newWindow.document.write(`<html><body style="background: #f3f4f6;">${html}</body></html>`);
+        newWindow.document.close();
     } catch (error) {
         console.error("Error previewing report:", error);
         alert(`Error: ${error.message}`);
     }
 };
 
-window.downloadSingleReport = async function(reportId, event) {
-    const button = event?.target?.closest('button') || event?.target || event;
-    const originalText = button?.innerHTML || '';
-    let pdfEl = null;
+// --- DOM INJECTION HELPER (Forces images to load before snapshot) ---
+async function buildOffscreenContainer(htmlString) {
+    const container = document.createElement('div');
+    container.innerHTML = htmlString;
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '800px';
+    container.style.backgroundColor = '#FFFFFF';
+    document.body.appendChild(container);
 
+    // Wait for all images to fully load
+    await Promise.all(Array.from(container.querySelectorAll('img')).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+        });
+    }));
+    return container;
+}
+
+const getPdfOptions = (filename) => ({
+    margin: [0.5, 0.5, 0.5, 0.5],
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true },
+    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] } 
+});
+
+window.downloadSingleReport = async function(reportId, event) {
+    const button = event?.target || event;
+    const originalText = button?.innerHTML || '';
+    
     try {
-        if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...'; button.disabled = true; }
+        if (button.innerHTML) {
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            button.disabled = true;
+        }
 
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
@@ -10613,205 +10515,110 @@ window.downloadSingleReport = async function(reportId, event) {
 
         if (progressModal) {
             progressModal.classList.remove('hidden');
-            if (progressMessage) progressMessage.textContent = 'Generating report...';
-            if (progressBar) progressBar.style.width = '10%';
-            if (progressText) progressText.textContent = '10%';
+            if (progressMessage) progressMessage.textContent = 'Generating PDF...';
+            if (progressBar) progressBar.style.width = '20%';
+            if (progressText) progressText.textContent = '20%';
         }
 
         const { html, reportData } = await generateReportHTML(reportId);
 
-        if (progressBar) progressBar.style.width = '50%';
-        if (progressText) progressText.textContent = '50%';
-
-        const safeStudentName = (reportData.studentName || 'Report').replace(/[^a-z0-9 ]/gi, '').replace(/\s+/g, '_');
-        const reportDate = reportData.submittedAt
-            ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0]
-            : new Date().toISOString().split('T')[0];
-
         if (typeof html2pdf !== 'undefined') {
-            if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
+            const container = await buildOffscreenContainer(html);
+            const safeStudentName = (reportData.studentName || 'Student').replace(/[^a-z0-9]/gi, '_');
+            const filename = `${safeStudentName}_Report_${Date.now()}.pdf`;
 
-            // KEY FIX: Render into a real off-screen DOM element instead of passing
-            // the HTML string directly. This prevents the blank-first-page bug.
-            pdfEl = createPdfContainer(html);
+            if (progressBar) progressBar.style.width = '60%';
+            if (progressMessage) progressMessage.textContent = 'Rendering Layout...';
 
-            // Let browser finish layout before html2canvas captures
-            await new Promise(r => setTimeout(r, 250));
-
-            const options = {
-                margin: [0.3, 0.4, 0.3, 0.4],
-                filename: `${safeStudentName}_Report_${reportDate}.pdf`,
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#FFFFFF',
-                    width: 794,
-                    windowWidth: 794
-                },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            };
-            await html2pdf().set(options).from(pdfEl).save();
-            removePdfContainer(pdfEl);
-            pdfEl = null;
+            await html2pdf().set(getPdfOptions(filename)).from(container).save();
+            document.body.removeChild(container);
         } else {
-            if (progressMessage) progressMessage.textContent = 'Saving as HTML...';
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${safeStudentName}_Report_${reportDate}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            const newWindow = window.open('', '_blank');
+            if (newWindow) {
+                newWindow.document.write(`<html><body>${html}</body></html>`);
+                newWindow.document.close();
+                newWindow.focus();
+                setTimeout(() => newWindow.print(), 800);
+            } else {
+                alert('Pop-ups blocked. Please allow pop-ups to print.');
+            }
         }
 
         if (progressBar) progressBar.style.width = '100%';
         if (progressText) progressText.textContent = '100%';
         if (progressMessage) progressMessage.textContent = 'Done!';
-        setTimeout(() => { if (progressModal) progressModal.classList.add('hidden'); }, 1000);
+        setTimeout(() => progressModal?.classList.add('hidden'), 1000);
 
     } catch (error) {
         console.error("Error downloading report:", error);
         alert(`Error downloading report: ${error.message}`);
-        const progressModal = document.getElementById('pdf-progress-modal');
-        if (progressModal) progressModal.classList.add('hidden');
+        document.getElementById('pdf-progress-modal')?.classList.add('hidden');
     } finally {
-        if (pdfEl) removePdfContainer(pdfEl);
-        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        if (button && originalText) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
     }
 };
 
-window.zipAndDownloadTutorReports = async function(reportsOrCacheKey, tutorName, button) {
+window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     const originalButtonText = button.innerHTML;
-    
-    // Resolve reports: accept either a cache key (string) or a direct array
-    let reports;
-    if (typeof reportsOrCacheKey === 'string' && window._tutorReportsCache[reportsOrCacheKey]) {
-        reports = window._tutorReportsCache[reportsOrCacheKey];
-    } else if (Array.isArray(reportsOrCacheKey)) {
-        reports = reportsOrCacheKey;
-    } else {
-        alert('Report data not found. Please refresh the page and try again.');
-        return;
-    }
-
-    if (!reports || reports.length === 0) {
-        alert('No reports available to download.');
-        return;
-    }
-    
     try {
-        button.disabled = true;
-
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
         
-        if (progressModal) progressModal.classList.remove('hidden');
-        if (progressMessage) progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
-        if (progressBar) progressBar.style.width = '0%';
-        if (progressText) progressText.textContent = '0%';
-
-        // Check if JSZip is available
-        if (typeof JSZip === 'undefined') {
-            throw new Error('JSZip library is not loaded. Please refresh the page.');
-        }
-
+        progressModal.classList.remove('hidden');
+        progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        
         const zip = new JSZip();
-        const useHtml2Pdf = typeof html2pdf !== 'undefined';
         let processedCount = 0;
 
         for (const report of reports) {
             try {
                 const progress = Math.round((processedCount / reports.length) * 100);
-                if (progressBar) progressBar.style.width = `${progress}%`;
-                if (progressText) progressText.textContent = `${progress}%`;
-                if (progressMessage) progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+                progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
                 button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
 
                 const { html, reportData } = await generateReportHTML(report.id);
+                const container = await buildOffscreenContainer(html);
                 
                 const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
-                const reportDate = reportData.submittedAt ? 
-                    new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                    'unknown_date';
+                const reportDate = reportData.submittedAt ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 'unknown_date';
+                const filename = `${safeStudentName}_${reportDate}.pdf`;
 
-                if (useHtml2Pdf) {
-                    // Use real DOM element to avoid blank-first-page bug
-                    const pdfEl = createPdfContainer(html);
-                    await new Promise(r => setTimeout(r, 200));
-
-                    const options = {
-                        margin: [0.3, 0.4, 0.3, 0.4],
-                        image: { type: 'jpeg', quality: 0.95 },
-                        html2canvas: {
-                            scale: 2,
-                            useCORS: true,
-                            logging: false,
-                            backgroundColor: '#FFFFFF',
-                            width: 794,
-                            windowWidth: 794
-                        },
-                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-                        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-                    };
-                    const pdfBlob = await html2pdf().set(options).from(pdfEl).output('blob');
-                    removePdfContainer(pdfEl);
-                    zip.file(`${safeStudentName}_${reportDate}.pdf`, pdfBlob);
-                } else {
-                    // Fallback: save as HTML files instead of blank PDFs
-                    zip.file(`${safeStudentName}_${reportDate}.html`, html);
-                }
+                const pdfBlob = await html2pdf().set(getPdfOptions(filename)).from(container).output('blob');
+                document.body.removeChild(container);
                 
+                zip.file(filename, pdfBlob);
             } catch (error) {
                 console.error(`Error processing report ${report.id}:`, error);
             }
-            
             processedCount++;
-            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
-        if (progressMessage) progressMessage.textContent = 'Creating ZIP file...';
-        if (progressBar) progressBar.style.width = '95%';
-        if (progressText) progressText.textContent = '95%';
-        
-        const zipBlob = await zip.generateAsync({ 
-            type: "blob",
-            compression: "DEFLATE"
-        });
+        progressMessage.textContent = 'Creating ZIP file...';
+        progressBar.style.width = '95%';
+        progressText.textContent = '95%';
 
-        if (progressMessage) progressMessage.textContent = 'Download starting...';
-        if (progressBar) progressBar.style.width = '100%';
-        if (progressText) progressText.textContent = '100%';
+        const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
         
-        // Use saveAs if available, otherwise manual download
-        if (typeof saveAs !== 'undefined') {
-            saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
-        } else {
-            const url = URL.createObjectURL(zipBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+        progressMessage.textContent = 'Download starting...';
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
         
-        setTimeout(() => {
-            if (progressModal) progressModal.classList.add('hidden');
-        }, 2000);
-        
+        saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
+        setTimeout(() => progressModal.classList.add('hidden'), 2000);
+
     } catch (error) {
         console.error("Error creating zip file:", error);
-        alert(`Failed to create zip file: ${error.message}`);
-        const progressModal = document.getElementById('pdf-progress-modal');
-        if (progressModal) progressModal.classList.add('hidden');
+        alert("Failed to create zip file. Please try again.");
+        document.getElementById('pdf-progress-modal').classList.add('hidden');
     } finally {
         button.innerHTML = originalButtonText;
         button.disabled = false;
@@ -11461,13 +11268,23 @@ async function updateTutorOfMonthIfNeeded(tutor, score, monthKey, monthLabel) {
 async function renderAcademicFollowUpPanel(container) {
     container.innerHTML = `
     <div class="space-y-4">
-        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center justify-between">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center justify-between flex-wrap gap-3">
             <div>
                 <h2 class="text-xl font-bold text-gray-800">📊 Academic Follow-Up</h2>
                 <p class="text-sm text-gray-500">Topic entries & homework per tutor, month by month</p>
             </div>
-            <div id="afu-clock" class="text-sm font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                ${formatLagosDatetime()}
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" id="afu-search" placeholder="Search tutor name..." 
+                           class="pl-9 pr-4 py-2 border-2 border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-sm w-56">
+                </div>
+                <button id="afu-refresh-btn" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-1 text-sm font-medium">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <div id="afu-clock" class="text-sm font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                    ${formatLagosDatetime()}
+                </div>
             </div>
         </div>
 
@@ -11638,6 +11455,30 @@ async function renderAcademicFollowUpPanel(container) {
                 arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
             });
         });
+
+        // Name search filter
+        const afuSearchInput = document.getElementById('afu-search');
+        if (afuSearchInput) {
+            afuSearchInput.addEventListener('input', () => {
+                const term = afuSearchInput.value.toLowerCase().trim();
+                listEl.querySelectorAll('.afu-header').forEach(btn => {
+                    const card = btn.closest('.bg-white.rounded-2xl');
+                    if (!card) return;
+                    const name = btn.querySelector('.font-bold.text-gray-800')?.textContent?.toLowerCase() || '';
+                    const email = btn.querySelector('.text-xs.text-gray-400')?.textContent?.toLowerCase() || '';
+                    card.style.display = (!term || name.includes(term) || email.includes(term)) ? '' : 'none';
+                });
+            });
+        }
+
+        // Refresh button
+        const afuRefreshBtn = document.getElementById('afu-refresh-btn');
+        if (afuRefreshBtn) {
+            afuRefreshBtn.addEventListener('click', () => {
+                invalidateTabCache('navAcademicFollowUp');
+                renderAcademicFollowUpPanel(container);
+            });
+        }
 
         document.getElementById('afu-loading').classList.add('hidden');
         listEl.classList.remove('hidden');
@@ -12207,7 +12048,7 @@ function initializeSidebarNavigation(staffData) {
                 document.getElementById('pageTitle').textContent = group.label;
                 
                 if (group.fn) {
-                    group.fn(document.getElementById('main-content'));
+                    switchToTabCached('navDashboard', group.fn);
                 }
             });
             navContainer.appendChild(dashboardItem);
@@ -12256,7 +12097,7 @@ function initializeSidebarNavigation(staffData) {
                     document.getElementById('pageTitle').textContent = itemLabel;
                     
                     if (navId && allNavItems[navId]) {
-                        allNavItems[navId].fn(document.getElementById('main-content'));
+                        switchToTabCached(navId, allNavItems[navId].fn);
                     }
                 });
             });
@@ -13121,23 +12962,22 @@ async function initManagementNotifications() {
         if (localStorage.getItem(key)) return;
         const cutoff = new Date(Date.now() - 7*24*60*60*1000);
         const cutTS = Timestamp.fromDate(cutoff);
-        console.log('🧹 Auto-clearing items older than 7 days...');
         try {
             // Old read management_notifications
             const s1 = await getDocs(query(collection(db,'management_notifications'), where('read','==',true), limit(200)));
-            if (s1.size) { const b = writeBatch(db); let n=0; s1.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit(); console.log('  Cleared',n,'old notifications'); }
+            if (s1.size) { const b = writeBatch(db); let n=0; s1.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit();; }
             // Old broadcasts
             const s2 = await getDocs(query(collection(db,'broadcasts'), where('createdAt','<',cutTS), limit(200)));
-            if (s2.size) { const b = writeBatch(db); s2.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s2.size,'old broadcasts'); }
+            if (s2.size) { const b = writeBatch(db); s2.docs.forEach(d=>b.delete(d.ref)); await b.commit();; }
             // Old sent messages
             const s3 = await getDocs(query(collection(db,'management_sent_messages'), where('createdAt','<',cutTS), limit(200)));
-            if (s3.size) { const b = writeBatch(db); s3.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s3.size,'old sent msgs'); }
+            if (s3.size) { const b = writeBatch(db); s3.docs.forEach(d=>b.delete(d.ref)); await b.commit();; }
             // Old read inbox messages
             const s4 = await getDocs(query(collection(db,'tutor_to_management_messages'), where('managementRead','==',true), limit(200)));
-            if (s4.size) { const b = writeBatch(db); let n=0; s4.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit(); console.log('  Cleared',n,'old inbox msgs'); }
+            if (s4.size) { const b = writeBatch(db); let n=0; s4.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit();; }
             // Old management_activity
             const s5 = await getDocs(query(collection(db,'management_activity'), where('timestamp','<',cutTS), limit(200)));
-            if (s5.size) { const b = writeBatch(db); s5.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s5.size,'old activity logs'); }
+            if (s5.size) { const b = writeBatch(db); s5.docs.forEach(d=>b.delete(d.ref)); await b.commit();; }
             localStorage.setItem(key, '1');
         } catch(e) { console.warn('Auto-clear err:', e.message); }
     })();
@@ -13416,7 +13256,6 @@ onAuthStateChanged(auth, async (user) => {
     }
     
     if (user) {
-        console.log("User authenticated:", user.email);
         
         try {
             const staffDocRef = doc(db, "staff", user.email);
@@ -13498,7 +13337,6 @@ onAuthStateChanged(auth, async (user) => {
 // ======================================================
 
 (function initMobilePatches() {
-    console.log("📱 Initializing God Mode Mobile Patches...");
 
     // 1. INJECT GLOBAL CSS FIXES (Solves Dark Shade & Scrolling)
     const patchStyles = document.createElement('style');
@@ -13577,5 +13415,4 @@ onAuthStateChanged(auth, async (user) => {
 
     // Start watching the body for changes
     observer.observe(document.body, { childList: true, subtree: true });
-    console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
