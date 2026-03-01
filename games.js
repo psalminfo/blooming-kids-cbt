@@ -22,7 +22,10 @@
         tttGameId: null,
         tttMyMark: 'X',
         tttUnsub: null,
-        tttTutors: []
+        tttTutors: [],
+        wordGameId: null,
+        wordMyRole: null,
+        wordUnsub: null
     };
 
     /* ── Firebase helpers (uses modular SDK bridged from tutor.js) ─────────── */
@@ -208,7 +211,6 @@
     }
 
     /* ── WORD BUILDER ────────────────────────────────── */
-    function initWordGame() { stopAll(); state.score=0; state.wordLevel=1; state.gameActive=true; state.validWordsFound=[]; generateLevel(); }
     function generateLevel() {
         state.targetWord = ROOTS[Math.floor(Math.random()*ROOTS.length)];
         state.wordTiles  = state.targetWord.split('').sort(()=>Math.random()-.5);
@@ -242,6 +244,36 @@
         window.bkWSubmit=submitWord;
         window.bkWordEnd=()=>showGameOver(state.score,'Word Builder');
     }
+    function initWordGame() {
+        stopAll();
+        state.score=0; state.wordLevel=1; state.gameActive=true; state.validWordsFound=[];
+        state.wordGameId=null; state.wordMyRole=null; state.wordUnsub=null;
+        // Show a quick mode selection: Solo vs Challenge
+        const c=container(); c.style.padding='16px';
+        loadTutorsForTTT();
+        c.innerHTML=`
+            <div style="width:100%;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <div style="font-weight:900;color:#1e1b4b;font-size:1rem;">🧩 Word Builder</div>
+                    <button onclick="window.bkGoMenu()" style="font-size:.72rem;color:#64748b;background:#f1f5f9;border:none;padding:5px 12px;border-radius:999px;cursor:pointer;font-weight:700;">← Menu</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+                    <button onclick="bkWordSolo()" style="border:2px solid #e0e7ff;border-radius:14px;padding:18px 8px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.borderColor='#6366f1';this.style.background='#f0f0ff'" onmouseout="this.style.borderColor='#e0e7ff';this.style.background='#fff'">
+                        <span style="font-size:1.8rem;">🧩</span>
+                        <span style="font-weight:800;color:#374151;font-size:.78rem;">Solo Play</span>
+                        <span style="font-size:.65rem;color:#9ca3af;">Beat your score</span>
+                    </button>
+                    <button onclick="bkWordChallenge()" style="border:2px solid #ede9fe;border-radius:14px;padding:18px 8px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.borderColor='#7c3aed';this.style.background='#faf5ff'" onmouseout="this.style.borderColor='#ede9fe';this.style.background='#fff'">
+                        <span style="font-size:1.8rem;">⚔️</span>
+                        <span style="font-weight:800;color:#374151;font-size:.78rem;">Challenge Tutor</span>
+                        <span style="font-size:.65rem;color:#9ca3af;">Tutor vs Tutor</span>
+                    </button>
+                </div>
+            </div>`;
+        window.bkGoMenu     = showMainMenu;
+        window.bkWordSolo   = ()=>{ state.score=0;state.wordLevel=1;state.gameActive=true;state.validWordsFound=[];generateLevel(); };
+        window.bkWordChallenge = renderWordOnlineChallengeMenu;
+    }
     function submitWord(){
         const fb=document.getElementById('wrd-feedback'),w=state.currentWord;
         if(!w)return;
@@ -251,6 +283,215 @@
         if(DICT.includes(w)||ROOTS.includes(w)){const pts=w.length*10;state.score+=pts;state.validWordsFound.push(w);fb.style.color='#16a34a';fb.textContent=`✓ Good! +${pts}`;document.getElementById('word-score').innerText=state.score;}
         else{fb.style.color='#ef4444';fb.textContent='Not in dictionary';}
         setTimeout(()=>{bkWClear();setTimeout(()=>fb.style.opacity='0',900);},500);
+    }
+
+    /* ── WORD BUILDER ONLINE (Tutor-vs-Tutor) ───────── */
+
+    async function createOnlineWordGame(opponentId, opponentName, opponentEmail) {
+        const statusEl=document.getElementById('wrd-invite-status');
+        if(statusEl) statusEl.textContent='Creating game…';
+        try {
+            if(!db()||!C()||!AD()) throw new Error('Firebase unavailable');
+            const myId    = state.currentUser.id||state.currentUser.email||'';
+            const myEmail = state.currentUser.email||'';
+            const myName  = state.currentUser.name||'Tutor';
+            const targetWord = ROOTS[Math.floor(Math.random()*ROOTS.length)];
+            const tiles      = targetWord.split('').sort(()=>Math.random()-.5);
+            const gameData = {
+                players:      { A: myId,    B: opponentId },
+                playerNames:  { A: myName,  B: opponentName },
+                playerEmails: { A: myEmail, B: opponentEmail||'' },
+                targetWord, tiles,
+                scores:      { A:0, B:0 },
+                foundWords:  { A:[], B:[] },
+                targetFound: null,
+                status:     'waiting',
+                createdAt:   new Date()
+            };
+            const ref = await AD()(C()(db(),'word_games'), gameData);
+            state.wordGameId  = ref.id;
+            state.wordMyRole  = 'A';
+            state.targetWord  = targetWord;
+            state.wordTiles   = tiles;
+
+            // ── Notify opponent ──
+            if(opponentEmail) {
+                try {
+                    await AD()(C()(db(),'tutor_notifications'), {
+                        type:       'word_challenge',
+                        tutorEmail: opponentEmail,
+                        fromName:   myName,
+                        fromId:     myId,
+                        gameId:     ref.id,
+                        gameType:   'word',
+                        title:      `🧩 Word Builder Challenge from ${myName}!`,
+                        message:    `${myName} has challenged you to a Word Builder match. Tap to accept!`,
+                        read:       false,
+                        createdAt:  new Date()
+                    });
+                } catch(ne){ console.warn('Word notify err:',ne.message); }
+            }
+
+            if(statusEl) statusEl.textContent='⏳ Waiting for opponent to join…';
+            subscribeToOnlineWordGame(ref.id);
+        } catch(e){
+            if(statusEl) statusEl.textContent='Error: '+e.message;
+        }
+    }
+
+    function subscribeToOnlineWordGame(gameId) {
+        if(!db()||!DC()||!SN()) return;
+        if(state.wordUnsub) state.wordUnsub();
+        state.gameActive = true;
+        state.wordUnsub  = SN()(DC()(db(),'word_games',gameId), snap=>{
+            if(!snap.exists()) return;
+            const g = snap.data();
+            state.targetWord = g.targetWord;
+            state.wordTiles  = g.tiles;
+
+            // Opponent joining: activate game
+            if(g.status==='waiting' && state.wordMyRole==='B' && UD() && DC()) {
+                UD()(DC()(db(),'word_games',gameId),{status:'active'}).catch(()=>{});
+            }
+            renderOnlineWordUI(g, gameId);
+            if(g.status==='done') { if(state.wordUnsub){state.wordUnsub();state.wordUnsub=null;} }
+        });
+    }
+
+    function renderOnlineWordUI(g, gameId) {
+        const c=container(); c.style.padding='12px';
+        const myRole   = state.wordMyRole||'A';
+        const oppRole  = myRole==='A'?'B':'A';
+        const myScore  = g.scores?.[myRole]||0;
+        const oppScore = g.scores?.[oppRole]||0;
+        const myName   = g.playerNames?.[myRole]||'You';
+        const oppName  = g.playerNames?.[oppRole]||'Opponent';
+        const waiting  = g.status==='waiting';
+        const done     = g.status==='done';
+        const winner   = g.targetFound; // 'A' or 'B' or null
+        const tiles    = g.tiles||[];
+
+        let statusBanner = '';
+        if(waiting)     statusBanner=`<div style="text-align:center;background:#fef3c7;border-radius:10px;padding:10px;font-weight:800;font-size:.82rem;color:#92400e;margin-bottom:10px;">⏳ Waiting for opponent to join…</div>`;
+        else if(done)   statusBanner=`<div style="text-align:center;background:${winner===myRole?'#d1fae5':'#fee2e2'};border-radius:10px;padding:10px;font-weight:800;font-size:.82rem;color:${winner===myRole?'#065f46':'#991b1b'};margin-bottom:10px;">${winner===myRole?'🏆 You found it first! You win!':'😅 Opponent found the word first!'}</div>`;
+        else            statusBanner=`<div style="text-align:center;background:#eef2ff;border-radius:10px;padding:10px;font-weight:800;font-size:.82rem;color:#3730a3;margin-bottom:10px;">🔴 Live — Build words from the tiles!</div>`;
+
+        c.innerHTML=`
+            <div style="width:100%;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">🧩 Word Builder <span style="font-size:.62rem;background:#eef2ff;color:#4338ca;padding:2px 7px;border-radius:999px;margin-left:4px;">ONLINE</span></div>
+                    <button onclick="window.bkGoMenu()" style="font-size:.68rem;color:#64748b;background:#f1f5f9;border:none;padding:4px 10px;border-radius:999px;cursor:pointer;">← Menu</button>
+                </div>
+                <!-- Scores -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                    <div style="text-align:center;background:linear-gradient(135deg,#eef2ff,#ddd6fe);border-radius:11px;padding:8px;">
+                        <div style="font-size:.65rem;color:#6366f1;font-weight:800;text-transform:uppercase;">You</div>
+                        <div style="font-size:1.4rem;font-weight:900;color:#3730a3;">${myScore}</div>
+                    </div>
+                    <div style="text-align:center;background:#f8fafc;border-radius:11px;padding:8px;border:1.5px solid #e2e8f0;">
+                        <div style="font-size:.65rem;color:#64748b;font-weight:800;text-transform:uppercase;">${esc(oppName)}</div>
+                        <div style="font-size:1.4rem;font-weight:900;color:#374151;">${oppScore}</div>
+                    </div>
+                </div>
+                ${statusBanner}
+                ${done ? '' : `
+                <div style="background:linear-gradient(135deg,#eef2ff,#ddd6fe);border-radius:12px;height:60px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;border:2px solid #c7d2fe;position:relative;">
+                    <span id="wrd-display" style="font-size:1.8rem;font-weight:900;color:#3730a3;letter-spacing:.1em;"></span>
+                    <span style="position:absolute;top:5px;right:9px;font-size:.58rem;color:#a5b4fc;font-weight:700;">Target: ${g.targetWord.length} letters</span>
+                </div>
+                <p id="wrd-feedback" style="height:20px;margin-bottom:6px;font-size:.8rem;font-weight:700;text-align:center;opacity:0;transition:opacity .3s;"></p>
+                <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-bottom:12px;" id="tile-rack">
+                    ${tiles.map((l,i)=>`<button class="wt" data-idx="${i}" data-l="${l}" style="width:38px;height:38px;background:linear-gradient(135deg,#eef2ff,#c7d2fe);color:#3730a3;font-weight:900;border-radius:10px;border:none;font-size:.95rem;cursor:pointer;transition:all .15s;">${l}</button>`).join('')}
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:8px;width:100%;">
+                    <button onclick="bkWShuffle()" style="padding:10px;background:#fef3c7;color:#92400e;border:none;border-radius:12px;font-weight:700;cursor:pointer;">🔀</button>
+                    <button onclick="bkWClear()" style="padding:10px;background:#f1f5f9;color:#374151;border:none;border-radius:12px;font-weight:700;cursor:pointer;">Clear</button>
+                    <button onclick="bkWOnlineSubmit('${gameId}')" style="padding:10px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;">Submit ✓</button>
+                </div>`}
+            </div>`;
+
+        if(!done) {
+            state.currentWord='';
+            state.wordTiles=[...tiles];
+            document.querySelectorAll('.wt').forEach(b=>{
+                b.onclick=function(){if(this.style.opacity==='0.3')return;state.currentWord+=this.dataset.l;this.style.opacity='0.3';this.style.cursor='default';document.getElementById('wrd-display').innerText=state.currentWord;};
+            });
+            window.bkWClear=()=>{state.currentWord='';document.getElementById('wrd-display').innerText='';document.querySelectorAll('.wt').forEach(b=>{b.style.opacity='1';b.style.cursor='pointer';});};
+            window.bkWShuffle=()=>{bkWClear();state.wordTiles.sort(()=>Math.random()-.5);renderOnlineWordUI(g,gameId);};
+            window.bkWOnlineSubmit = async (gid)=>{
+                const fb=document.getElementById('wrd-feedback'), w=state.currentWord;
+                if(!w||waiting) return;
+                fb.style.opacity='1';
+                const myWords=g.foundWords?.[myRole]||[];
+                if(myWords.includes(w)){fb.style.color='#f59e0b';fb.textContent='Already found!';setTimeout(()=>{bkWClear();fb.style.opacity='0';},800);return;}
+                if(w===g.targetWord){
+                    // Target word found — end game
+                    const finalScore=(myScore+w.length*50);
+                    await UD()(DC()(db(),'word_games',gid),{
+                        [`scores.${myRole}`]: finalScore,
+                        [`foundWords.${myRole}`]: [...myWords,w],
+                        targetFound: myRole,
+                        status:'done'
+                    }).catch(()=>{});
+                    return;
+                }
+                if(DICT.includes(w)||ROOTS.includes(w)){
+                    const pts=w.length*10;
+                    await UD()(DC()(db(),'word_games',gid),{
+                        [`scores.${myRole}`]: myScore+pts,
+                        [`foundWords.${myRole}`]: [...myWords,w]
+                    }).catch(()=>{});
+                    fb.style.color='#16a34a';fb.textContent=`✓ Good! +${pts}`;
+                } else {
+                    fb.style.color='#ef4444';fb.textContent='Not in dictionary';
+                }
+                setTimeout(()=>{bkWClear();setTimeout(()=>fb.style.opacity='0',900);},500);
+            };
+        }
+        window.bkGoMenu = showMainMenu;
+    }
+
+    function renderWordOnlineChallengeMenu() {
+        const c=container(); c.style.padding='14px';
+        loadTutorsForTTT(); // reuse same tutor list loader
+        c.innerHTML=`
+            <div style="width:100%;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">🧩 Word Builder Challenge</div>
+                    <button onclick="window.bkGoMenu()" style="font-size:.72rem;color:#64748b;background:#f1f5f9;border:none;padding:5px 12px;border-radius:999px;cursor:pointer;font-weight:700;">← Menu</button>
+                </div>
+                <p style="color:#6b7280;font-size:.78rem;margin-bottom:12px;">Choose a tutor to challenge. You'll get the same scrambled word — first to find it wins!</p>
+                <div style="position:relative;margin-bottom:8px;">
+                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input id="word-tutor-search" type="text" placeholder="Search tutor…" style="width:100%;padding:8px 10px 8px 28px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.8rem;outline:none;box-sizing:border-box;" oninput="bkWord_filterTutors(this.value)">
+                </div>
+                <div id="word-tutor-list" style="max-height:160px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:10px;">
+                    <div style="text-align:center;padding:20px;color:#9ca3af;font-size:.78rem;">Loading tutors…</div>
+                </div>
+                <div id="wrd-invite-status" style="font-size:.75rem;color:#6b7280;text-align:center;min-height:20px;"></div>
+            </div>`;
+        window.bkGoMenu = showMainMenu;
+        window.bkWord_filterTutors = q=>{
+            const el=document.getElementById('word-tutor-list'); if(!el)return;
+            const filtered=state.tttTutors.filter(t=>!q||t.name.toLowerCase().includes(q.toLowerCase())||t.email.toLowerCase().includes(q.toLowerCase()));
+            if(!filtered.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:#9ca3af;font-size:.78rem;">${state.tttTutors.length?'No match':'No other tutors found'}</div>`;return;}
+            el.innerHTML=filtered.map(t=>`
+                <div onclick="bkWord_invite('${esc(t.id)}','${esc(t.name)}','${esc(t.email)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f0f0ff'" onmouseout="this.style.background='#fff'">
+                    <div style="width:34px;height:34px;border-radius:10px;background:#ede9fe;color:#7c3aed;font-weight:900;font-size:.75rem;display:flex;align-items:center;justify-content:center;">${t.name.charAt(0).toUpperCase()}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;color:#1e293b;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.name)}</div>
+                        <div style="font-size:.65rem;color:#94a3b8;">${esc(t.email)}</div>
+                    </div>
+                    <span style="font-size:.65rem;background:#ede9fe;color:#7c3aed;padding:3px 8px;border-radius:999px;font-weight:700;">Challenge ▶</span>
+                </div>`).join('');
+            window.bkWord_invite = createOnlineWordGame;
+        };
+        // Render immediately (tutors may already be loaded)
+        window.bkWord_filterTutors('');
+        // If not yet loaded, re-render once loaded
+        if(!state.tttTutors.length) {
+            setTimeout(()=>{ if(state.tttTutors.length) window.bkWord_filterTutors(''); },2500);
+        }
     }
 
     /* ── TIC-TAC-TOE ─────────────────────────────────── */
@@ -348,7 +589,7 @@
         const filtered = state.tttTutors.filter(t=>!q||t.name.toLowerCase().includes(q.toLowerCase())||t.email.toLowerCase().includes(q.toLowerCase()));
         if(!filtered.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:#9ca3af;font-size:.78rem;">${state.tttTutors.length?'No match':'No other tutors found'}</div>`;return;}
         el.innerHTML=filtered.map(t=>`
-            <div onclick="bkTTT_invite('${esc(t.id)}','${esc(t.name)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f0f0ff'" onmouseout="this.style.background='#fff'">
+            <div onclick="bkTTT_invite('${esc(t.id)}','${esc(t.name)}','${esc(t.email)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f0f0ff'" onmouseout="this.style.background='#fff'">
                 <div style="width:34px;height:34px;border-radius:10px;background:#eef2ff;color:#4338ca;font-weight:900;font-size:.75rem;display:flex;align-items:center;justify-content:center;">${t.name.charAt(0).toUpperCase()}</div>
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:700;color:#1e293b;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.name)}</div>
@@ -359,14 +600,18 @@
         window.bkTTT_invite = createOnlineTTTGame;
     }
 
-    async function createOnlineTTTGame(opponentId, opponentName) {
+    async function createOnlineTTTGame(opponentId, opponentName, opponentEmail) {
         const statusEl=document.getElementById('ttt-invite-status');
         if(statusEl) statusEl.textContent='Creating game…';
         try {
             if(!db()||!C()||!AD()) throw new Error('Firebase unavailable');
+            const myId    = state.currentUser.id||state.currentUser.email||'';
+            const myEmail = state.currentUser.email||'';
+            const myName  = state.currentUser.name||'Tutor';
             const gameData = {
-                players: { X: state.currentUser.id||state.currentUser.email, O: opponentId },
-                playerNames: { X: state.currentUser.name, O: opponentName },
+                players:     { X: myId, O: opponentId },
+                playerNames: { X: myName, O: opponentName },
+                playerEmails:{ X: myEmail, O: opponentEmail||'' },
                 board: Array(9).fill(null),
                 turn: 'X',
                 status: 'waiting', // waiting → active → done
@@ -377,7 +622,26 @@
             const ref = await AD()(C()(db(),'ttt_games'), gameData);
             state.tttGameId = ref.id;
             state.tttMyMark = 'X';
-            if(statusEl) statusEl.textContent='Waiting for opponent…';
+
+            // ── Notify the opponent via tutor_notifications ──
+            if(opponentEmail) {
+                try {
+                    await AD()(C()(db(),'tutor_notifications'), {
+                        type:         'ttt_challenge',
+                        tutorEmail:   opponentEmail,
+                        fromName:     myName,
+                        fromId:       myId,
+                        gameId:       ref.id,
+                        gameType:     'ttt',
+                        title:        `🎮 Tic-Tac-Toe Challenge from ${myName}!`,
+                        message:      `${myName} has challenged you to a Tic-Tac-Toe match. Tap to accept and play!`,
+                        read:         false,
+                        createdAt:    new Date()
+                    });
+                } catch(ne){ console.warn('TTT notify err:',ne.message); }
+            }
+
+            if(statusEl) statusEl.textContent='⏳ Waiting for opponent to join…';
             subscribeToOnlineTTT(ref.id);
         } catch(e) {
             if(statusEl) statusEl.textContent='Error: '+e.message;
@@ -388,12 +652,20 @@
         if(!db()||!DC()||!SN()) return;
         if(state.tttUnsub) state.tttUnsub();
         state.gameActive=true;
+        state.tttMode='online';
+        state.tttGameId=gameId;
         state.tttUnsub = SN()(DC()(db(),'ttt_games',gameId), snap => {
             if(!snap.exists()) return;
             const g = snap.data();
             state.tttBoard = g.board || Array(9).fill(null);
             state.tttTurn  = g.turn  || 'X';
             if(g.scores) state.tttScores = g.scores;
+
+            // If challenger is waiting and opponent has joined → activate game
+            if(g.status==='waiting' && state.tttMyMark==='O' && DC() && UD()) {
+                UD()(DC()(db(),'ttt_games',gameId),{status:'active'}).catch(()=>{});
+            }
+
             const winLine = tttWinLine(state.tttBoard);
             renderTTT(winLine, gameId);
             if(g.status==='done') { if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;} }
@@ -551,6 +823,7 @@
         state.gameActive=false;
         if(state.snakeInterval){clearInterval(state.snakeInterval);state.snakeInterval=null;}
         if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;}
+        if(state.wordUnsub){state.wordUnsub();state.wordUnsub=null;}
         document.onkeydown=null;
     }
 
@@ -565,6 +838,89 @@
         } catch(e){}
     }
 
-    window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); });
+    /* ── Accept game challenge from notification ─────── */
+    window.bkAcceptGameChallenge = function(gameId, gameType) {
+        // Open the modal if not open
+        const modal = document.getElementById('bk-game-modal');
+        if(modal) modal.style.display='flex';
+
+        if(gameType==='ttt') {
+            stopAll();
+            state.tttBoard=Array(9).fill(null); state.tttTurn='X';
+            state.tttScores={X:0,O:0,draws:0}; state.gameActive=true;
+            state.tttMode='online'; state.tttGameId=gameId; state.tttMyMark='O';
+            subscribeToOnlineTTT(gameId);
+        } else if(gameType==='word') {
+            stopAll();
+            state.gameActive=true;
+            state.wordMyRole='B';
+            subscribeToOnlineWordGame(gameId);
+        }
+    };
+
+    /* ── Poll for incoming game challenges ───────────── */
+    function listenForIncomingChallenges() {
+        if(!db()||!C()||!Q()||!W()||!SN()||!DC()) return;
+        const myId    = state.currentUser.id||state.currentUser.email||'';
+        const myEmail = state.currentUser.email||'';
+        if(!myId && !myEmail) return;
+
+        // Watch ttt_games where I am player O and status=waiting
+        try {
+            const qTTT = Q()(C()(db(),'ttt_games'),
+                W()('players.O','==',myId),
+                W()('status','==','waiting')
+            );
+            SN()(qTTT, snap=>{
+                snap.docChanges().forEach(change=>{
+                    if(change.type==='added'){
+                        const g=change.doc.data();
+                        showGameChallengeBadge(change.doc.id,'ttt',g.playerNames?.X||'A tutor');
+                    }
+                });
+            });
+        } catch(e){ console.warn('TTT invite listen:',e); }
+
+        // Watch word_games where I am player B and status=waiting
+        try {
+            const qWord = Q()(C()(db(),'word_games'),
+                W()('players.B','==',myId),
+                W()('status','==','waiting')
+            );
+            SN()(qWord, snap=>{
+                snap.docChanges().forEach(change=>{
+                    if(change.type==='added'){
+                        const g=change.doc.data();
+                        showGameChallengeBadge(change.doc.id,'word',g.playerNames?.A||'A tutor');
+                    }
+                });
+            });
+        } catch(e){ console.warn('Word invite listen:',e); }
+    }
+
+    function showGameChallengeBadge(gameId, gameType, fromName) {
+        // Don't re-show if already visible
+        if(document.getElementById('bk-challenge-toast-'+gameId)) return;
+        const toast = document.createElement('div');
+        toast.id = 'bk-challenge-toast-'+gameId;
+        toast.style.cssText = 'position:fixed;bottom:220px;right:20px;z-index:9999999;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border-radius:16px;padding:12px 16px;box-shadow:0 8px 28px rgba(99,102,241,.5);cursor:pointer;max-width:260px;animation:bkToastIn .3s ease;';
+        const gameLabel = gameType==='ttt' ? 'Tic-Tac-Toe' : 'Word Builder';
+        toast.innerHTML = `
+            <div style="font-weight:900;font-size:.85rem;margin-bottom:3px;">🎮 Game Challenge!</div>
+            <div style="font-size:.75rem;opacity:.9;margin-bottom:8px;">${esc(fromName)} challenged you to ${gameLabel}</div>
+            <div style="display:flex;gap:6px;">
+                <button onclick="window.bkAcceptGameChallenge('${gameId}','${gameType}');this.closest('[id^=bk-challenge-toast]').remove();" style="flex:1;background:#fff;color:#4338ca;border:none;border-radius:8px;padding:6px;font-weight:800;font-size:.75rem;cursor:pointer;">▶ Accept</button>
+                <button onclick="this.closest('[id^=bk-challenge-toast]').remove();" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:.75rem;">✕</button>
+            </div>`;
+        if(!document.getElementById('bk-toast-anim')) {
+            const s=document.createElement('style'); s.id='bk-toast-anim';
+            s.textContent='@keyframes bkToastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}';
+            document.head.appendChild(s);
+        }
+        document.body.appendChild(toast);
+        setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 30000);
+    }
+
+    window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); setTimeout(listenForIncomingChallenges, 3000); });
 
 })();
