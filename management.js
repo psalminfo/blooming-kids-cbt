@@ -1585,12 +1585,13 @@ function showTransitionStudentModal() {
                             <option value="14" selected>2 weeks</option>
                             <option value="21">3 weeks</option>
                             <option value="28">4 weeks</option>
+                            <option value="custom">Custom Date...</option>
                         </select>
                     </div>
                     
-                    <!-- Calculated End Date (read-only) -->
+                    <!-- End Date: auto-calculated or custom date picker -->
                     <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2 text-gray-700">End Date (auto-calculated)</label>
+                        <label class="block text-sm font-medium mb-2 text-gray-700" id="transition-end-date-label">End Date (auto-calculated)</label>
                         <input type="text" 
                                id="transition-end-date-display" 
                                class="w-full p-2 bg-gray-100 border rounded-md text-gray-700" 
@@ -1640,16 +1641,42 @@ function showTransitionStudentModal() {
         
         // Update end date display based on start date and duration
         function updateEndDate() {
-            const startDateStr = document.getElementById('transition-start-date').value;
-            if (!startDateStr) return;
-            const startDate = new Date(startDateStr);
-            const durationDays = parseInt(document.getElementById('transition-duration').value, 10);
-            const endDate = new Date(startDate);
-            endDate.setDate(startDate.getDate() + durationDays);
-            document.getElementById('transition-end-date-display').value = endDate.toISOString().split('T')[0];
+            const durationVal = document.getElementById('transition-duration').value;
+            const endDateInput = document.getElementById('transition-end-date-display');
+            const endDateLabel = document.getElementById('transition-end-date-label');
+
+            if (durationVal === 'custom') {
+                // Switch to an editable date picker
+                endDateLabel.textContent = 'End Date (select date)';
+                endDateInput.readOnly = false;
+                endDateInput.type = 'date';
+                endDateInput.classList.remove('bg-gray-100');
+                endDateInput.classList.add('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                endDateInput.min = new Date().toISOString().split('T')[0];
+                if (!endDateInput.value) {
+                    // Default to 2 weeks from today
+                    const def = new Date();
+                    def.setDate(def.getDate() + 14);
+                    endDateInput.value = def.toISOString().split('T')[0];
+                }
+            } else {
+                // Auto-calculate end date
+                endDateLabel.textContent = 'End Date (auto-calculated)';
+                endDateInput.readOnly = true;
+                endDateInput.type = 'text';
+                endDateInput.classList.add('bg-gray-100');
+                endDateInput.classList.remove('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                const startDateStr = document.getElementById('transition-start-date').value;
+                if (!startDateStr) return;
+                const startDate = new Date(startDateStr);
+                const durationDays = parseInt(durationVal, 10);
+                const endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + durationDays);
+                endDateInput.value = endDate.toISOString().split('T')[0];
+            }
         }
         
-        // Use hidden start date field (we'll keep the date picker but hide it)
+        // Use hidden start date field
         const startDateHtml = `<input type="date" id="transition-start-date" value="${new Date().toISOString().split('T')[0]}" class="hidden">`;
         document.querySelector('#transition-student-form').insertAdjacentHTML('afterbegin', startDateHtml);
         
@@ -1678,12 +1705,21 @@ function showTransitionStudentModal() {
             const tutorEmail = document.getElementById('transition-tutor').value;
             const startDate = document.getElementById('transition-start-date').value;
             const endDate = document.getElementById('transition-end-date-display').value;
-            const durationDays = parseInt(document.getElementById('transition-duration').value, 10);
+            const durationRaw = document.getElementById('transition-duration').value;
+            // If custom date selected, calculate durationDays from start→end date diff
+            const durationDays = durationRaw === 'custom'
+                ? Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+                : parseInt(durationRaw, 10);
             const reason = document.getElementById('transition-reason').value.trim();
             const allowReporting = document.getElementById('allow-reporting').checked;
             
             if (!studentId || !tutorEmail || !startDate || !endDate) {
                 alert("Please fill all required fields");
+                return;
+            }
+            
+            if (durationDays <= 0 || isNaN(durationDays)) {
+                alert("End date must be after the start date.");
                 return;
             }
             
@@ -2251,11 +2287,12 @@ function showEnhancedReassignStudentModal() {
                                 <option value="14" selected>2 weeks</option>
                                 <option value="21">3 weeks</option>
                                 <option value="28">4 weeks</option>
+                                <option value="custom">Custom Date...</option>
                             </select>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2 text-gray-700">End Date (auto-calculated)</label>
+                            <label class="block text-sm font-medium mb-2 text-gray-700" id="transition-end-date-reassign-label">End Date (auto-calculated)</label>
                             <input type="text" 
                                    id="transition-end-date-reassign-display" 
                                    class="w-full p-2 bg-gray-100 border rounded-md text-gray-700" 
@@ -2314,13 +2351,36 @@ function showEnhancedReassignStudentModal() {
         document.getElementById('transition-duration-reassign').required = false;
         
         function updateTemporaryEndDate() {
-            const startDateStr = document.getElementById('transition-start-date-reassign').value;
-            if (!startDateStr) return;
-            const startDate = new Date(startDateStr);
-            const durationDays = parseInt(document.getElementById('transition-duration-reassign').value, 10);
-            const endDate = new Date(startDate);
-            endDate.setDate(startDate.getDate() + durationDays);
-            document.getElementById('transition-end-date-reassign-display').value = endDate.toISOString().split('T')[0];
+            const durationVal = document.getElementById('transition-duration-reassign').value;
+            const endDateInput = document.getElementById('transition-end-date-reassign-display');
+            const endDateLabel = document.getElementById('transition-end-date-reassign-label');
+
+            if (durationVal === 'custom') {
+                endDateLabel.textContent = 'End Date (select date)';
+                endDateInput.readOnly = false;
+                endDateInput.type = 'date';
+                endDateInput.classList.remove('bg-gray-100');
+                endDateInput.classList.add('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                endDateInput.min = new Date().toISOString().split('T')[0];
+                if (!endDateInput.value) {
+                    const def = new Date();
+                    def.setDate(def.getDate() + 14);
+                    endDateInput.value = def.toISOString().split('T')[0];
+                }
+            } else {
+                endDateLabel.textContent = 'End Date (auto-calculated)';
+                endDateInput.readOnly = true;
+                endDateInput.type = 'text';
+                endDateInput.classList.add('bg-gray-100');
+                endDateInput.classList.remove('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                const startDateStr = document.getElementById('transition-start-date-reassign').value;
+                if (!startDateStr) return;
+                const startDate = new Date(startDateStr);
+                const durationDays = parseInt(durationVal, 10);
+                const endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + durationDays);
+                endDateInput.value = endDate.toISOString().split('T')[0];
+            }
         }
         
         document.getElementById('transition-duration-reassign').addEventListener('change', updateTemporaryEndDate);
@@ -2406,12 +2466,21 @@ function showEnhancedReassignStudentModal() {
                 const tutorEmail = document.getElementById('reassign-tutor-temp').value;
                 const reason = document.getElementById('transition-reason-temp').value.trim();
                 const endDate = document.getElementById('transition-end-date-reassign-display').value;
-                const durationDays = parseInt(document.getElementById('transition-duration-reassign').value, 10);
+                const durationRaw = document.getElementById('transition-duration-reassign').value;
+                // If custom date selected, calculate durationDays from start→end date diff
+                const durationDays = durationRaw === 'custom'
+                    ? Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+                    : parseInt(durationRaw, 10);
                 const allowReporting = document.getElementById('allow-reporting-reassign').checked;
                 const startDate = document.getElementById('transition-start-date-reassign').value;
                 
                 if (!studentId || !tutorEmail || !reason) {
                     alert("Please select student, tutor and provide a reason");
+                    return;
+                }
+                
+                if (durationDays <= 0 || isNaN(durationDays)) {
+                    alert("End date must be after the start date.");
                     return;
                 }
                 
@@ -2423,7 +2492,7 @@ function showEnhancedReassignStudentModal() {
                     return;
                 }
                 
-                if (confirm(`Temporarily transition ${student.studentName} to ${newTutor.name} for ${durationDays} days (until ${endDate})?`)) {
+                if (confirm(`Temporarily transition ${student.studentName} to ${newTutor.name} until ${endDate} (${durationDays} days)?`)) {
                     await performTransition(
                         student, 
                         newTutor, 
