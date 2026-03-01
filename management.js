@@ -5980,6 +5980,86 @@ async function resetParentBalance(parentUid, currentEarnings) {
 // SUBSECTION 5.1: Tutor Reports Panel
 // ======================================================
 
+// ======================================================
+// GLOBAL TUTOR REPORTS: Cache & Export Helpers
+// These must live outside renderTutorReportsPanel so that
+// inline onclick handlers in dynamically generated HTML
+// can find them via the window object.
+// ======================================================
+
+// Cache that stores tutor-grouped report arrays by tutor name key.
+// Populated each time the report list renders, consumed by
+// zipAndDownloadTutorReports so we never need giant JSON in onclick attrs.
+window._tutorReportsCache = {};
+
+// Holds the currently visible (filtered) reports array so CSV export
+// can access it from the global scope.
+window._filteredTutorReports = [];
+
+// Global CSV export – called from the Export CSV button's event listener.
+window.exportReportsToCSV = function () {
+    try {
+        const reports = window._filteredTutorReports || [];
+        if (reports.length === 0) {
+            alert('No reports to export.');
+            return;
+        }
+        const csvData = window.convertReportsToCSV(reports);
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const startDate = document.getElementById('reports-start-date')?.value || 'start';
+        const endDate = document.getElementById('reports-end-date')?.value || 'end';
+        link.href = URL.createObjectURL(blob);
+        link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    } catch (error) {
+        console.error('Error exporting CSV:', error);
+        alert('Failed to export CSV. Please try again.');
+    }
+};
+
+// Global CSV converter – includes ALL report fields.
+window.convertReportsToCSV = function (reports) {
+    const headers = [
+        'Tutor Name', 'Tutor Email', 'Student Name', 'Parent Name',
+        'Parent Phone', 'Grade', 'Submission Date', 'Introduction',
+        'Topics Covered', 'Progress', 'Strengths & Weaknesses',
+        'Recommendations', 'General Comments'
+    ];
+
+    const csvEscape = (val) => {
+        const str = String(val || 'N/A');
+        return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const rows = reports.map(report => {
+        const submissionDate = report.submittedAt
+            ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString()
+            : 'N/A';
+
+        return [
+            csvEscape(report.tutorName),
+            csvEscape(report.tutorEmail),
+            csvEscape(report.studentName),
+            csvEscape(report.parentName),
+            csvEscape(report.parentPhone),
+            csvEscape(report.grade),
+            csvEscape(submissionDate),
+            csvEscape(report.introduction),
+            csvEscape(report.topics),
+            csvEscape(report.progress),
+            csvEscape(report.strengthsWeaknesses),
+            csvEscape(report.recommendations),
+            csvEscape(report.generalComments)
+        ];
+    });
+
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+};
+
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -6111,7 +6191,7 @@ async function renderTutorReportsPanel(container) {
 
     const exportBtn = document.getElementById('export-reports-csv-btn');
     if (exportBtn) {
-        exportBtn.addEventListener('click', exportReportsToCSV);
+        exportBtn.addEventListener('click', window.exportReportsToCSV);
     }
 
     handleDateChange();
@@ -6142,49 +6222,10 @@ async function renderTutorReportsPanel(container) {
         renderTutorReportsFromCache();
     }
 
-    async function exportReportsToCSV() {
-        try {
-            const csvData = convertReportsToCSV(filteredReports);
-            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const startDate = document.getElementById('reports-start-date').value;
-            const endDate = document.getElementById('reports-end-date').value;
-            link.href = URL.createObjectURL(blob);
-            link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
-            link.click();
-        } catch (error) {
-            console.error('Error exporting CSV:', error);
-            alert('Failed to export CSV. Please try again.');
-        }
-    }
+    // exportReportsToCSV and convertReportsToCSV are now global (window.*) — see above renderTutorReportsPanel
 
-    function convertReportsToCSV(reports) {
-        const headers = [
-            'Tutor Name', 'Tutor Email', 'Student Name', 'Parent Name', 'Grade',
-            'Submission Date', 'Topics Covered', 'Progress', 'Strengths & Weaknesses',
-            'Recommendations'
-        ];
-
-        const rows = reports.map(report => {
-            const submissionDate = report.submittedAt ? 
-                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
-            
-            return [
-                `"${report.tutorName || 'N/A'}"`,
-                `"${report.tutorEmail || 'N/A'}"`,
-                `"${report.studentName || 'N/A'}"`,
-                `"${report.parentName || 'N/A'}"`,
-                `"${report.grade || 'N/A'}"`,
-                `"${submissionDate}"`,
-                `"${(report.topics || 'N/A').replace(/"/g, '""')}"`,
-                `"${(report.progress || 'N/A').replace(/"/g, '""')}"`,
-                `"${(report.strengthsWeaknesses || 'N/A').replace(/"/g, '""')}"`,
-                `"${(report.recommendations || 'N/A').replace(/"/g, '""')}"`
-            ];
-        });
-
-        return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    }
+    // Expose for the inline "Try Again" button in error states
+    window._fetchAndRenderTutorReports = fetchAndRenderTutorReports;
 
     async function fetchAndRenderTutorReports() {
         const reportsListContainer = document.getElementById('tutor-reports-list');
@@ -6247,7 +6288,7 @@ async function renderTutorReportsPanel(container) {
                 <div class="text-center py-10 text-red-600">
                     <p class="font-semibold">Failed to load reports</p>
                     <p class="text-sm mt-2">${error.message}</p>
-                    <button onclick="fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    <button onclick="window._fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                         Try Again
                     </button>
                 </div>
@@ -6272,6 +6313,11 @@ async function renderTutorReportsPanel(container) {
     function renderTutorReportsFromCache() {
         const reportsListContainer = document.getElementById('tutor-reports-list');
         if (!reportsListContainer) return;
+
+        // Sync to global so CSV export and other global functions can access
+        window._filteredTutorReports = filteredReports;
+        // Clear the tutor cache for this render cycle
+        window._tutorReportsCache = {};
 
         if (filteredReports.length === 0) {
             reportsListContainer.innerHTML = `
@@ -6305,6 +6351,11 @@ async function renderTutorReportsPanel(container) {
         let html = '';
         
         Object.values(reportsByTutor).forEach(tutorData => {
+            // Store this tutor's reports in the global cache so the ZIP
+            // button can retrieve them without giant inline JSON.
+            const cacheKey = (tutorData.name || 'unknown').replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            window._tutorReportsCache[cacheKey] = tutorData.reports;
+
             const reportsByStudent = {};
             tutorData.reports.forEach(report => {
                 if (!reportsByStudent[report.studentName]) {
@@ -6353,7 +6404,7 @@ async function renderTutorReportsPanel(container) {
 
             const zipButtonHTML = canDownload ? `
                 <div class="p-4 border-t bg-blue-50">
-                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports).replace(/"/g, '&quot;')}, '${tutorData.name.replace(/'/g, "\\'")}', this)" 
+                    <button onclick="zipAndDownloadTutorReports('${cacheKey}', '${tutorData.name.replace(/'/g, "\\'")}', this)" 
                             class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
@@ -10471,9 +10522,16 @@ async function generateReportHTML(reportId) {
 window.previewReport = async function(reportId) {
     try {
         const { html } = await generateReportHTML(reportId);
-        const newWindow = window.open();
-        newWindow.document.write(html);
-        newWindow.document.close();
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+            newWindow.document.write(html);
+            newWindow.document.close();
+        } else {
+            // Popup blocked — fallback: open as blob URL
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank') || alert('Pop-ups are blocked. Please allow pop-ups for this site and try again.');
+        }
     } catch (error) {
         console.error("Error previewing report:", error);
         alert(`Error: ${error.message}`);
@@ -10481,11 +10539,11 @@ window.previewReport = async function(reportId) {
 };
 
 window.downloadSingleReport = async function(reportId, event) {
-    const button = event?.target || event;
+    const button = event?.target?.closest('button') || event?.target || event;
     const originalText = button?.innerHTML || '';
     
     try {
-        if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; button.disabled = true; }
+        if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...'; button.disabled = true; }
         
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
@@ -10494,7 +10552,7 @@ window.downloadSingleReport = async function(reportId, event) {
         
         if (progressModal) {
             progressModal.classList.remove('hidden');
-            if (progressMessage) progressMessage.textContent = 'Generating PDF...';
+            if (progressMessage) progressMessage.textContent = 'Generating report...';
             if (progressBar) progressBar.style.width = '10%';
             if (progressText) progressText.textContent = '10%';
         }
@@ -10503,29 +10561,34 @@ window.downloadSingleReport = async function(reportId, event) {
         
         if (progressBar) progressBar.style.width = '50%';
         if (progressText) progressText.textContent = '50%';
-        if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
 
-        // Try html2pdf first, fallback to print window
+        const safeStudentName = (reportData.studentName || 'Report').replace(/[^a-z0-9 ]/gi, '').replace(/\s+/g, '_');
+        const reportDate = reportData.submittedAt
+            ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0];
+
         if (typeof html2pdf !== 'undefined') {
+            if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
             const options = {
                 margin: 0.5,
-                filename: `${reportData.studentName}_Report_${Date.now()}.pdf`,
+                filename: `${safeStudentName}_Report_${reportDate}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
             };
             await html2pdf().set(options).from(html).save();
         } else {
-            // Fallback: open in new window for browser print-to-PDF
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {
-                newWindow.document.write(html);
-                newWindow.document.close();
-                newWindow.focus();
-                setTimeout(() => newWindow.print(), 800);
-            } else {
-                alert('Pop-ups blocked. Please allow pop-ups and try again, or right-click the preview button to print.');
-            }
+            // Fallback: download as an HTML file with all the content
+            if (progressMessage) progressMessage.textContent = 'Saving as HTML...';
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${safeStudentName}_Report_${reportDate}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
         
         if (progressBar) progressBar.style.width = '100%';
@@ -10543,94 +10606,120 @@ window.downloadSingleReport = async function(reportId, event) {
     }
 };
 
-window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
+window.zipAndDownloadTutorReports = async function(reportsOrCacheKey, tutorName, button) {
     const originalButtonText = button.innerHTML;
     
+    // Resolve reports: accept either a cache key (string) or a direct array
+    let reports;
+    if (typeof reportsOrCacheKey === 'string' && window._tutorReportsCache[reportsOrCacheKey]) {
+        reports = window._tutorReportsCache[reportsOrCacheKey];
+    } else if (Array.isArray(reportsOrCacheKey)) {
+        reports = reportsOrCacheKey;
+    } else {
+        alert('Report data not found. Please refresh the page and try again.');
+        return;
+    }
+
+    if (!reports || reports.length === 0) {
+        alert('No reports available to download.');
+        return;
+    }
+    
     try {
+        button.disabled = true;
+
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
         
-        progressModal.classList.remove('hidden');
-        progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
-        progressBar.style.width = '0%';
-        progressText.textContent = '0%';
+        if (progressModal) progressModal.classList.remove('hidden');
+        if (progressMessage) progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressText) progressText.textContent = '0%';
+
+        // Check if JSZip is available
+        if (typeof JSZip === 'undefined') {
+            throw new Error('JSZip library is not loaded. Please refresh the page.');
+        }
 
         const zip = new JSZip();
+        const useHtml2Pdf = typeof html2pdf !== 'undefined';
         let processedCount = 0;
 
         for (const report of reports) {
             try {
                 const progress = Math.round((processedCount / reports.length) * 100);
-                progressBar.style.width = `${progress}%`;
-                progressText.textContent = `${progress}%`;
-                progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
+                if (progressBar) progressBar.style.width = `${progress}%`;
+                if (progressText) progressText.textContent = `${progress}%`;
+                if (progressMessage) progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
                 button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
 
                 const { html, reportData } = await generateReportHTML(report.id);
-                
-                const options = {
-                    margin: 0.5,
-                    image: { 
-                        type: 'jpeg', 
-                        quality: 0.98 
-                    },
-                    html2canvas: { 
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#FFFFFF'
-                    },
-                    jsPDF: { 
-                        unit: 'in', 
-                        format: 'a4', 
-                        orientation: 'portrait'
-                    }
-                };
-
-                const pdfBlob = await html2pdf().set(options).from(html).output('blob');
                 
                 const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
                 const reportDate = reportData.submittedAt ? 
                     new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
                     'unknown_date';
-                const filename = `${safeStudentName}_${reportDate}.pdf`;
-                
-                zip.file(filename, pdfBlob);
+
+                if (useHtml2Pdf) {
+                    const options = {
+                        margin: 0.5,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
+                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                    };
+                    const pdfBlob = await html2pdf().set(options).from(html).output('blob');
+                    zip.file(`${safeStudentName}_${reportDate}.pdf`, pdfBlob);
+                } else {
+                    // Fallback: save as HTML files instead of blank PDFs
+                    zip.file(`${safeStudentName}_${reportDate}.html`, html);
+                }
                 
             } catch (error) {
                 console.error(`Error processing report ${report.id}:`, error);
             }
             
             processedCount++;
-            
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
-        progressMessage.textContent = 'Creating ZIP file...';
-        progressBar.style.width = '95%';
-        progressText.textContent = '95%';
+        if (progressMessage) progressMessage.textContent = 'Creating ZIP file...';
+        if (progressBar) progressBar.style.width = '95%';
+        if (progressText) progressText.textContent = '95%';
         
         const zipBlob = await zip.generateAsync({ 
             type: "blob",
             compression: "DEFLATE"
         });
 
-        progressMessage.textContent = 'Download starting...';
-        progressBar.style.width = '100%';
-        progressText.textContent = '100%';
+        if (progressMessage) progressMessage.textContent = 'Download starting...';
+        if (progressBar) progressBar.style.width = '100%';
+        if (progressText) progressText.textContent = '100%';
         
-        saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
+        // Use saveAs if available, otherwise manual download
+        if (typeof saveAs !== 'undefined') {
+            saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
+        } else {
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
         
         setTimeout(() => {
-            progressModal.classList.add('hidden');
+            if (progressModal) progressModal.classList.add('hidden');
         }, 2000);
         
     } catch (error) {
         console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. Please try again.");
-        document.getElementById('pdf-progress-modal').classList.add('hidden');
+        alert(`Failed to create zip file: ${error.message}`);
+        const progressModal = document.getElementById('pdf-progress-modal');
+        if (progressModal) progressModal.classList.add('hidden');
     } finally {
         button.innerHTML = originalButtonText;
         button.disabled = false;
@@ -13398,6 +13487,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
-
-
