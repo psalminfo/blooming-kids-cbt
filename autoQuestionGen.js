@@ -1,37 +1,35 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs, query, where, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let loadedQuestions = [];
 let currentSessionId = null;
 let saveTimeout = null;
 let saveTextTimeout = null;
 
-/**
- * STRATEGIC FIX: UNIVERSAL SUBJECT MATCHER
- * Intelligently maps variations like "Reading" and "English" to "ELA"
- */
+function getAdminQuestionsSubject(testSubject) {
+    const subjectMap = {
+        'ela': 'English',
+        'math': 'Mathematics', 
+        'science': 'Science',
+        'socialstudies': 'Social Studies'
+    };
+    return subjectMap[testSubject.toLowerCase()] || testSubject;
+}
+
 function isSubjectMatch(docSubject, requestedSubject) {
     if (!docSubject || !requestedSubject) return false;
-    
     const dbSub = String(docSubject).toLowerCase();
     const reqSub = String(requestedSubject).toLowerCase();
 
-    // Map ELA to Reading, English, Writing
     if (reqSub === 'ela') {
         return dbSub.includes('ela') || dbSub.includes('english') || dbSub.includes('reading') || dbSub.includes('writing');
     }
-    // Map Math to Mathematics
     if (reqSub === 'math') {
         return dbSub.includes('math') || dbSub.includes('mathematics');
     }
-    
     return dbSub.includes(reqSub) || reqSub.includes(dbSub);
 }
 
-/**
- * STRATEGIC FIX: UNIVERSAL GRADE MATCHER
- * Normalizes "Grade 3", "grade3", "3", 3 to match perfectly
- */
 function isGradeMatch(docGrade, requestedGrade) {
     if (!docGrade || !requestedGrade) return false;
     const dbGradeStr = String(docGrade).toLowerCase().replace(/[^0-9]/g, '');
@@ -94,7 +92,10 @@ function selectELAQuestions(allQuestions, passagesMap) {
     const questionsWithoutPassages = [];
     
     allQuestions.forEach(question => {
-        if (question.passageId && passagesMap[question.passageId]) {
+        // STRATEGIC FIX: Force exact string matching
+        const qPassageId = question.passageId ? String(question.passageId).trim() : null;
+        
+        if (qPassageId && passagesMap[qPassageId]) {
             questionsWithPassages.push(question);
         } else {
             questionsWithoutPassages.push(question);
@@ -103,8 +104,9 @@ function selectELAQuestions(allQuestions, passagesMap) {
     
     const questionsByPassage = {};
     questionsWithPassages.forEach(question => {
-        if (!questionsByPassage[question.passageId]) questionsByPassage[question.passageId] = [];
-        questionsByPassage[question.passageId].push(question);
+        const qPassageId = String(question.passageId).trim();
+        if (!questionsByPassage[qPassageId]) questionsByPassage[qPassageId] = [];
+        questionsByPassage[qPassageId].push(question);
     });
     
     const selectedQuestions = [];
@@ -144,10 +146,6 @@ function selectELAQuestions(allQuestions, passagesMap) {
     return selectedQuestions.slice(0, 15);
 }
 
-/**
- * STRATEGIC OMNI-FILTER: TESTS COLLECTION
- * Bypasses Document ID constraints to find any matching test.
- */
 async function fetchFromTestsCollection(grade, subject) {
     let allQuestions = [];
     let allPassages = [];
@@ -159,14 +157,15 @@ async function fetchFromTestsCollection(grade, subject) {
         snapshot.forEach(docSnap => {
             const rawData = docSnap.data();
             
-            // Handle Nested Tests Array (e.g. staar_reading_3_2022)
             if (rawData && rawData.tests && Array.isArray(rawData.tests)) {
                 rawData.tests.forEach((test) => {
-                    // Check if this specific test matches grade and subject
                     if (isGradeMatch(test.grade, grade) && isSubjectMatch(test.subject, subject)) {
                         if (test.passages && Array.isArray(test.passages)) {
                             test.passages.forEach(passage => {
-                                if (passage && !passage.passageId && passage.id) passage.passageId = passage.id;
+                                // STRICT NORMALIZATION
+                                passage.passageId = passage.passageId || passage.id || passage.passage_id;
+                                if (passage.passageId) passage.passageId = String(passage.passageId).trim();
+                                passage.content = passage.content || passage.text || passage.body;
                                 allPassages.push(passage);
                             });
                         }
@@ -176,23 +175,28 @@ async function fetchFromTestsCollection(grade, subject) {
                                 q.subject = test.subject || subject;
                                 q.imageUrl = q.imageUrl || q.image_url || q.image || null;
                                 q.passageId = q.passageId || q.passage_id || null;
+                                if (q.passageId) q.passageId = String(q.passageId).trim();
                             });
                             allQuestions.push(...test.questions);
                         }
                     }
                 });
-            } 
-            // Handle Root Level Tests
-            else if (rawData && isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
+            } else if (rawData && isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
                 if (rawData.questions && Array.isArray(rawData.questions)) {
                     rawData.questions.forEach(q => {
                         q.imageUrl = q.imageUrl || q.image_url || q.image || null;
                         q.passageId = q.passageId || q.passage_id || null;
+                        if (q.passageId) q.passageId = String(q.passageId).trim();
                     });
                     allQuestions.push(...rawData.questions);
                 }
                 if (rawData.passages && Array.isArray(rawData.passages)) {
-                    allPassages.push(...rawData.passages);
+                    rawData.passages.forEach(passage => {
+                        passage.passageId = passage.passageId || passage.id || passage.passage_id;
+                        if (passage.passageId) passage.passageId = String(passage.passageId).trim();
+                        passage.content = passage.content || passage.text || passage.body;
+                        allPassages.push(passage);
+                    });
                 }
             }
         });
@@ -203,18 +207,12 @@ async function fetchFromTestsCollection(grade, subject) {
     return { questions: allQuestions, passages: allPassages };
 }
 
-/**
- * STRATEGIC OMNI-FILTER: ADMIN_QUESTIONS COLLECTION
- */
 async function fetchFromAdminQuestions(grade, subject) {
     let allQuestions = [];
     try {
-        console.log(`🔍 Scanning 'admin_questions' for Grade: ${grade}, Subject: ${subject}`);
         const snapshot = await getDocs(collection(db, "admin_questions"));
-        
         snapshot.forEach(docSnap => {
             const qData = docSnap.data();
-            
             if (qData && isGradeMatch(qData.grade, grade) && isSubjectMatch(qData.subject, subject)) {
                 const normalizedQuestion = {
                     ...qData,
@@ -225,6 +223,7 @@ async function fetchFromAdminQuestions(grade, subject) {
                     type: qData.type || (qData.topic === 'CREATIVE WRITING' ? 'creative-writing' : 'mcq'),
                     image_position: qData.image_position || qData.imagePosition || 'before'
                 };
+                if (normalizedQuestion.passageId) normalizedQuestion.passageId = String(normalizedQuestion.passageId).trim();
                 
                 if (qData.options) {
                     if (Array.isArray(qData.options)) {
@@ -242,11 +241,9 @@ async function fetchFromAdminQuestions(grade, subject) {
                 } else {
                     normalizedQuestion.options = [];
                 }
-                
                 allQuestions.push(normalizedQuestion);
             }
         });
-        console.log(`✅ Extracted from 'admin_questions': ${allQuestions.length} questions`);
     } catch (err) {
         console.error(`Error querying 'admin_questions':`, err);
     }
@@ -301,24 +298,31 @@ async function fetchFromGitHub(grade, subject) {
                     }
                 }
 
-                questions = questions.map((q, idx) => ({
-                    ...q,
-                    id: q.id || `gh-q-${idx}`,
-                    imageUrl: q.image || q.image_url || q.imageUrl || null,
-                    passageId: q.passage_id || q.passageId || null,
-                    type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'creative-writing')
-                }));
+                questions = questions.map((q, idx) => {
+                    let pid = q.passage_id || q.passageId || null;
+                    if (pid) pid = String(pid).trim();
+                    return {
+                        ...q,
+                        id: q.id || `gh-q-${idx}`,
+                        imageUrl: q.image || q.image_url || q.imageUrl || null,
+                        passageId: pid,
+                        type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'creative-writing')
+                    };
+                });
 
-                passages = passages.map((p, idx) => ({
-                    ...p,
-                    passageId: p.id || p.passageId || `gh-p-${idx}`
-                }));
+                passages = passages.map((p, idx) => {
+                    let pid = p.id || p.passageId || p.passage_id || `gh-p-${idx}`;
+                    if (pid) pid = String(pid).trim();
+                    return {
+                        ...p,
+                        passageId: pid,
+                        content: p.content || p.text || p.body
+                    };
+                });
                 
                 return { questions, passages };
             }
-        } catch (e) {
-            // Move to next pattern
-        }
+        } catch (e) { }
     }
     throw new Error('No GitHub file found with any pattern');
 }
@@ -337,6 +341,9 @@ function optimizeImageUrl(originalUrl) {
 }
 
 export async function loadQuestions(subject, grade, state) {
+    // FORCE CACHE WIPE ON EVERY RELOAD FOR NOW TO PREVENT GHOST CACHE
+    sessionStorage.removeItem('currentTestSession');
+    
     if (state === 'creative-writing') {
         if (subject.toLowerCase() !== 'ela' && subject.toLowerCase() !== 'english' && subject.toLowerCase() !== 'reading') {
             const params = new URLSearchParams(window.location.search);
@@ -355,15 +362,6 @@ export async function loadQuestions(subject, grade, state) {
     if (submitBtnContainer) submitBtnContainer.style.display = 'none';
 
     currentSessionId = generateSessionId(grade, subject, state);
-
-    const savedSession = getSavedSession();
-    if (savedSession && savedSession.questions && savedSession.questions.length > 0) {
-        loadedQuestions = savedSession.questions;
-        displayQuestionsBasedOnState(loadedQuestions, state);
-        restoreSavedAnswers();
-        if (submitBtnContainer && state === 'mcq') submitBtnContainer.style.display = 'block';
-        return;
-    }
 
     let allQuestions = [];
     let allPassages = [];
@@ -389,14 +387,18 @@ export async function loadQuestions(subject, grade, state) {
             }
         }
 
-        // Final Normalization Pass
-        allQuestions = allQuestions.map((q, index) => ({
-            ...q,
-            id: q.firebaseId || q.id || `question-${index}`,
-            imageUrl: q.image || q.imageUrl || q.image_url || null,
-            passageId: q.passageId || q.passage_id || null,
-            type: q.type || (q.options && q.options.length > 0 ? "mcq" : "creative-writing")
-        }));
+        // Deep mapping
+        allQuestions = allQuestions.map((q, index) => {
+            let pid = q.passageId || q.passage_id || null;
+            if (pid) pid = String(pid).trim();
+            return {
+                ...q,
+                id: q.firebaseId || q.id || `question-${index}`,
+                imageUrl: q.image || q.imageUrl || q.image_url || null,
+                passageId: pid,
+                type: q.type || (q.options && q.options.length > 0 ? "mcq" : "creative-writing")
+            }
+        });
 
         const passagesMap = {};
         allPassages.forEach(passage => {
@@ -404,6 +406,11 @@ export async function loadQuestions(subject, grade, state) {
                 passagesMap[passage.passageId] = passage;
             }
         });
+
+        console.log("🔥 DIAGNOSTIC DUMP 🔥");
+        console.log("Found Questions Total:", allQuestions.length);
+        console.log("Found Passages Total:", Object.keys(passagesMap).length);
+        console.log("Passage Map Data:", passagesMap);
 
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No ${subject} questions found in any source.</p>`;
@@ -626,9 +633,10 @@ function displayMCQQuestions(questions, passagesMap = {}) {
     const questionsWithoutPassage = [];
     
     questions.forEach((question) => {
-        if (question.passageId && passagesMap[question.passageId]) {
-            if (!questionsByPassage[question.passageId]) questionsByPassage[question.passageId] = [];
-            questionsByPassage[question.passageId].push(question);
+        const qPassageId = question.passageId ? String(question.passageId).trim() : null;
+        if (qPassageId && passagesMap[qPassageId]) {
+            if (!questionsByPassage[qPassageId]) questionsByPassage[qPassageId] = [];
+            questionsByPassage[qPassageId].push(question);
         } else {
             questionsWithoutPassage.push(question);
         }
