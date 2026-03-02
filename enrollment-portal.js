@@ -2652,46 +2652,37 @@ class EnrollmentApp {
 
             // Handle successful portal creation
             if (portalResult && portalResult.isNew) {
-                document.getElementById('temp-password').textContent = portalResult.password;
-                document.getElementById('temp-password-container').style.display = 'block';
-                this.showAlert(`Portal created! Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
-
-                if (portalResult.referralCode) {
-                    const referralContainer = document.createElement('div');
-                    referralContainer.id = 'referral-code-container';
-                    referralContainer.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
-                    referralContainer.innerHTML = `
-                        <p class="font-semibold text-green-800">Your Referral Code:</p>
-                        <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${this.escapeHtml(portalResult.referralCode)}</p>
-                        <p class="text-sm text-green-700 mt-2">Share this code with other parents to earn ₦5,000!</p>
-                    `;
-                    document.getElementById('temp-password-container').after(referralContainer);
-                }
+                // FIX: Show a blocking modal so the parent MUST save their password before proceeding
+                this._showPasswordModal(portalResult);
             } else if (portalResult && !portalResult.isNew) {
                 this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
+                // STEP 3: Fire-and-forget email notifications
+                setTimeout(() => {
+                    const invoiceElement = document.getElementById('invoice-content');
+                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+                }, 2000);
+                // Redirect existing user
+                this.showAlert("Redirecting you to the parent portal...", "success");
+                setTimeout(() => { window.location.href = "parent.html"; }, 2000);
+                btn.innerHTML = 'Enrollment Complete! Redirecting...';
+                btn.disabled = true;
             } else {
                 // STEP 2.5: ERROR RECOVERY - Enrollment saved, but portal failed.
                 this.showAlert("Enrollment successful, but we couldn't auto-login to your portal. Please contact support to link your account.", "warning");
                 btn.innerHTML = 'Enrollment Complete (Portal Setup Pending)';
                 btn.disabled = false;
-                return; // Halt execution here so we don't open the portal tab blindly
+                return;
             }
 
-            // STEP 3: Fire-and-forget email notifications
-            setTimeout(() => {
-                const invoiceElement = document.getElementById('invoice-content');
-                const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
-                this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-            }, 2000);
-
-            // STEP 4: Auto-redirect to Parent Portal after 1.5 seconds
-            this.showAlert("Enrollment complete! Redirecting you to the parent portal...", "success");
-            setTimeout(() => {
-                window.location.href = "parent.html";
-            }, 1500);
-
-            btn.innerHTML = 'Enrollment Complete! Redirecting...';
-            btn.disabled = true;
+            // STEP 3: Fire-and-forget email notifications (for new users, called after modal confirm)
+            if (portalResult && portalResult.isNew) {
+                setTimeout(() => {
+                    const invoiceElement = document.getElementById('invoice-content');
+                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+                }, 2000);
+            }
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2742,9 +2733,93 @@ class EnrollmentApp {
         }, 2000);
     }
 
-   // ==============================================
-   // REFERRAL CODE GENERATION (HIGH ENTROPY)
-   // ==============================================
+    // ==============================================
+    // PASSWORD MODAL — shown after successful enrollment
+    // Blocks redirect until parent confirms they've saved their credentials
+    // ==============================================
+    _showPasswordModal(portalResult) {
+        // Remove any existing modal
+        const existing = document.getElementById('bkh-password-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'bkh-password-modal';
+        modal.style.cssText = `
+            position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.7);
+            display:flex;align-items:center;justify-content:center;padding:16px;
+        `;
+        modal.innerHTML = `
+            <div style="background:#fff;border-radius:16px;padding:36px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+                <div style="font-size:48px;margin-bottom:16px;">🎉</div>
+                <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;">Enrollment Complete!</h2>
+                <p style="color:#555;margin:0 0 24px;font-size:14px;">Your parent portal account has been created. Save the credentials below — you'll need them to log in.</p>
+                
+                <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:20px;text-align:left;">
+                    <p style="margin:0 0 8px;font-size:13px;color:#555;font-weight:600;">📧 LOGIN EMAIL</p>
+                    <p id="bkh-modal-email" style="margin:0 0 16px;font-size:15px;font-weight:700;color:#1a1a2e;word-break:break-all;">${this.escapeHtml(portalResult.email || '')}</p>
+                    
+                    <p style="margin:0 0 8px;font-size:13px;color:#555;font-weight:600;">🔑 TEMPORARY PASSWORD</p>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <code id="bkh-modal-password" style="flex:1;background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:16px;letter-spacing:2px;font-weight:700;color:#1a1a2e;">${this.escapeHtml(portalResult.password)}</code>
+                        <button id="bkh-copy-pw" style="background:#22c55e;color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">Copy</button>
+                    </div>
+
+                    ${portalResult.referralCode ? `
+                    <p style="margin:16px 0 8px;font-size:13px;color:#555;font-weight:600;">🎁 YOUR REFERRAL CODE</p>
+                    <p style="margin:0;font-size:15px;font-weight:700;color:#16a34a;letter-spacing:2px;">${this.escapeHtml(portalResult.referralCode)}</p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">Share with other parents to earn ₦5,000 per referral</p>
+                    ` : ''}
+                </div>
+
+                <div style="background:#fefce8;border:1px solid #fbbf24;border-radius:8px;padding:12px;margin-bottom:24px;font-size:13px;color:#92400e;">
+                    ⚠️ You will be asked to set a new password when you first log in. Please copy or screenshot your temporary password now.
+                </div>
+
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:20px;text-align:left;">
+                    <input type="checkbox" id="bkh-saved-confirm" style="width:18px;height:18px;cursor:pointer;">
+                    <span style="font-size:14px;color:#374151;">I have saved my email and temporary password</span>
+                </label>
+
+                <button id="bkh-goto-portal" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;opacity:0.4;pointer-events:none;transition:opacity 0.2s;">
+                    Go to My Parent Portal →
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Wire up copy button
+        document.getElementById('bkh-copy-pw').addEventListener('click', () => {
+            navigator.clipboard?.writeText(portalResult.password).catch(() => {});
+            document.getElementById('bkh-copy-pw').textContent = '✓ Copied!';
+        });
+
+        // Fill email (available from sessionStorage payload)
+        try {
+            const stored = JSON.parse(sessionStorage.getItem('bkh_new_parent') || '{}');
+            if (stored.email) document.getElementById('bkh-modal-email').textContent = stored.email;
+        } catch(e) {}
+
+        // Unlock button only when checkbox is checked
+        const checkbox = document.getElementById('bkh-saved-confirm');
+        const goBtn = document.getElementById('bkh-goto-portal');
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                goBtn.style.opacity = '1';
+                goBtn.style.pointerEvents = 'auto';
+            } else {
+                goBtn.style.opacity = '0.4';
+                goBtn.style.pointerEvents = 'none';
+            }
+        });
+
+        // Redirect on confirm
+        goBtn.addEventListener('click', () => {
+            window.location.href = 'parent.html';
+        });
+    }
+
+
    async generateReferralCode() {
         // Helper: generate a cryptographically secure random suffix
         const _secureRandomSuffix = () => {
@@ -2878,6 +2953,18 @@ class EnrollmentApp {
                         parentUid: user.uid
                     });
                 }
+
+                // FIX: Sign the user in immediately so parent.html receives an authenticated session
+                await firebase.auth().signInWithEmailAndPassword(parentEmail, randomPassword);
+
+                // FIX: Store temp credentials in sessionStorage so parent.html can show the "set your password" prompt
+                sessionStorage.setItem('bkh_new_parent', JSON.stringify({
+                    email: parentEmail,
+                    tempPassword: randomPassword,
+                    referralCode: newReferralCode,
+                    parentName: parentName,
+                    isFirstLogin: true
+                }));
 
                 return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
             }
