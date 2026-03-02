@@ -5058,11 +5058,25 @@ async function renderStudentDatabase(container, tutor) {
     
     // Queries - fetch by tutorEmail OR tutorId (management assigns via tutorId)
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
+    const allResultsQuery     = query(collection(db, "student_results"),   where("tutorEmail", "==", tutor.email));
 
-    const [allStudentDocs, allSubmissionsSnapshot] = await Promise.all([
+    const [allStudentDocs, allSubmissionsSnapshot, allResultsSnapshot] = await Promise.all([
         fetchStudentsForTutor(tutor, "students"),
-        getDocs(allSubmissionsQuery)
+        getDocs(allSubmissionsQuery),
+        getDocs(allResultsQuery)
     ]);
+
+    // Build Sets for fast O(1) lookup inside the render loop.
+    // Matches by studentId (preferred) AND by lowercased studentName (fallback for
+    // older results written before studentId was stored).
+    const studentsWithResults     = new Set();
+    const studentsWithResultNames = new Set();
+    allResultsSnapshot.forEach(d => {
+        const r = d.data();
+        if (r.studentId)   studentsWithResults.add(r.studentId);
+        if (r.studentName) studentsWithResultNames.add(r.studentName.trim().toLowerCase());
+    });
+    console.log(`[Placement] student_results fetched: ${allResultsSnapshot.size} docs | ids: ${studentsWithResults.size} | names: ${studentsWithResultNames.size}`);
 
     // Process Students - ONLY APPROVED STUDENTS
     let approvedStudents = allStudentDocs
@@ -5136,6 +5150,9 @@ async function renderStudentDatabase(container, tutor) {
         } else {
             studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
 
+            // Placement test cutoff: only students added on/after this date are eligible.
+            const PLACEMENT_CUTOFF = new Date('2026-02-26T00:00:00');
+
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
@@ -5201,24 +5218,32 @@ async function renderStudentDatabase(container, tutor) {
                 }
 
                 // ── SETTING 5: Placement Test ──────────────────────────────────────────────
-                // Show for ANY grade 3–12 student who has not yet done a placement test.
-                // Logic (no admin toggle needed — always on from Feb 28 2026):
-                //   • Grade must be 3–12 (isPlacementTestEligible)
-                //   • Student must NOT already have a result in student_results
-                //   • placementTestStatus on the student doc must not be 'completed'
-                const _hasResult = studentsWithResults.has(student.id) ||
+                // Show for ANY grade 3–12 student who:
+                //   • Was added on or after Feb 26 2026 (createdAt cutoff)
+                //   • Has a grade between 3 and 12
+                //   • Has NO result in student_results (checked by id OR name)
+                //   • Does NOT have placementTestStatus='completed' on their doc
+                // No admin toggle required — this is always active from Feb 26 2026.
+                const studentCreatedAt = student.createdAt?.toDate
+                    ? student.createdAt.toDate()
+                    : (student.createdAt ? new Date(student.createdAt) : null);
+                const _isNewEnough      = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
+                const _hasResult        = studentsWithResults.has(student.id) ||
                     studentsWithResultNames.has((student.studentName || '').trim().toLowerCase());
-                const _gradeOk   = isPlacementTestEligible(student.grade);
-                const _notDone   = (student.placementTestStatus || '') !== 'completed';
-                const _showPlacementBtn = _gradeOk && !_hasResult && _notDone;
+                const _gradeOk          = isPlacementTestEligible(student.grade);
+                const _notDone          = (student.placementTestStatus || '') !== 'completed';
+                const _showPlacementBtn = _isNewEnough && _gradeOk && !_hasResult && _notDone;
 
-                // ── DEBUG PANEL (remove once confirmed working) ──────────────────────────
+                // ── DEBUG — logs every grade 3–12 student so you can see exactly why
+                //            the button is/isn't showing. Check browser console.
                 if (_gradeOk) {
                     console.log(
-                        `[Placement] ${student.studentName} | grade="${student.grade}" gradeOk=${_gradeOk} | ` +
-                        `hasResult=${_hasResult} (id:${studentsWithResults.has(student.id)} name:${studentsWithResultNames.has((student.studentName||'').trim().toLowerCase())}) | ` +
-                        `placementTestStatus="${student.placementTestStatus||''}" notDone=${_notDone} | ` +
-                        `SHOW BUTTON: ${_showPlacementBtn}`
+                        `[Placement] ${student.studentName}` +
+                        ` | grade="${student.grade}" gradeOk=${_gradeOk}` +
+                        ` | createdAt=${studentCreatedAt ? studentCreatedAt.toISOString() : 'MISSING ⚠️'} newEnough=${_isNewEnough}` +
+                        ` | hasResult=${_hasResult} (byId:${studentsWithResults.has(student.id)} byName:${studentsWithResultNames.has((student.studentName||'').trim().toLowerCase())})` +
+                        ` | placementTestStatus="${student.placementTestStatus||''}" notDone=${_notDone}` +
+                        ` | ➡ SHOW BUTTON: ${_showPlacementBtn}`
                     );
                 }
 
