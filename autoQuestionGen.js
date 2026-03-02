@@ -1,5 +1,5 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, query, where, documentId, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let loadedQuestions = [];
 let currentSessionId = null;
@@ -17,6 +17,36 @@ function getAdminQuestionsSubject(testSubject) {
         'socialstudies': 'Social Studies'
     };
     return subjectMap[testSubject.toLowerCase()] || testSubject;
+}
+
+/**
+ * Check if subject matches (flexible matching)
+ */
+function isSubjectMatch(docSubject, requestedSubject) {
+    if (!docSubject || !requestedSubject) return false;
+    const dbSub = String(docSubject).toLowerCase();
+    const reqSub = String(requestedSubject).toLowerCase();
+    
+    // Special handling for ELA/English
+    if (reqSub === 'ela') {
+        return dbSub.includes('ela') || dbSub.includes('english') || dbSub.includes('reading') || dbSub.includes('writing');
+    }
+    // Special handling for Math
+    if (reqSub === 'math') {
+        return dbSub.includes('math') || dbSub.includes('mathematics');
+    }
+    // General matching
+    return dbSub.includes(reqSub) || reqSub.includes(dbSub);
+}
+
+/**
+ * Check if grade matches (extract numbers and compare)
+ */
+function isGradeMatch(docGrade, requestedGrade) {
+    if (!docGrade || !requestedGrade) return false;
+    const dbGradeStr = String(docGrade).toLowerCase().replace(/[^0-9]/g, '');
+    const reqGradeStr = String(requestedGrade).toLowerCase().replace(/[^0-9]/g, '');
+    return dbGradeStr === reqGradeStr;
 }
 
 /**
@@ -161,26 +191,27 @@ function selectELAQuestions(allQuestions, passagesMap) {
  * Attempt to fetch from GitHub with multiple filename variations
  */
 async function fetchFromGitHub(grade, subject) {
-    // grade is expected to be like "grade3" (with 'grade' prefix)
-    // subject is like "math"
     const baseUrl = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/';
     
-    // Extract just the number from grade (e.g., "grade3" → "3")
+    // Extract just the number from grade (e.g., "grade4" → "4")
     const gradeNumber = grade.replace('grade', '');
     
     // Define possible filename patterns
     const patterns = [
-        `${grade}-${subject}.json`,           // grade3-math.json
-        `${grade}${subject}.json`,             // grade3math.json
-        `${gradeNumber}-${subject}.json`,      // 3-math.json
-        `${gradeNumber}${subject}.json`,       // 3math.json
+        `${grade}-${subject}.json`,           // grade4-ela.json
+        `${grade}${subject}.json`,             // grade4ela.json
+        `${gradeNumber}-${subject}.json`,      // 4-ela.json
+        `${gradeNumber}${subject}.json`,       // 4ela.json
         `${grade}-${subject}`.toLowerCase(),   // already lowercase
         `${grade}${subject}`.toLowerCase(),
         `${gradeNumber}-${subject}`.toLowerCase(),
         `${gradeNumber}${subject}`.toLowerCase(),
+        `Grade ${gradeNumber}-${subject}.json`, // Grade 4-ela.json
+        `${gradeNumber}-ela.json`,              // 4-ela.json (explicit)
+        `${gradeNumber}-math.json`,              // 4-math.json (explicit)
         // Some possible capitalizations
-        `${grade.charAt(0).toUpperCase() + grade.slice(1)}-${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`, // Grade3-Math.json
-        `${grade.charAt(0).toUpperCase() + grade.slice(1)}${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`  // Grade3Math.json
+        `${grade.charAt(0).toUpperCase() + grade.slice(1)}-${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`, // Grade4-Ela.json
+        `${grade.charAt(0).toUpperCase() + grade.slice(1)}${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`  // Grade4Ela.json
     ];
     
     // Remove duplicates
@@ -190,23 +221,293 @@ async function fetchFromGitHub(grade, subject) {
         const url = baseUrl + pattern;
         try {
             console.log(`Trying GitHub URL: ${url}`);
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
             if (response.ok) {
                 const data = await response.json();
                 console.log(`✅ Successfully fetched from GitHub using pattern: ${pattern}`);
-                return data;
+                
+                // Process the data to extract questions and passages
+                let questions = [];
+                let passages = [];
+                
+                if (Array.isArray(data)) {
+                    questions = data;
+                } else if (data && data.tests && Array.isArray(data.tests)) {
+                    data.tests.forEach(test => {
+                        if (test.questions) questions.push(...test.questions);
+                        if (test.passages) passages.push(...test.passages);
+                    });
+                } else if (data && data.questions) {
+                    questions = Array.isArray(data.questions) ? data.questions : [data.questions];
+                    if (data.passages) passages = Array.isArray(data.passages) ? data.passages : [data.passages];
+                }
+                
+                // Normalize questions
+                questions = questions.map((q, idx) => ({
+                    ...q,
+                    id: q.id || q.questionId || `gh-q-${idx}`,
+                    imageUrl: q.image || q.image_url || q.imageUrl || null,
+                    passageId: (q.passage_id || q.passageId) ? String(q.passage_id || q.passageId).trim() : null,
+                    type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'creative-writing')
+                }));
+                
+                // Normalize passages
+                passages = passages.map((p, idx) => ({
+                    ...p,
+                    passageId: (p.id || p.passageId || p.passage_id || `gh-p-${idx}`).toString().trim(),
+                    content: p.content || p.text || p.body
+                }));
+                
+                return { questions, passages };
             }
         } catch (e) {
             // Ignore individual fetch errors
         }
     }
-    throw new Error('No GitHub file found with any pattern');
+    return { questions: [], passages: [] };
+}
+
+/**
+ * Fetch from tests collection with comprehensive scanning
+ */
+async function fetchFromTestsCollection(grade, subject) {
+    let allQuestions = [];
+    let allPassages = [];
+    
+    try {
+        const gradeNum = grade.replace(/[^0-9]/g, '');
+        let subjectKey = subject.toLowerCase();
+        if (subjectKey === 'english' || subjectKey === 'reading') {
+            subjectKey = 'ela';
+        }
+        
+        console.log(`🔍 Fetching from tests collection for grade ${gradeNum}, subject ${subjectKey}`);
+        
+        // 1. Try direct document IDs first (fastest)
+        const targetIds = [
+            `${gradeNum}-${subjectKey}`,
+            `staar_reading_${gradeNum}_2022`,
+            `staar_grade_${gradeNum}_math_2018`,
+            `${grade}-${subjectKey}`,
+            `${grade}${subjectKey}`
+        ];
+        
+        for (const docId of targetIds) {
+            try {
+                const docRef = doc(db, "tests", docId);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    console.log(`✅ Found document with ID: ${docId}`);
+                    const rawData = docSnap.data();
+                    
+                    // Process tests array if it exists
+                    if (rawData.tests && Array.isArray(rawData.tests)) {
+                        rawData.tests.forEach(test => {
+                            // Process passages
+                            if (test.passages && Array.isArray(test.passages)) {
+                                test.passages.forEach(p => {
+                                    const normalizedPassage = {
+                                        ...p,
+                                        passageId: String(p.passageId || p.id || '').trim(),
+                                        content: p.content || p.text || p.body || ''
+                                    };
+                                    if (normalizedPassage.passageId && normalizedPassage.content) {
+                                        allPassages.push(normalizedPassage);
+                                    }
+                                });
+                            }
+                            
+                            // Process questions
+                            if (test.questions && Array.isArray(test.questions)) {
+                                test.questions.forEach(q => {
+                                    const normalizedQuestion = {
+                                        ...q,
+                                        id: q.id || q.questionId || `test-q-${Date.now()}`,
+                                        imageUrl: q.imageUrl || q.image_url || q.image || null,
+                                        passageId: (q.passageId || q.passage_id) ? String(q.passageId || q.passage_id).trim() : null,
+                                        type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'creative-writing')
+                                    };
+                                    allQuestions.push(normalizedQuestion);
+                                });
+                            }
+                        });
+                    }
+                    
+                    // If we found questions, return them
+                    if (allQuestions.length > 0) {
+                        return { questions: allQuestions, passages: allPassages };
+                    }
+                }
+            } catch (e) {
+                // Ignore individual document fetch errors
+            }
+        }
+        
+        // 2. If direct IDs didn't work, do a deep scan of the collection
+        console.log("🔍 Direct IDs not found, scanning entire tests collection...");
+        const snapshot = await getDocs(collection(db, "tests"));
+        
+        snapshot.forEach(docSnap => {
+            const rawData = docSnap.data();
+            
+            // Check various possible structures
+            const possibleArrays = ['tests', 'questions', 'items', 'data'];
+            
+            possibleArrays.forEach(arrayKey => {
+                if (rawData[arrayKey] && Array.isArray(rawData[arrayKey])) {
+                    rawData[arrayKey].forEach((item) => {
+                        // Check if this item matches our grade and subject
+                        if (item && (item.grade || item.gradeLevel) && (item.subject || item.subjectArea)) {
+                            const itemGrade = item.grade || item.gradeLevel || '';
+                            const itemSubject = item.subject || item.subjectArea || '';
+                            
+                            if (isGradeMatch(itemGrade, grade) && isSubjectMatch(itemSubject, subject)) {
+                                // Extract passages
+                                if (item.passages && Array.isArray(item.passages)) {
+                                    item.passages.forEach(p => {
+                                        const normalizedPassage = {
+                                            ...p,
+                                            passageId: String(p.passageId || p.id || '').trim(),
+                                            content: p.content || p.text || p.body || ''
+                                        };
+                                        if (normalizedPassage.passageId && normalizedPassage.content) {
+                                            allPassages.push(normalizedPassage);
+                                        }
+                                    });
+                                }
+                                
+                                // Extract questions
+                                if (item.questions && Array.isArray(item.questions)) {
+                                    item.questions.forEach(q => {
+                                        const normalizedQuestion = {
+                                            ...q,
+                                            id: q.id || q.questionId || `scan-q-${Date.now()}-${Math.random()}`,
+                                            imageUrl: q.imageUrl || q.image_url || q.image || null,
+                                            passageId: (q.passageId || q.passage_id) ? String(q.passageId || q.passage_id).trim() : null,
+                                            type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'creative-writing')
+                                        };
+                                        allQuestions.push(normalizedQuestion);
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Also check if the document itself has questions/passages at root level
+            if (rawData.questions && Array.isArray(rawData.questions) && rawData.grade && rawData.subject) {
+                if (isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
+                    rawData.questions.forEach(q => {
+                        const normalizedQuestion = {
+                            ...q,
+                            id: q.id || q.questionId || `root-q-${Date.now()}`,
+                            imageUrl: q.imageUrl || q.image_url || q.image || null,
+                            passageId: (q.passageId || q.passage_id) ? String(q.passageId || q.passage_id).trim() : null,
+                            type: q.type || (q.options && q.options.length > 0 ? 'mcq' : 'creative-writing')
+                        };
+                        allQuestions.push(normalizedQuestion);
+                    });
+                }
+            }
+            
+            if (rawData.passages && Array.isArray(rawData.passages) && rawData.grade && rawData.subject) {
+                if (isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
+                    rawData.passages.forEach(p => {
+                        const normalizedPassage = {
+                            ...p,
+                            passageId: String(p.passageId || p.id || '').trim(),
+                            content: p.content || p.text || p.body || ''
+                        };
+                        if (normalizedPassage.passageId && normalizedPassage.content) {
+                            allPassages.push(normalizedPassage);
+                        }
+                    });
+                }
+            }
+        });
+        
+        console.log(`📊 Tests collection scan complete: ${allQuestions.length} questions, ${allPassages.length} passages`);
+        
+    } catch (err) {
+        console.error("Error fetching from tests collection:", err);
+    }
+    
+    return { questions: allQuestions, passages: allPassages };
+}
+
+/**
+ * Fetch from admin_questions collection
+ */
+async function fetchFromAdminQuestions(grade, subject) {
+    let allQuestions = [];
+    
+    try {
+        console.log(`🔍 Fetching from admin_questions for grade ${grade}, subject ${subject}`);
+        
+        const gradeNum = grade.replace(/[^0-9]/g, '');
+        const adminSubject = getAdminQuestionsSubject(subject);
+        
+        // Query by grade and subject
+        const q = query(
+            collection(db, "admin_questions"),
+            where("grade", "==", gradeNum),
+            where("subject", "==", adminSubject)
+        );
+        
+        const snapshot = await getDocs(q);
+        
+        snapshot.forEach(docSnap => {
+            const qData = docSnap.data();
+            
+            // Double-check subject match (case insensitive)
+            if (isSubjectMatch(qData.subject, subject)) {
+                const normalizedQuestion = {
+                    ...qData,
+                    firebaseId: docSnap.id,
+                    id: docSnap.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    imageUrl: qData.imageUrl || qData.image_url || qData.image || null,
+                    passageId: qData.passageId || qData.passage_id || null,
+                    type: qData.type || (qData.topic === 'CREATIVE WRITING' ? 'creative-writing' : 'mcq'),
+                    image_position: qData.image_position || qData.imagePosition || 'before',
+                    subject: subject.toLowerCase(),
+                    grade: grade
+                };
+                
+                // Parse options if needed
+                if (qData.options) {
+                    try {
+                        normalizedQuestion.options = Array.isArray(qData.options) 
+                            ? qData.options 
+                            : (typeof qData.options === 'string' 
+                                ? JSON.parse(qData.options) 
+                                : [qData.options]);
+                    } catch (e) {
+                        normalizedQuestion.options = [qData.options];
+                    }
+                }
+                
+                if (normalizedQuestion.passageId) {
+                    normalizedQuestion.passageId = String(normalizedQuestion.passageId).trim();
+                }
+                
+                allQuestions.push(normalizedQuestion);
+            }
+        });
+        
+        console.log(`✅ Loaded ${allQuestions.length} valid ${subject} questions from ADMIN_QUESTIONS`);
+        
+    } catch (err) {
+        console.error("Error fetching from admin_questions:", err);
+    }
+    
+    return allQuestions;
 }
 
 /**
  * The entry point to load and display questions for a test.
  * @param {string} subject The subject of the test (e.g., 'math').
- * @param {string} grade The grade level of the test (e.g., 'grade3').
+ * @param {string} grade The grade level of the test (e.g., 'grade4').
  * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
 export async function loadQuestions(subject, grade, state) {
@@ -264,104 +565,29 @@ export async function loadQuestions(subject, grade, state) {
     try {
         console.log(`🔄 FETCHING QUESTIONS FOR: ${grade} ${subject.toUpperCase()} - STATE: ${state}`);
 
-        // 1. FETCH FROM BOTH FIREBASE COLLECTIONS SIMULTANEOUSLY
-        const [testsSnapshot, adminSnapshot] = await Promise.all([
-            // Fetch from tests collection - BY DOCUMENT ID PATTERN
-            getDocs(query(
-                collection(db, "tests"),
-                where(documentId(), '>=', `${grade}-${subject.toLowerCase().slice(0, 3)}`),
-                where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
-            )),
-            
-            // Fetch from admin_questions collection - BY SUBJECT AND GRADE NUMBER
-            getDocs(query(
-                collection(db, "admin_questions"),
-                where("grade", "==", grade.replace('grade', '')), // e.g., "3"
-                where("subject", "==", getAdminQuestionsSubject(subject))
-            ))
-        ]);
+        // 1. FETCH FROM TESTS COLLECTION (with comprehensive scanning)
+        const testsResult = await fetchFromTestsCollection(grade, subject);
+        allQuestions.push(...testsResult.questions);
+        allPassages.push(...testsResult.passages);
+        console.log(`📊 TESTS Collection: Found ${testsResult.questions.length} questions and ${testsResult.passages.length} passages`);
 
-        console.log(`📊 TESTS Collection: Found ${testsSnapshot.size} documents for ${grade}-${subject}`);
-        console.log(`📊 ADMIN_QUESTIONS Collection: Found ${adminSnapshot.size} documents for grade ${grade.replace('grade', '')} ${getAdminQuestionsSubject(subject)}`);
-
-        // 2. PROCESS TESTS COLLECTION
-        if (!testsSnapshot.empty) {
-            const docSnap = testsSnapshot.docs[0];
-            const rawData = docSnap.data();
-            let testArray = [];
-            if (rawData && rawData.tests) {
-                testArray = rawData.tests;
-            } else if (rawData && rawData.questions) {
-                testArray = [{ questions: rawData.questions }];
-            }
-            
-            allQuestions = testArray.flatMap(test => test.questions || []);
-            allPassages = testArray.flatMap(test => test.passages || []);
-            console.log(`✅ Loaded ${allQuestions.length} questions from TESTS collection for ${subject}`);
-        } else {
-            console.log(`❌ No documents found in TESTS collection for ${grade}-${subject}`);
+        // 2. FETCH FROM ADMIN_QUESTIONS COLLECTION
+        const adminQuestions = await fetchFromAdminQuestions(grade, subject);
+        if (adminQuestions.length > 0) {
+            allQuestions.push(...adminQuestions);
+            console.log(`📊 ADMIN_QUESTIONS Collection: Added ${adminQuestions.length} questions`);
         }
 
-        // 3. PROCESS ADMIN_QUESTIONS COLLECTION
-        if (!adminSnapshot.empty) {
-            const adminQuestions = [];
-            adminSnapshot.forEach(doc => {
-                try {
-                    const questionData = doc.data();
-                    
-                    if (!questionData || (!questionData.question && !questionData.type)) {
-                        console.warn('Skipping invalid admin question (missing fields):', doc.id);
-                        return;
-                    }
-                    
-                    const questionSubject = questionData.subject?.toLowerCase();
-                    const expectedSubject = getAdminQuestionsSubject(subject).toLowerCase();
-                    
-                    if (questionSubject !== expectedSubject) {
-                        console.warn(`Skipping admin question - subject mismatch. Expected: ${expectedSubject}, Got: ${questionSubject}`, doc.id);
-                        return;
-                    }
-                    
-                    const normalizedQuestion = {
-                        ...questionData,
-                        firebaseId: doc.id,
-                        id: doc.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        subject: subject.toLowerCase(),
-                        grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
-                    };
-                    
-                    adminQuestions.push(normalizedQuestion);
-                    
-                } catch (err) {
-                    console.error('Error processing admin question:', doc.id, err);
-                }
-            });
-            console.log(`✅ Loaded ${adminQuestions.length} valid ${subject} questions from ADMIN_QUESTIONS`);
-            
-            allQuestions = [...allQuestions, ...adminQuestions];
-        } else {
-            console.log(`❌ No documents found in ADMIN_QUESTIONS for grade ${grade.replace('grade', '')} ${getAdminQuestionsSubject(subject)}`);
-        }
-
-        // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
+        // 3. FETCH FROM GITHUB (Fallback if no questions found)
         if (allQuestions.length === 0) {
             console.log(`📦 No ${subject} questions found in Firebase, trying GitHub...`);
             try {
-                const rawData = await fetchFromGitHub(grade, subject);
-
-                let testArray = [];
-                if (rawData && rawData.tests) {
-                    testArray = rawData.tests;
-                } else if (rawData && rawData.questions) {
-                    testArray = [{ questions: rawData.questions }];
-                }
-                
-                allQuestions = testArray.flatMap(test => test.questions || []);
-                allPassages = testArray.flatMap(test => test.passages || []);
-                console.log(`✅ Loaded ${allQuestions.length} questions from GitHub for ${subject}`);
+                const gitHubData = await fetchFromGitHub(grade, subject);
+                allQuestions.push(...gitHubData.questions);
+                allPassages.push(...gitHubData.passages);
+                console.log(`✅ Loaded ${gitHubData.questions.length} questions from GitHub for ${subject}`);
             } catch (gitHubError) {
                 console.error("❌ GitHub fallback also failed:", gitHubError);
-                throw new Error("No questions found in any source.");
             }
         }
 
@@ -439,7 +665,7 @@ export async function loadQuestions(subject, grade, state) {
 }
 
 /**
- * Check if grade is 3 or higher for creative writing (grade is normalized, e.g., "grade3")
+ * Check if grade is 3 or higher for creative writing (grade is normalized, e.g., "grade4")
  */
 function isGrade3Plus(grade) {
     try {
