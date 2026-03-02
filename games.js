@@ -46,13 +46,7 @@
 
     /* ── widget init ─────────────────────────────────── */
     function initWidget() {
-        if (window.tutorData) {
-            state.currentUser.name  = window.tutorData.displayName || window.tutorData.name  || 'Tutor';
-            state.currentUser.id    = window.tutorData.id    || null;
-            state.currentUser.email = window.tutorData.email || null;
-        }
-
-        // Floating button
+        // Build the UI immediately
         const btn = document.createElement('button');
         btn.id = 'bk-game-floater';
         btn.style.cssText = 'position:fixed;bottom:155px;right:20px;z-index:99999;width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(145deg,#f59e0b,#d97706);color:#fff;box-shadow:0 8px 24px rgba(245,158,11,.45),0 0 0 3px rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:1.5rem;transition:all .22s cubic-bezier(.22,1,.36,1);';
@@ -95,6 +89,20 @@
         document.body.appendChild(modal);
         document.getElementById('bk-close-btn').onclick = closeModal;
         modal.addEventListener('click', e => { if (e.target===modal) closeModal(); });
+
+        // Poll for tutorData — it's set by tutor.js after Firebase auth resolves,
+        // which can take several seconds. Once available, hydrate state and start listeners.
+        function tryHydrateTutorData() {
+            if (window.tutorData && (window.tutorData.id || window.tutorData.email)) {
+                state.currentUser.name  = window.tutorData.displayName || window.tutorData.name || 'Tutor';
+                state.currentUser.id    = window.tutorData.tutorUid || window.tutorData.id || null;
+                state.currentUser.email = window.tutorData.email || null;
+                listenForIncomingChallenges();
+            } else {
+                setTimeout(tryHydrateTutorData, 800);
+            }
+        }
+        tryHydrateTutorData();
     }
 
     function updateGameFloaterBadge(count) {
@@ -123,6 +131,26 @@
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.25);
                 osc.start(ctx.currentTime + i * 0.12);
                 osc.stop(ctx.currentTime + i * 0.12 + 0.28);
+            });
+        } catch(e) {}
+    }
+
+    function playWinTone() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            // Triumphant fanfare: C5 E5 G5 C6
+            const notes = [523, 659, 784, 1047];
+            notes.forEach((freq, i) => {
+                const osc  = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'triangle';
+                const t = ctx.currentTime + i * 0.14;
+                gain.gain.setValueAtTime(0.22, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+                osc.start(t);
+                osc.stop(t + 0.40);
             });
         } catch(e) {}
     }
@@ -344,7 +372,7 @@
             if(!db()||!C()||!AD()) throw new Error('Firebase unavailable');
             const myId    = state.currentUser.id||state.currentUser.email||'';
             const myEmail = state.currentUser.email||'';
-            const myName  = state.currentUser.name||'Tutor';
+            const myName  = window.tutorData?.displayName || window.tutorData?.name || state.currentUser.name || 'Tutor';
             const targetWord = ROOTS[Math.floor(Math.random()*ROOTS.length)];
             const tiles      = targetWord.split('').sort(()=>Math.random()-.5);
             const gameData = {
@@ -657,7 +685,7 @@
             if(!db()||!C()||!AD()) throw new Error('Firebase unavailable');
             const myId    = state.currentUser.id||state.currentUser.email||'';
             const myEmail = state.currentUser.email||'';
-            const myName  = state.currentUser.name||'Tutor';
+            const myName  = window.tutorData?.displayName || window.tutorData?.name || state.currentUser.name || 'Tutor';
             const gameData = {
                 players:     { X: myId, O: opponentId },
                 playerNames: { X: myName, O: opponentName },
@@ -727,7 +755,7 @@
             const firestoreWinner = g.winner || null;
             const isDone = g.status === 'done';
             renderTTT(winLine, gameId, firestoreWinner, isDone);
-            if(isDone) { if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;} }
+            // NOTE: do NOT unsubscribe here — keep listening so "New Round" works for both players
         });
     }
 
@@ -744,7 +772,7 @@
         // Confetti — only for the winner, only once per game
         if(winner && !state._confettiShown) {
             const iWon = isOnline ? winner === state.tttMyMark : winner === 'X';
-            if(iWon) { state._confettiShown = true; setTimeout(triggerConfetti, 200); }
+            if(iWon) { state._confettiShown = true; setTimeout(triggerConfetti, 200); setTimeout(playWinTone, 100); }
         }
         if(!winner && !isDraw) state._confettiShown = false;
 
@@ -858,8 +886,12 @@
 
     async function resetOnlineTTT(gameId) {
         if(!db()||!DC()||!UD()) return;
-        const newBoard = Array(9).fill(null);
-        await UD()(DC()(db(),'ttt_games',gameId),{board:newBoard,turn:'X',winner:null,status:'active'});
+        await UD()(DC()(db(),'ttt_games',gameId),{
+            board:  Array(9).fill(null),
+            turn:   'X',
+            winner: null,
+            status: 'active'
+        }).catch(e=>console.warn('resetOnlineTTT:',e));
     }
 
     /* ── Firebase: save score + fetch top-5 ─────────── */
@@ -1024,6 +1056,6 @@
         setTimeout(()=>{ if(toast.parentNode){ toast.remove(); window.bkReduceChallengeBadge&&window.bkReduceChallengeBadge(); } }, 30000);
     }
 
-    window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); setTimeout(listenForIncomingChallenges, 3000); });
+    window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); });
 
 })();
