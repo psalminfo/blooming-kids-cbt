@@ -947,6 +947,13 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         });
 
         console.log("✅ Account created and profile saved");
+
+        // Back-fill parent email onto any existing student records matching this phone.
+        // Fire-and-forget — won't block login if it fails.
+        attachEmailToMatchingStudentRecords(finalPhone, email).catch(err =>
+            console.warn('Non-critical: email back-fill on signup failed:', err.message)
+        );
+
         showMessage('Account created successfully!', 'success');
         
     } catch (error) {
@@ -1000,6 +1007,89 @@ async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
         if (sendResetBtn) sendResetBtn.disabled = false;
         if (resetLoader) resetLoader.classList.add('hidden');
     }
+}
+
+// ============================================================================
+// ATTACH PARENT EMAIL TO MATCHING STUDENT RECORDS (phone-suffix based)
+// Safe to call multiple times — skips docs that already have the correct email.
+// ============================================================================
+async function attachEmailToMatchingStudentRecords(parentPhone, parentEmail) {
+    if (!parentPhone || !parentEmail) return 0;
+
+    const normalizedPhone = parentPhone; // already normalized before being passed in
+    const phoneSuffix     = extractPhoneSuffix(parentPhone); // last 10 digits
+    if (!phoneSuffix) return 0;
+
+    // Every plausible format a tutor might have stored for this number:
+    //   +2348012345678  (international with +)
+    //   2348012345678   (international without +)
+    //   8012345678      (last 10 digits / suffix)
+    //   +8012345678     (+ on suffix)
+    //   08012345678     (Nigerian local: 0 + last 10)
+    const noPlus = normalizedPhone.replace(/^\+/, '');
+    const phoneVariants = [...new Set([
+        normalizedPhone,
+        noPlus,
+        phoneSuffix,
+        '+' + phoneSuffix,
+        '0' + phoneSuffix
+    ])].filter(Boolean);
+
+    const phoneFields = [
+        'parentPhone', 'parent_phone', 'guardianPhone',
+        'motherPhone',  'fatherPhone',  'phone',
+        'contactPhone', 'normalizedParentPhone'
+    ];
+
+    const collections = ['student_results', 'tutor_submissions'];
+    let updateCount = 0;
+
+    for (const colName of collections) {
+        // Run one targeted query per (field x variant) pair — all in parallel.
+        // Only matching docs are returned — zero collection scanning.
+        const queries = [];
+        for (const field of phoneFields) {
+            for (const variant of phoneVariants) {
+                queries.push(
+                    db.collection(colName)
+                        .where(field, '==', variant)
+                        .get()
+                        .catch(() => null) // field may not be indexed — skip silently
+                );
+            }
+        }
+
+        const snapshots = await Promise.all(queries);
+
+        // Deduplicate by doc id, then batch-write only docs missing the email.
+        const batch = db.batch();
+        let batchCount = 0;
+        const seen = new Set();
+
+        for (const snap of snapshots) {
+            if (!snap) continue;
+            snap.forEach(doc => {
+                if (seen.has(doc.id)) return;
+                seen.add(doc.id);
+                if (doc.data().parentEmail !== parentEmail) {
+                    batch.update(doc.ref, { parentEmail: parentEmail });
+                    batchCount++;
+                }
+            });
+        }
+
+        if (batchCount > 0) {
+            await batch.commit();
+            updateCount += batchCount;
+        }
+    }
+
+    if (updateCount > 0) {
+        console.log('attachEmail: linked parent email to ' + updateCount + ' student record(s)');
+    } else {
+        console.log('attachEmail: no unlinked records found');
+    }
+    return updateCount;
 }
 
 // ============================================================================
@@ -1164,150 +1254,76 @@ async function comprehensiveFindChildren(parentPhone) {
     }
 
     try {
-        // Search in students and pending_students collections in parallel
-        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
-            db.collection('students').get().catch(() => ({ forEach: () => {} })),
-            db.collection('pending_students').get().catch(() => ({ forEach: () => {} }))
-        ]);
-        
-        // Process students
-        studentsSnapshot.forEach(doc => {
-            const data = doc.data();
-            const studentId = doc.id;
-            const studentName = safeText(data.studentName || data.name || 'Unknown');
-            
-            if (studentName === 'Unknown') return;
-            
-            const phoneFields = [
-                data.parentPhone,
-                data.guardianPhone,
-                data.motherPhone,
-                data.fatherPhone,
-                data.contactPhone,
-                data.phone,
-                data.parentPhone1,
-                data.parentPhone2,
-                data.emergencyPhone
-            ];
-            
-            let isMatch = false;
-            let matchedField = '';
-            
-            for (const fieldPhone of phoneFields) {
-                if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
-                    isMatch = true;
-                    matchedField = fieldPhone;
-                    break;
-                }
-            }
-            
-            if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ SUFFIX MATCH: Student ${studentName} linked`);
-                
-                allChildren.set(studentId, {
-                    id: studentId,
-                    name: studentName,
-                    data: data,
-                    isPending: false,
-                    collection: 'students'
+        // ── STEP 1: Fast email query — reads only this parent's students ────
+        // Pass parentEmail as second arg when calling comprehensiveFindChildren.
+        // Falls back to phone scan only when nothing is found (new parent / not yet backfilled).
+        const parentEmail = arguments[1] || '';
+
+        if (parentEmail) {
+            const [studentsSnap, pendingSnap] = await Promise.all([
+                db.collection('students').where('parentEmail', '==', parentEmail).get().catch(() => null),
+                db.collection('pending_students').where('parentEmail', '==', parentEmail).get().catch(() => null)
+            ]);
+
+            const processSnap = (snap, isPending) => {
+                if (!snap) return;
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    const studentId = doc.id;
+                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+                    if (studentName === 'Unknown' || allChildren.has(studentId)) return;
+                    allChildren.set(studentId, { id: studentId, name: studentName, data, isPending, collection: isPending ? 'pending_students' : 'students' });
+                    if (studentNameIdMap.has(studentName)) {
+                        studentNameIdMap.set(studentName + ' (' + studentId.substring(0, 4) + ')', studentId);
+                    } else {
+                        studentNameIdMap.set(studentName, studentId);
+                    }
                 });
-                
-                if (studentNameIdMap.has(studentName)) {
-                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                    studentNameIdMap.set(uniqueName, studentId);
-                } else {
-                    studentNameIdMap.set(studentName, studentId);
-                }
-            }
-        });
-        
-        // Process pending students
-        pendingSnapshot.forEach(doc => {
-            const data = doc.data();
-            const studentId = doc.id;
-            const studentName = safeText(data.studentName || data.name || 'Unknown');
-            
-            if (studentName === 'Unknown') return;
-            
-            const phoneFields = [
-                data.parentPhone,
-                data.guardianPhone,
-                data.motherPhone,
-                data.fatherPhone,
-                data.contactPhone,
-                data.phone
-            ];
-            
-            let isMatch = false;
-            let matchedField = '';
-            
-            for (const fieldPhone of phoneFields) {
-                if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
-                    isMatch = true;
-                    matchedField = fieldPhone;
-                    break;
-                }
-            }
-            
-            if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ PENDING SUFFIX MATCH: Parent ${parentSuffix} = ${matchedField} → Student ${studentName}`);
-                
-                allChildren.set(studentId, {
-                    id: studentId,
-                    name: studentName,
-                    data: data,
-                    isPending: true,
-                    collection: 'pending_students'
+            };
+
+            processSnap(studentsSnap, false);
+            processSnap(pendingSnap, true);
+            console.log('✅ comprehensiveFindChildren email query:', allChildren.size, 'student(s) found');
+        }
+
+        // ── STEP 2: Phone scan fallback — only when email found nothing ─────
+        // Picks up students added by a tutor before the parent registered
+        // (their email won't be on those records yet).
+        if (allChildren.size === 0) {
+            console.log('📱 No email results — running phone scan fallback');
+
+            const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+                db.collection('students').get().catch(() => ({ forEach: () => {} })),
+                db.collection('pending_students').get().catch(() => ({ forEach: () => {} }))
+            ]);
+
+            const scanSnap = (snap, isPending) => {
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    const studentId = doc.id;
+                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+                    if (studentName === 'Unknown' || allChildren.has(studentId)) return;
+
+                    const fields = [
+                        data.parentPhone, data.guardianPhone, data.motherPhone,
+                        data.fatherPhone, data.contactPhone, data.phone,
+                        data.parentPhone1, data.parentPhone2, data.emergencyPhone
+                    ];
+                    const matched = fields.some(f => f && extractPhoneSuffix(f) === parentSuffix);
+                    if (!matched) return;
+
+                    allChildren.set(studentId, { id: studentId, name: studentName, data, isPending, collection: isPending ? 'pending_students' : 'students' });
+                    if (studentNameIdMap.has(studentName)) {
+                        studentNameIdMap.set(studentName + ' (' + studentId.substring(0, 4) + ')', studentId);
+                    } else {
+                        studentNameIdMap.set(studentName, studentId);
+                    }
                 });
-                
-                if (studentNameIdMap.has(studentName)) {
-                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                    studentNameIdMap.set(uniqueName, studentId);
-                } else {
-                    studentNameIdMap.set(studentName, studentId);
-                }
-            }
-        });
+            };
 
-        // Email matching (backup)
-        const userDoc = await db.collection('parent_users')
-            .where('normalizedPhone', '==', parentPhone)
-            .limit(1)
-            .get();
-
-        if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
-            if (userData.email) {
-                try {
-                    const emailSnapshot = await db.collection('students')
-                        .where('parentEmail', '==', userData.email)
-                        .get();
-
-                    emailSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        const studentId = doc.id;
-                        const studentName = safeText(data.studentName || data.name || 'Unknown');
-
-                        if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                            console.log(`✅ EMAIL MATCH: ${userData.email} → Student ${studentName}`);
-                            
-                            allChildren.set(studentId, {
-                                id: studentId,
-                                name: studentName,
-                                data: data,
-                                isPending: false,
-                                collection: 'students'
-                            });
-                            
-                            if (!studentNameIdMap.has(studentName)) {
-                                studentNameIdMap.set(studentName, studentId);
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.warn("Email search error:", error.message);
-                }
-            }
+            scanSnap(studentsSnapshot, false);
+            scanSnap(pendingSnapshot, true);
+            console.log('✅ Phone scan fallback:', allChildren.size, 'student(s) found');
         }
 
         const studentNames = Array.from(studentNameIdMap.keys());
@@ -1339,148 +1355,114 @@ async function comprehensiveFindChildren(parentPhone) {
 // ============================================================================
 
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 SUFFIX-MATCHING Search for:", { parentPhone });
-    
+    console.log("🔍 Search for reports | email:", parentEmail, "phone:", parentPhone);
+
     let assessmentResults = [];
     let monthlyResults = [];
-    
+
     try {
-        // Get parent's phone suffix for comparison
-        const parentSuffix = extractPhoneSuffix(parentPhone);
-        
-        if (!parentSuffix) {
-            console.warn("⚠️ No valid suffix in parent phone");
-            return { assessmentResults: [], monthlyResults: [] };
-        }
-
-        console.log(`🎯 Searching with suffix: ${parentSuffix}`);
-
-        // --- PARALLEL SEARCHES ---
-        const searchPromises = [];
-        
-        // 1. Search assessment reports
-        searchPromises.push(
-            db.collection("student_results").limit(500).get().then(snapshot => {
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    
-                    // Check ALL phone fields with suffix matching
-                    const phoneFields = [
-                        data.parentPhone,
-                        data.parent_phone,
-                        data.guardianPhone,
-                        data.motherPhone,
-                        data.fatherPhone,
-                        data.phone,
-                        data.contactPhone,
-                        data.normalizedParentPhone
-                    ];
-                    
-                    for (const fieldPhone of phoneFields) {
-                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
-                            assessmentResults.push({ 
-                                id: doc.id,
-                                collection: 'student_results',
-                                matchType: 'suffix-match',
-                                matchedField: fieldPhone,
-                                ...data,
-                                timestamp: getTimestampFromData(data),
-                                type: 'assessment'
-                            });
-                            break;
-                        }
-                    }
-                });
-                console.log(`✅ Found ${assessmentResults.length} assessment reports (suffix match)`);
-            }).catch(error => {
-                console.log("ℹ️ Assessment search error:", error.message);
-            })
-        );
-        
-        // 2. Search monthly reports
-        searchPromises.push(
-            db.collection("tutor_submissions").limit(500).get().then(snapshot => {
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    
-                    const phoneFields = [
-                        data.parentPhone,
-                        data.parent_phone,
-                        data.guardianPhone,
-                        data.motherPhone,
-                        data.fatherPhone,
-                        data.phone,
-                        data.contactPhone,
-                        data.normalizedParentPhone
-                    ];
-                    
-                    for (const fieldPhone of phoneFields) {
-                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
-                            monthlyResults.push({ 
-                                id: doc.id,
-                                collection: 'tutor_submissions',
-                                matchType: 'suffix-match',
-                                matchedField: fieldPhone,
-                                ...data,
-                                timestamp: getTimestampFromData(data),
-                                type: 'monthly'
-                            });
-                            break;
-                        }
-                    }
-                });
-                console.log(`✅ Found ${monthlyResults.length} monthly reports (suffix match)`);
-            }).catch(error => {
-                console.log("ℹ️ Monthly search error:", error.message);
-            })
-        );
-        
-        // 3. Email search (backup)
+        // ── STEP 1: Fast email query (only matching docs read) ──────────────
+        // This works for every parent whose email was attached at signup / backfill.
         if (parentEmail) {
-            searchPromises.push(
-                db.collection("student_results")
-                    .where("parentEmail", "==", parentEmail)
-                    .limit(100)
+            const [assessSnap, monthlySnap] = await Promise.all([
+                db.collection('student_results')
+                    .where('parentEmail', '==', parentEmail)
                     .get()
-                    .then(snapshot => {
-                        if (!snapshot.empty) {
-                            snapshot.forEach(doc => {
-                                const data = doc.data();
-                                const existing = assessmentResults.find(r => r.id === doc.id);
-                                if (!existing) {
-                                    assessmentResults.push({ 
-                                        id: doc.id,
-                                        collection: 'student_results',
-                                        matchType: 'email',
-                                        ...data,
-                                        timestamp: getTimestampFromData(data),
-                                        type: 'assessment'
-                                    });
-                                }
-                            });
-                            console.log(`✅ Found ${snapshot.size} reports by email`);
-                        }
-                    }).catch(() => {})
-            );
+                    .catch(() => null),
+                db.collection('tutor_submissions')
+                    .where('parentEmail', '==', parentEmail)
+                    .get()
+                    .catch(() => null)
+            ]);
+
+            assessSnap && assessSnap.forEach(doc => {
+                assessmentResults.push({
+                    id: doc.id, collection: 'student_results',
+                    matchType: 'email', ...doc.data(),
+                    timestamp: getTimestampFromData(doc.data()), type: 'assessment'
+                });
+            });
+
+            monthlySnap && monthlySnap.forEach(doc => {
+                monthlyResults.push({
+                    id: doc.id, collection: 'tutor_submissions',
+                    matchType: 'email', ...doc.data(),
+                    timestamp: getTimestampFromData(doc.data()), type: 'monthly'
+                });
+            });
+
+            console.log('✅ Email query:', assessmentResults.length, 'assessments,', monthlyResults.length, 'monthly reports');
         }
-        
-        // Wait for all searches to complete
-        await Promise.all(searchPromises);
-        
-        // Remove duplicates
-        assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
-        monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
-        
-        console.log("🎯 SEARCH SUMMARY:", {
-            assessments: assessmentResults.length,
-            monthly: monthlyResults.length,
-            parentSuffix: parentSuffix
-        });
-        
+
+        // ── STEP 2: Phone fallback — only runs when email found nothing ─────
+        // Catches any new records a tutor just added that haven't been backfilled yet.
+        // Uses targeted where() queries — no collection scans.
+        const needsPhoneFallback = assessmentResults.length === 0 && monthlyResults.length === 0;
+
+        if (needsPhoneFallback && parentPhone) {
+            const parentSuffix = extractPhoneSuffix(parentPhone);
+            if (!parentSuffix) {
+                console.warn('No valid phone suffix, skipping phone fallback');
+                return { assessmentResults, monthlyResults };
+            }
+
+            console.log('📱 No email results — running phone fallback with suffix:', parentSuffix);
+
+            const noPlus = parentPhone.replace(/^\+/, '');
+            const phoneVariants = [...new Set([
+                parentPhone, noPlus, parentSuffix,
+                '+' + parentSuffix, '0' + parentSuffix
+            ])].filter(Boolean);
+
+            const phoneFields = [
+                'parentPhone', 'parent_phone', 'guardianPhone',
+                'motherPhone', 'fatherPhone', 'phone',
+                'contactPhone', 'normalizedParentPhone'
+            ];
+
+            const colMap = [
+                { col: 'student_results',  type: 'assessment', arr: assessmentResults },
+                { col: 'tutor_submissions', type: 'monthly',    arr: monthlyResults   }
+            ];
+
+            for (const { col, type, arr } of colMap) {
+                const queries = [];
+                for (const field of phoneFields) {
+                    for (const variant of phoneVariants) {
+                        queries.push(
+                            db.collection(col).where(field, '==', variant).get().catch(() => null)
+                        );
+                    }
+                }
+                const snaps = await Promise.all(queries);
+                const seen = new Set(arr.map(r => r.id));
+                snaps.forEach(snap => {
+                    if (!snap) return;
+                    snap.forEach(doc => {
+                        if (seen.has(doc.id)) return;
+                        seen.add(doc.id);
+                        arr.push({
+                            id: doc.id, collection: col,
+                            matchType: 'phone-fallback', ...doc.data(),
+                            timestamp: getTimestampFromData(doc.data()), type
+                        });
+                    });
+                });
+            }
+
+            // Back-fill email onto any newly discovered records so next login is fast
+            if (parentEmail && (assessmentResults.length > 0 || monthlyResults.length > 0)) {
+                attachEmailToMatchingStudentRecords(parentPhone, parentEmail)
+                    .catch(e => console.warn('Non-critical: post-login backfill failed:', e.message));
+            }
+
+            console.log('✅ Phone fallback:', assessmentResults.length, 'assessments,', monthlyResults.length, 'monthly');
+        }
+
     } catch (error) {
-        console.error("❌ Suffix-matching search error:", error);
+        console.error('❌ searchAllReportsForParent error:', error);
     }
-    
+
     return { assessmentResults, monthlyResults };
 }
 
@@ -2646,17 +2628,17 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     showSkeletonLoader('reportContent', 'dashboard');
 
     try {
-        // PARALLEL DATA LOADING
-        const [userDoc, searchResults] = await Promise.all([
-            db.collection('parent_users').doc(userId).get(),
-            searchAllReportsForParent(parentPhone, '', userId)
-        ]);
+        // Fetch user doc first so we have the email for the targeted report search.
+        const userDoc = await db.collection('parent_users').doc(userId).get();
         
         if (!userDoc.exists) {
             throw new Error("User profile not found");
         }
         
         const userData = userDoc.data();
+
+        // Now run the report search with the real email — no collection scans needed.
+        const searchResults = await searchAllReportsForParent(parentPhone, userData.email || '', userId);
         
         // Update UI immediately
         currentUserData = {
@@ -2907,6 +2889,22 @@ class UnifiedAuthManager {
             };
 
             console.log("👤 User data loaded:", this.currentUser.parentName);
+
+            // ONE-TIME backfill for existing parents: attach email to student records
+            // that were created before they signed up. Runs only once per account,
+            // guarded by the `emailBackfilled` flag on their parent_users doc.
+            if (!userData.emailBackfilled) {
+                attachEmailToMatchingStudentRecords(
+                    this.currentUser.normalizedPhone,
+                    this.currentUser.email
+                ).then(count => {
+                    // Mark as done so this never runs again
+                    db.collection('parent_users').doc(user.uid).update({ emailBackfilled: true })
+                        .catch(e => console.warn('Could not set emailBackfilled flag:', e.message));
+                }).catch(err =>
+                    console.warn('Non-critical: email back-fill on login failed:', err.message)
+                );
+            }
 
             // Update UI immediately
             this.showDashboardUI();
