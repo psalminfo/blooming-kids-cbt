@@ -2892,13 +2892,25 @@ class EnrollmentApp {
 // INITIALIZE APPLICATION
 // ==============================================
 document.addEventListener('DOMContentLoaded', () => {
-    // firebaseConfig is already set by the module script (firebaseConfig.js)
-    if (window.firebaseConfig) {
-        window.enrollmentApp = new EnrollmentApp(window.firebaseConfig);
-    } else {
-        console.error('Firebase config not loaded. Make sure firebaseConfig.js is present and loaded as a module.');
-        // Optionally show a user-friendly message
-        document.getElementById('alert-area').innerHTML = 
-            '<div class="alert alert-danger">Configuration error. Please contact support.</div>';
+    // firebaseConfig.js loads as type="module" (async), so window.firebaseConfig
+    // may not be set yet when DOMContentLoaded fires.
+    // Poll briefly, then fall back to offline/localStorage mode so the portal
+    // always renders and addStudent() always runs.
+    let attempts = 0;
+    const maxAttempts = 20; // 20 x 100ms = 2s max wait
+
+    function tryInit() {
+        if (window.firebaseConfig) {
+            window.enrollmentApp = new EnrollmentApp(window.firebaseConfig);
+        } else if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(tryInit, 100);
+        } else {
+            // Config never arrived - run in offline/localStorage mode
+            console.warn('Firebase config not loaded - starting in offline mode.');
+            window.enrollmentApp = new EnrollmentApp(null);
+        }
     }
+
+    tryInit();
 });
