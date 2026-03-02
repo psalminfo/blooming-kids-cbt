@@ -311,7 +311,7 @@ async function fetchFromAdminQuestions(grade, subject) {
 }
 
 /**
- * STRATEGIC FIX: Attempt to fetch from GitHub with Adaptive Parsing
+ * Fetch from GitHub with Adaptive Parsing (Handles Objects & Arrays)
  */
 async function fetchFromGitHub(grade, subject) {
     const baseUrl = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/';
@@ -342,7 +342,6 @@ async function fetchFromGitHub(grade, subject) {
                 let questions = [];
                 let passages = [];
                 
-                // Adaptive Array vs Object Handling
                 if (Array.isArray(data)) {
                     questions = data;
                 } else if (data && data.tests && Array.isArray(data.tests)) {
@@ -357,7 +356,6 @@ async function fetchFromGitHub(grade, subject) {
                     }
                 }
 
-                // Global Key Normalizer (Fixes 'image' and 'passageId' gaps)
                 questions = questions.map((q, idx) => ({
                     ...q,
                     id: q.id || `gh-q-${idx}`,
@@ -374,7 +372,7 @@ async function fetchFromGitHub(grade, subject) {
                 return { questions, passages };
             }
         } catch (e) {
-            // Ignore fetch errors, move to next pattern
+            // Move to next pattern
         }
     }
     throw new Error('No GitHub file found with any pattern');
@@ -462,6 +460,15 @@ export async function loadQuestions(subject, grade, state) {
             allQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
         }
 
+        // Final Normalization Pass to ensure keys match UI expectations
+        allQuestions = allQuestions.map((q, index) => ({
+            ...q,
+            id: q.firebaseId || q.id || `question-${index}`,
+            imageUrl: q.image || q.imageUrl || q.image_url || null,
+            passageId: q.passageId || q.passage_id || null,
+            type: q.type || (q.options && q.options.length > 0 ? "mcq" : "creative-writing")
+        }));
+
         const passagesMap = {};
         allPassages.forEach(passage => {
             if (passage.passageId && passage.content) {
@@ -473,13 +480,6 @@ export async function loadQuestions(subject, grade, state) {
             container.innerHTML = `<p class="text-red-600">❌ No ${subject} questions found in any source.</p>`;
             return;
         }
-
-        // Final Normalization Pass
-        allQuestions = allQuestions.map(q => ({
-            ...q,
-            imageUrl: q.image || q.imageUrl || q.image_url || null,
-            passageId: q.passageId || q.passage_id || null
-        }));
 
         if (subject.toLowerCase() === 'ela' && state === 'creative-writing' && isGrade3Plus(grade)) {
             creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing');
@@ -510,11 +510,7 @@ export async function loadQuestions(subject, grade, state) {
                 selectedQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
             }
             
-            loadedQuestions = selectedQuestions.map((q, index) => ({ 
-                ...q, 
-                id: q.firebaseId || q.id || `question-${index}`
-            }));
-            
+            loadedQuestions = selectedQuestions;
             saveSession(loadedQuestions, passagesMap);
             displayMCQQuestions(loadedQuestions, passagesMap);
             if (submitBtnContainer) submitBtnContainer.style.display = 'block';
@@ -534,9 +530,9 @@ function isGrade3Plus(grade) {
     }
 }
 
-function saveSession(questions, passages) {
+function saveSession(questions, passagesMap) {
     try {
-        const sessionData = { questions, passages, timestamp: Date.now(), sessionId: currentSessionId };
+        const sessionData = { questions, passages: passagesMap, timestamp: Date.now(), sessionId: currentSessionId };
         sessionStorage.setItem(currentSessionId, JSON.stringify(sessionData));
     } catch (err) {
         console.error('Error saving session:', err);
@@ -593,8 +589,16 @@ function saveTextAnswer(questionId, answer) {
 
 function displayQuestionsBasedOnState(questions, state) {
     const savedSession = getSavedSession();
-    const passagesMap = savedSession?.passages ? 
-        Object.fromEntries(savedSession.passages.map(p => [p.passageId, p])) : {};
+    let passagesMap = {};
+
+    // THE TACTICAL FIX: Handle both Array and Object correctly so .map doesn't crash
+    if (savedSession && savedSession.passages) {
+        if (Array.isArray(savedSession.passages)) {
+            passagesMap = Object.fromEntries(savedSession.passages.map(p => [p.passageId, p]));
+        } else {
+            passagesMap = savedSession.passages; 
+        }
+    }
     
     if (state === 'creative-writing') {
         const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing');
@@ -649,7 +653,7 @@ function displayCreativeWriting(question) {
     const tutorEmail = escapeHtml(params.get('tutorEmail') || '');
     const grade = escapeHtml(params.get('grade') || '');
     
-    const safeQuestionId = question.id ? question.id.replace(/[^a-zA-Z0-9]/g, '_') : 'creative_writing_0';
+    const safeQuestionId = question.id ? String(question.id).replace(/[^a-zA-Z0-9]/g, '_') : 'creative_writing_0';
     const safeQuestionText = escapeHtml(question.question || '');
     
     container.innerHTML = `
