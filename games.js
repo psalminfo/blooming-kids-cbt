@@ -21,8 +21,13 @@
         tttMode:'ai', // 'ai' | 'online'
         tttGameId: null,
         tttMyMark: 'X',
+        tttOpponentName: 'Opponent',
         tttUnsub: null,
-        tttTutors: []
+        tttTutors: [],
+        wordGameId: null,
+        wordMyRole: null,
+        wordUnsub: null,
+        pendingChallenges: 0
     };
 
     /* ── Firebase helpers (uses modular SDK bridged from tutor.js) ─────────── */
@@ -42,7 +47,7 @@
     /* ── widget init ─────────────────────────────────── */
     function initWidget() {
         if (window.tutorData) {
-            state.currentUser.name  = window.tutorData.name  || 'Tutor';
+            state.currentUser.name  = window.tutorData.displayName || window.tutorData.name  || 'Tutor';
             state.currentUser.id    = window.tutorData.id    || null;
             state.currentUser.email = window.tutorData.email || null;
         }
@@ -57,6 +62,18 @@
         btn.onmouseout  = () => { btn.style.transform=''; btn.style.boxShadow='0 8px 24px rgba(245,158,11,.45),0 0 0 3px rgba(255,255,255,.3)'; };
         btn.onclick = openModal;
         document.body.appendChild(btn);
+
+        // Challenge badge style
+        if (!document.getElementById('bk-game-badge-style')) {
+            const st = document.createElement('style');
+            st.id = 'bk-game-badge-style';
+            st.textContent = `
+                #bk-game-challenge-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9999px;font-size:.65rem;font-weight:900;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;animation:bkBadgePulse 1.5s ease-in-out infinite;pointer-events:none;}
+                @keyframes bkBadgePulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.6)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+                #bk-game-floater{position:relative;}
+            `;
+            document.head.appendChild(st);
+        }
 
         // Modal
         const modal = document.createElement('div');
@@ -79,6 +96,43 @@
         document.body.appendChild(modal);
         document.getElementById('bk-close-btn').onclick = closeModal;
         modal.addEventListener('click', e => { if (e.target===modal) closeModal(); });
+    }
+
+    function updateGameFloaterBadge(count) {
+        const btn = document.getElementById('bk-game-floater');
+        if (!btn) return;
+        let badge = document.getElementById('bk-game-challenge-badge');
+        if (count > 0) {
+            if (!badge) { badge = document.createElement('span'); badge.id = 'bk-game-challenge-badge'; btn.appendChild(badge); }
+            badge.textContent = count > 9 ? '9+' : count;
+        } else {
+            if (badge) badge.remove();
+        }
+    }
+
+    function playChallengeTone() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const notes = [523, 659, 784]; // C5, E5, G5
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.12);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.25);
+                osc.start(ctx.currentTime + i * 0.12);
+                osc.stop(ctx.currentTime + i * 0.12 + 0.28);
+            });
+        } catch(e) {}
+    }
+
+    function triggerConfetti() {
+        if (typeof confetti === 'function') {
+            confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#6366f1','#f59e0b','#10b981','#f43f5e','#8b5cf6'] });
+            setTimeout(() => confetti({ particleCount: 60, spread: 55, origin: { y: 0.5 }, colors: ['#6366f1','#fbbf24','#34d399'] }), 400);
+        }
     }
 
     function openModal()  { document.getElementById('bk-game-modal').style.display='flex'; showMainMenu(); }
@@ -208,7 +262,6 @@
     }
 
     /* ── WORD BUILDER ────────────────────────────────── */
-    function initWordGame() { stopAll(); state.score=0; state.wordLevel=1; state.gameActive=true; state.validWordsFound=[]; generateLevel(); }
     function generateLevel() {
         state.targetWord = ROOTS[Math.floor(Math.random()*ROOTS.length)];
         state.wordTiles  = state.targetWord.split('').sort(()=>Math.random()-.5);
@@ -242,6 +295,36 @@
         window.bkWSubmit=submitWord;
         window.bkWordEnd=()=>showGameOver(state.score,'Word Builder');
     }
+    function initWordGame() {
+        stopAll();
+        state.score=0; state.wordLevel=1; state.gameActive=true; state.validWordsFound=[];
+        state.wordGameId=null; state.wordMyRole=null; state.wordUnsub=null;
+        // Show a quick mode selection: Solo vs Challenge
+        const c=container(); c.style.padding='16px';
+        loadTutorsForTTT();
+        c.innerHTML=`
+            <div style="width:100%;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <div style="font-weight:900;color:#1e1b4b;font-size:1rem;">🧩 Word Builder</div>
+                    <button onclick="window.bkGoMenu()" style="font-size:.72rem;color:#64748b;background:#f1f5f9;border:none;padding:5px 12px;border-radius:999px;cursor:pointer;font-weight:700;">← Menu</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+                    <button onclick="bkWordSolo()" style="border:2px solid #e0e7ff;border-radius:14px;padding:18px 8px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.borderColor='#6366f1';this.style.background='#f0f0ff'" onmouseout="this.style.borderColor='#e0e7ff';this.style.background='#fff'">
+                        <span style="font-size:1.8rem;">🧩</span>
+                        <span style="font-weight:800;color:#374151;font-size:.78rem;">Solo Play</span>
+                        <span style="font-size:.65rem;color:#9ca3af;">Beat your score</span>
+                    </button>
+                    <button onclick="bkWordChallenge()" style="border:2px solid #ede9fe;border-radius:14px;padding:18px 8px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.borderColor='#7c3aed';this.style.background='#faf5ff'" onmouseout="this.style.borderColor='#ede9fe';this.style.background='#fff'">
+                        <span style="font-size:1.8rem;">⚔️</span>
+                        <span style="font-weight:800;color:#374151;font-size:.78rem;">Challenge Tutor</span>
+                        <span style="font-size:.65rem;color:#9ca3af;">Tutor vs Tutor</span>
+                    </button>
+                </div>
+            </div>`;
+        window.bkGoMenu     = showMainMenu;
+        window.bkWordSolo   = ()=>{ state.score=0;state.wordLevel=1;state.gameActive=true;state.validWordsFound=[];generateLevel(); };
+        window.bkWordChallenge = renderWordOnlineChallengeMenu;
+    }
     function submitWord(){
         const fb=document.getElementById('wrd-feedback'),w=state.currentWord;
         if(!w)return;
@@ -251,6 +334,215 @@
         if(DICT.includes(w)||ROOTS.includes(w)){const pts=w.length*10;state.score+=pts;state.validWordsFound.push(w);fb.style.color='#16a34a';fb.textContent=`✓ Good! +${pts}`;document.getElementById('word-score').innerText=state.score;}
         else{fb.style.color='#ef4444';fb.textContent='Not in dictionary';}
         setTimeout(()=>{bkWClear();setTimeout(()=>fb.style.opacity='0',900);},500);
+    }
+
+    /* ── WORD BUILDER ONLINE (Tutor-vs-Tutor) ───────── */
+
+    async function createOnlineWordGame(opponentId, opponentName, opponentEmail) {
+        const statusEl=document.getElementById('wrd-invite-status');
+        if(statusEl) statusEl.textContent='Creating game…';
+        try {
+            if(!db()||!C()||!AD()) throw new Error('Firebase unavailable');
+            const myId    = state.currentUser.id||state.currentUser.email||'';
+            const myEmail = state.currentUser.email||'';
+            const myName  = state.currentUser.name||'Tutor';
+            const targetWord = ROOTS[Math.floor(Math.random()*ROOTS.length)];
+            const tiles      = targetWord.split('').sort(()=>Math.random()-.5);
+            const gameData = {
+                players:      { A: myId,    B: opponentId },
+                playerNames:  { A: myName,  B: opponentName },
+                playerEmails: { A: myEmail, B: opponentEmail||'' },
+                targetWord, tiles,
+                scores:      { A:0, B:0 },
+                foundWords:  { A:[], B:[] },
+                targetFound: null,
+                status:     'waiting',
+                createdAt:   new Date()
+            };
+            const ref = await AD()(C()(db(),'word_games'), gameData);
+            state.wordGameId  = ref.id;
+            state.wordMyRole  = 'A';
+            state.targetWord  = targetWord;
+            state.wordTiles   = tiles;
+
+            // ── Notify opponent ──
+            if(opponentEmail) {
+                try {
+                    await AD()(C()(db(),'tutor_notifications'), {
+                        type:       'word_challenge',
+                        tutorEmail: opponentEmail,
+                        fromName:   myName,
+                        fromId:     myId,
+                        gameId:     ref.id,
+                        gameType:   'word',
+                        title:      `🧩 Word Builder Challenge from ${myName}!`,
+                        message:    `${myName} has challenged you to a Word Builder match. Tap to accept!`,
+                        read:       false,
+                        createdAt:  new Date()
+                    });
+                } catch(ne){ console.warn('Word notify err:',ne.message); }
+            }
+
+            if(statusEl) statusEl.textContent='⏳ Waiting for opponent to join…';
+            subscribeToOnlineWordGame(ref.id);
+        } catch(e){
+            if(statusEl) statusEl.textContent='Error: '+e.message;
+        }
+    }
+
+    function subscribeToOnlineWordGame(gameId) {
+        if(!db()||!DC()||!SN()) return;
+        if(state.wordUnsub) state.wordUnsub();
+        state.gameActive = true;
+        state.wordUnsub  = SN()(DC()(db(),'word_games',gameId), snap=>{
+            if(!snap.exists()) return;
+            const g = snap.data();
+            state.targetWord = g.targetWord;
+            state.wordTiles  = g.tiles;
+
+            // Opponent joining: activate game
+            if(g.status==='waiting' && state.wordMyRole==='B' && UD() && DC()) {
+                UD()(DC()(db(),'word_games',gameId),{status:'active'}).catch(()=>{});
+            }
+            renderOnlineWordUI(g, gameId);
+            if(g.status==='done') { if(state.wordUnsub){state.wordUnsub();state.wordUnsub=null;} }
+        });
+    }
+
+    function renderOnlineWordUI(g, gameId) {
+        const c=container(); c.style.padding='12px';
+        const myRole   = state.wordMyRole||'A';
+        const oppRole  = myRole==='A'?'B':'A';
+        const myScore  = g.scores?.[myRole]||0;
+        const oppScore = g.scores?.[oppRole]||0;
+        const myName   = g.playerNames?.[myRole]||'You';
+        const oppName  = g.playerNames?.[oppRole]||'Opponent';
+        const waiting  = g.status==='waiting';
+        const done     = g.status==='done';
+        const winner   = g.targetFound; // 'A' or 'B' or null
+        const tiles    = g.tiles||[];
+
+        let statusBanner = '';
+        if(waiting)     statusBanner=`<div style="text-align:center;background:#fef3c7;border-radius:10px;padding:10px;font-weight:800;font-size:.82rem;color:#92400e;margin-bottom:10px;">⏳ Waiting for opponent to join…</div>`;
+        else if(done)   statusBanner=`<div style="text-align:center;background:${winner===myRole?'#d1fae5':'#fee2e2'};border-radius:10px;padding:10px;font-weight:800;font-size:.82rem;color:${winner===myRole?'#065f46':'#991b1b'};margin-bottom:10px;">${winner===myRole?'🏆 You found it first! You win!':'😅 Opponent found the word first!'}</div>`;
+        else            statusBanner=`<div style="text-align:center;background:#eef2ff;border-radius:10px;padding:10px;font-weight:800;font-size:.82rem;color:#3730a3;margin-bottom:10px;">🔴 Live — Build words from the tiles!</div>`;
+
+        c.innerHTML=`
+            <div style="width:100%;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">🧩 Word Builder <span style="font-size:.62rem;background:#eef2ff;color:#4338ca;padding:2px 7px;border-radius:999px;margin-left:4px;">ONLINE</span></div>
+                    <button onclick="window.bkGoMenu()" style="font-size:.68rem;color:#64748b;background:#f1f5f9;border:none;padding:4px 10px;border-radius:999px;cursor:pointer;">← Menu</button>
+                </div>
+                <!-- Scores -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                    <div style="text-align:center;background:linear-gradient(135deg,#eef2ff,#ddd6fe);border-radius:11px;padding:8px;">
+                        <div style="font-size:.65rem;color:#6366f1;font-weight:800;text-transform:uppercase;">You</div>
+                        <div style="font-size:1.4rem;font-weight:900;color:#3730a3;">${myScore}</div>
+                    </div>
+                    <div style="text-align:center;background:#f8fafc;border-radius:11px;padding:8px;border:1.5px solid #e2e8f0;">
+                        <div style="font-size:.65rem;color:#64748b;font-weight:800;text-transform:uppercase;">${esc(oppName)}</div>
+                        <div style="font-size:1.4rem;font-weight:900;color:#374151;">${oppScore}</div>
+                    </div>
+                </div>
+                ${statusBanner}
+                ${done ? '' : `
+                <div style="background:linear-gradient(135deg,#eef2ff,#ddd6fe);border-radius:12px;height:60px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;border:2px solid #c7d2fe;position:relative;">
+                    <span id="wrd-display" style="font-size:1.8rem;font-weight:900;color:#3730a3;letter-spacing:.1em;"></span>
+                    <span style="position:absolute;top:5px;right:9px;font-size:.58rem;color:#a5b4fc;font-weight:700;">Target: ${g.targetWord.length} letters</span>
+                </div>
+                <p id="wrd-feedback" style="height:20px;margin-bottom:6px;font-size:.8rem;font-weight:700;text-align:center;opacity:0;transition:opacity .3s;"></p>
+                <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-bottom:12px;" id="tile-rack">
+                    ${tiles.map((l,i)=>`<button class="wt" data-idx="${i}" data-l="${l}" style="width:38px;height:38px;background:linear-gradient(135deg,#eef2ff,#c7d2fe);color:#3730a3;font-weight:900;border-radius:10px;border:none;font-size:.95rem;cursor:pointer;transition:all .15s;">${l}</button>`).join('')}
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:8px;width:100%;">
+                    <button onclick="bkWShuffle()" style="padding:10px;background:#fef3c7;color:#92400e;border:none;border-radius:12px;font-weight:700;cursor:pointer;">🔀</button>
+                    <button onclick="bkWClear()" style="padding:10px;background:#f1f5f9;color:#374151;border:none;border-radius:12px;font-weight:700;cursor:pointer;">Clear</button>
+                    <button onclick="bkWOnlineSubmit('${gameId}')" style="padding:10px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;">Submit ✓</button>
+                </div>`}
+            </div>`;
+
+        if(!done) {
+            state.currentWord='';
+            state.wordTiles=[...tiles];
+            document.querySelectorAll('.wt').forEach(b=>{
+                b.onclick=function(){if(this.style.opacity==='0.3')return;state.currentWord+=this.dataset.l;this.style.opacity='0.3';this.style.cursor='default';document.getElementById('wrd-display').innerText=state.currentWord;};
+            });
+            window.bkWClear=()=>{state.currentWord='';document.getElementById('wrd-display').innerText='';document.querySelectorAll('.wt').forEach(b=>{b.style.opacity='1';b.style.cursor='pointer';});};
+            window.bkWShuffle=()=>{bkWClear();state.wordTiles.sort(()=>Math.random()-.5);renderOnlineWordUI(g,gameId);};
+            window.bkWOnlineSubmit = async (gid)=>{
+                const fb=document.getElementById('wrd-feedback'), w=state.currentWord;
+                if(!w||waiting) return;
+                fb.style.opacity='1';
+                const myWords=g.foundWords?.[myRole]||[];
+                if(myWords.includes(w)){fb.style.color='#f59e0b';fb.textContent='Already found!';setTimeout(()=>{bkWClear();fb.style.opacity='0';},800);return;}
+                if(w===g.targetWord){
+                    // Target word found — end game
+                    const finalScore=(myScore+w.length*50);
+                    await UD()(DC()(db(),'word_games',gid),{
+                        [`scores.${myRole}`]: finalScore,
+                        [`foundWords.${myRole}`]: [...myWords,w],
+                        targetFound: myRole,
+                        status:'done'
+                    }).catch(()=>{});
+                    return;
+                }
+                if(DICT.includes(w)||ROOTS.includes(w)){
+                    const pts=w.length*10;
+                    await UD()(DC()(db(),'word_games',gid),{
+                        [`scores.${myRole}`]: myScore+pts,
+                        [`foundWords.${myRole}`]: [...myWords,w]
+                    }).catch(()=>{});
+                    fb.style.color='#16a34a';fb.textContent=`✓ Good! +${pts}`;
+                } else {
+                    fb.style.color='#ef4444';fb.textContent='Not in dictionary';
+                }
+                setTimeout(()=>{bkWClear();setTimeout(()=>fb.style.opacity='0',900);},500);
+            };
+        }
+        window.bkGoMenu = showMainMenu;
+    }
+
+    function renderWordOnlineChallengeMenu() {
+        const c=container(); c.style.padding='14px';
+        loadTutorsForTTT(); // reuse same tutor list loader
+        c.innerHTML=`
+            <div style="width:100%;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">🧩 Word Builder Challenge</div>
+                    <button onclick="window.bkGoMenu()" style="font-size:.72rem;color:#64748b;background:#f1f5f9;border:none;padding:5px 12px;border-radius:999px;cursor:pointer;font-weight:700;">← Menu</button>
+                </div>
+                <p style="color:#6b7280;font-size:.78rem;margin-bottom:12px;">Choose a tutor to challenge. You'll get the same scrambled word — first to find it wins!</p>
+                <div style="position:relative;margin-bottom:8px;">
+                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input id="word-tutor-search" type="text" placeholder="Search tutor…" style="width:100%;padding:8px 10px 8px 28px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.8rem;outline:none;box-sizing:border-box;" oninput="bkWord_filterTutors(this.value)">
+                </div>
+                <div id="word-tutor-list" style="max-height:160px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:10px;">
+                    <div style="text-align:center;padding:20px;color:#9ca3af;font-size:.78rem;">Loading tutors…</div>
+                </div>
+                <div id="wrd-invite-status" style="font-size:.75rem;color:#6b7280;text-align:center;min-height:20px;"></div>
+            </div>`;
+        window.bkGoMenu = showMainMenu;
+        window.bkWord_filterTutors = q=>{
+            const el=document.getElementById('word-tutor-list'); if(!el)return;
+            const filtered=state.tttTutors.filter(t=>!q||t.name.toLowerCase().includes(q.toLowerCase())||t.email.toLowerCase().includes(q.toLowerCase()));
+            if(!filtered.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:#9ca3af;font-size:.78rem;">${state.tttTutors.length?'No match':'No other tutors found'}</div>`;return;}
+            el.innerHTML=filtered.map(t=>`
+                <div onclick="bkWord_invite('${esc(t.id)}','${esc(t.name)}','${esc(t.email)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f0f0ff'" onmouseout="this.style.background='#fff'">
+                    <div style="width:34px;height:34px;border-radius:10px;background:#ede9fe;color:#7c3aed;font-weight:900;font-size:.75rem;display:flex;align-items:center;justify-content:center;">${t.name.charAt(0).toUpperCase()}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;color:#1e293b;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.name)}</div>
+                        <div style="font-size:.65rem;color:#94a3b8;">${esc(t.email)}</div>
+                    </div>
+                    <span style="font-size:.65rem;background:#ede9fe;color:#7c3aed;padding:3px 8px;border-radius:999px;font-weight:700;">Challenge ▶</span>
+                </div>`).join('');
+            window.bkWord_invite = createOnlineWordGame;
+        };
+        // Render immediately (tutors may already be loaded)
+        window.bkWord_filterTutors('');
+        // If not yet loaded, re-render once loaded
+        if(!state.tttTutors.length) {
+            setTimeout(()=>{ if(state.tttTutors.length) window.bkWord_filterTutors(''); },2500);
+        }
     }
 
     /* ── TIC-TAC-TOE ─────────────────────────────────── */
@@ -301,7 +593,7 @@
             const panel=document.getElementById('ttt-mode-panel');
             if(mode==='ai'){
                 panel.innerHTML=`<button onclick="bkTTT_start()" style="width:100%;padding:13px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:13px;font-weight:800;cursor:pointer;font-size:.9rem;box-shadow:0 4px 14px rgba(99,102,241,.35);">▶ Start Game</button>`;
-                window.bkTTT_start=()=>{state.tttMode='ai';state.tttBoard=Array(9).fill(null);state.tttTurn='X';renderTTT(null,null);};
+                window.bkTTT_start=()=>{state.gameActive=true;state.tttMode='ai';state.tttBoard=Array(9).fill(null);state.tttTurn='X';state._confettiShown=false;renderTTT(null,null,null,false);};
             } else {
                 renderTTTOnlinePanel(panel);
             }
@@ -348,7 +640,7 @@
         const filtered = state.tttTutors.filter(t=>!q||t.name.toLowerCase().includes(q.toLowerCase())||t.email.toLowerCase().includes(q.toLowerCase()));
         if(!filtered.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:#9ca3af;font-size:.78rem;">${state.tttTutors.length?'No match':'No other tutors found'}</div>`;return;}
         el.innerHTML=filtered.map(t=>`
-            <div onclick="bkTTT_invite('${esc(t.id)}','${esc(t.name)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f0f0ff'" onmouseout="this.style.background='#fff'">
+            <div onclick="bkTTT_invite('${esc(t.id)}','${esc(t.name)}','${esc(t.email)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f0f0ff'" onmouseout="this.style.background='#fff'">
                 <div style="width:34px;height:34px;border-radius:10px;background:#eef2ff;color:#4338ca;font-weight:900;font-size:.75rem;display:flex;align-items:center;justify-content:center;">${t.name.charAt(0).toUpperCase()}</div>
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:700;color:#1e293b;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.name)}</div>
@@ -359,14 +651,18 @@
         window.bkTTT_invite = createOnlineTTTGame;
     }
 
-    async function createOnlineTTTGame(opponentId, opponentName) {
+    async function createOnlineTTTGame(opponentId, opponentName, opponentEmail) {
         const statusEl=document.getElementById('ttt-invite-status');
         if(statusEl) statusEl.textContent='Creating game…';
         try {
             if(!db()||!C()||!AD()) throw new Error('Firebase unavailable');
+            const myId    = state.currentUser.id||state.currentUser.email||'';
+            const myEmail = state.currentUser.email||'';
+            const myName  = state.currentUser.name||'Tutor';
             const gameData = {
-                players: { X: state.currentUser.id||state.currentUser.email, O: opponentId },
-                playerNames: { X: state.currentUser.name, O: opponentName },
+                players:     { X: myId, O: opponentId },
+                playerNames: { X: myName, O: opponentName },
+                playerEmails:{ X: myEmail, O: opponentEmail||'' },
                 board: Array(9).fill(null),
                 turn: 'X',
                 status: 'waiting', // waiting → active → done
@@ -377,7 +673,27 @@
             const ref = await AD()(C()(db(),'ttt_games'), gameData);
             state.tttGameId = ref.id;
             state.tttMyMark = 'X';
-            if(statusEl) statusEl.textContent='Waiting for opponent…';
+            state.tttOpponentName = opponentName || 'Opponent';
+
+            // ── Notify the opponent via tutor_notifications ──
+            if(opponentEmail) {
+                try {
+                    await AD()(C()(db(),'tutor_notifications'), {
+                        type:         'ttt_challenge',
+                        tutorEmail:   opponentEmail,
+                        fromName:     myName,
+                        fromId:       myId,
+                        gameId:       ref.id,
+                        gameType:     'ttt',
+                        title:        `🎮 Tic-Tac-Toe Challenge from ${myName}!`,
+                        message:      `${myName} has challenged you to a Tic-Tac-Toe match. Tap to accept and play!`,
+                        read:         false,
+                        createdAt:    new Date()
+                    });
+                } catch(ne){ console.warn('TTT notify err:',ne.message); }
+            }
+
+            if(statusEl) statusEl.textContent='⏳ Waiting for opponent to join…';
             subscribeToOnlineTTT(ref.id);
         } catch(e) {
             if(statusEl) statusEl.textContent='Error: '+e.message;
@@ -387,80 +703,123 @@
     function subscribeToOnlineTTT(gameId) {
         if(!db()||!DC()||!SN()) return;
         if(state.tttUnsub) state.tttUnsub();
+        state.gameActive=true;
+        state.tttMode='online';
+        state.tttGameId=gameId;
         state.tttUnsub = SN()(DC()(db(),'ttt_games',gameId), snap => {
             if(!snap.exists()) return;
             const g = snap.data();
             state.tttBoard = g.board || Array(9).fill(null);
             state.tttTurn  = g.turn  || 'X';
             if(g.scores) state.tttScores = g.scores;
+
+            // Derive opponent name from playerNames
+            const myMark = state.tttMyMark;
+            const oppMark = myMark === 'X' ? 'O' : 'X';
+            if(g.playerNames?.[oppMark]) state.tttOpponentName = g.playerNames[oppMark];
+
+            // If joining as O, activate game
+            if(g.status==='waiting' && state.tttMyMark==='O' && DC() && UD()) {
+                UD()(DC()(db(),'ttt_games',gameId),{status:'active'}).catch(()=>{});
+            }
+
             const winLine = tttWinLine(state.tttBoard);
-            renderTTT(winLine, gameId);
-            if(g.status==='done') { if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;} }
+            // Use Firestore winner field as source of truth for done state
+            const firestoreWinner = g.winner || null;
+            const isDone = g.status === 'done';
+            renderTTT(winLine, gameId, firestoreWinner, isDone);
+            if(isDone) { if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;} }
         });
     }
 
-    function renderTTT(winLine=null, gameId=null) {
+    function renderTTT(winLine=null, gameId=null, firestoreWinner=null, isDone=false) {
         const c=container(); c.style.padding='14px';
         const b=state.tttBoard, sc=state.tttScores;
         const isOnline = state.tttMode==='online' && gameId;
         const myTurn   = !isOnline || state.tttTurn===state.tttMyMark;
-        const winner   = tttWinLine(b) ? b[tttWinLine(b)[0]] : null;
-        const isDraw   = !winner && b.every(x=>x);
+        // For online games, use firestoreWinner as authoritative source; locally derive from board
+        const winner   = isOnline ? firestoreWinner : (tttWinLine(b) ? b[tttWinLine(b)[0]] : null);
+        const isDraw   = isOnline ? (isDone && !winner) : (!winner && b.every(x=>x));
+        const opponentLabel = isOnline ? esc(state.tttOpponentName) : 'AI';
+
+        // Confetti — only for the winner, only once per game
+        if(winner && !state._confettiShown) {
+            const iWon = isOnline ? winner === state.tttMyMark : winner === 'X';
+            if(iWon) { state._confettiShown = true; setTimeout(triggerConfetti, 200); }
+        }
+        if(!winner && !isDraw) state._confettiShown = false;
 
         let statusText, statusBg;
-        if(winner){statusText=`🏆 ${winner==='X'?'X':'O'} wins!`;statusBg='linear-gradient(135deg,#d1fae5,#ecfdf5)';}
-        else if(isDraw){statusText='🤝 Draw!';statusBg='#f8fafc';}
-        else if(isOnline && !myTurn){statusText='⏳ Waiting for opponent…';statusBg='#fef3c7';}
-        else{statusText=`${b[0]===null?'':''} ${state.tttTurn==='X'?'Your turn (✕)':'AI/Opponent turn (⭕)'}`;statusBg='#eef2ff';}
+        if(winner){
+            if(isOnline){
+                if(winner===state.tttMyMark){ statusText='🏆 You Win!'; statusBg='linear-gradient(135deg,#d1fae5,#ecfdf5)'; }
+                else { statusText='😅 ' + opponentLabel + ' Wins!'; statusBg='linear-gradient(135deg,#fee2e2,#fff1f2)'; }
+            } else {
+                statusText = winner==='X' ? '🏆 You Win!' : '🤖 AI Wins!';
+                statusBg   = winner==='X' ? 'linear-gradient(135deg,#d1fae5,#ecfdf5)' : 'linear-gradient(135deg,#fee2e2,#fff1f2)';
+            }
+        } else if(isDraw){statusText='🤝 Draw!';statusBg='#f8fafc';}
+        else if(isOnline && !myTurn){statusText='⏳ Waiting for ' + opponentLabel + '…';statusBg='#fef3c7';}
+        else{statusText=(state.tttTurn==='X'?'Your turn (✕)':'Opponent turn (⭕)');statusBg='#eef2ff';}
 
-        c.innerHTML=`
-            <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-                <div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">❌⭕ Tic-Tac-Toe ${isOnline?'<span style="font-size:.65rem;background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:999px;margin-left:4px;">ONLINE</span>':''}</div>
-                <button onclick="window.bkGoMenu()" style="font-size:.68rem;color:#64748b;background:#f1f5f9;border:none;padding:4px 10px;border-radius:999px;cursor:pointer;">← Menu</button>
-            </div>
-            <!-- Scoreboard -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;">
-                <div style="text-align:center;background:linear-gradient(135deg,#fef3c7,#fef9c3);border-radius:11px;padding:8px;border:1.5px solid ${state.tttTurn==='X'&&!winLine&&!isDraw?'#f59e0b':'#fde68a'};">
-                    <div style="font-size:1.1rem;font-weight:900;color:#d97706;">✕</div>
-                    <div style="font-size:1.1rem;font-weight:900;color:#92400e;">${sc.X}</div>
-                    <div style="font-size:.6rem;color:#a16207;font-weight:700;">YOU</div>
-                </div>
-                <div style="text-align:center;background:#f8fafc;border-radius:11px;padding:8px;border:1.5px solid #e2e8f0;">
-                    <div style="font-size:.9rem;">🤝</div>
-                    <div style="font-size:1.1rem;font-weight:900;color:#374151;">${sc.draws}</div>
-                    <div style="font-size:.6rem;color:#9ca3af;font-weight:700;">DRAWS</div>
-                </div>
-                <div style="text-align:center;background:linear-gradient(135deg,#ede9fe,#e0e7ff);border-radius:11px;padding:8px;border:1.5px solid ${state.tttTurn==='O'&&!winLine&&!isDraw?'#8b5cf6':'#ddd6fe'};">
-                    <div style="font-size:1.1rem;font-weight:900;color:#7c3aed;">⭕</div>
-                    <div style="font-size:1.1rem;font-weight:900;color:#5b21b6;">${sc.O}</div>
-                    <div style="font-size:.6rem;color:#6d28d9;font-weight:700;">${isOnline?'TUTOR':'AI'}</div>
-                </div>
-            </div>
-            <!-- Status -->
-            <div style="text-align:center;padding:8px;border-radius:10px;background:${statusBg};font-weight:800;font-size:.82rem;color:#374151;margin-bottom:12px;">${statusText}</div>
-            <!-- Board -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-                ${b.map((cell,i)=>{
-                    const wl=tttWinLine(b);const isW=wl&&wl.includes(i);
-                    const bg=isW?(cell==='X'?'linear-gradient(135deg,#fde68a,#fbbf24)':'linear-gradient(135deg,#ddd6fe,#c4b5fd)'):cell?'#f8fafc':'#fff';
-                    const bc=isW?(cell==='X'?'#f59e0b':'#8b5cf6'):cell?'#e2e8f0':'#e0e7ff';
-                    const clickable=!cell&&!winner&&!isDraw&&(state.tttMode!=='online'||myTurn);
-                    return `<button class="ttt-c" data-i="${i}" style="aspect-ratio:1;border-radius:13px;border:2px solid ${bc};background:${bg};font-size:1.6rem;font-weight:900;color:${cell==='X'?'#d97706':cell==='O'?'#7c3aed':'transparent'};cursor:${clickable?'pointer':'default'};box-shadow:${isW?'0 0 0 3px '+(cell==='X'?'rgba(245,158,11,.25)':'rgba(139,92,246,.25)'):'none'};transition:all .15s;" ${clickable?`onmouseover="this.style.background='#f0f0ff';this.style.borderColor='#a5b4fc'" onmouseout="this.style.background='#fff';this.style.borderColor='#e0e7ff'"`:''}>
-                        ${cell==='X'?'✕':cell==='O'?'⭕':''}</button>`;
-                }).join('')}
-            </div>
-            <button id="ttt-new" style="width:100%;padding:11px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.85rem;">🔄 New Round</button>`;
+        // Determine which mark belongs to "you" vs opponent for scoreboard labels
+        const myMarkLabel  = isOnline ? state.tttMyMark  : 'X';
+        const oppMarkLabel = myMarkLabel === 'X' ? 'O' : 'X';
+        const leftScore    = sc[myMarkLabel]  || 0;
+        const rightScore   = sc[oppMarkLabel] || 0;
+        const leftColor    = myMarkLabel  === 'X' ? '#d97706' : '#7c3aed';
+        const leftBg       = myMarkLabel  === 'X' ? 'linear-gradient(135deg,#fef3c7,#fef9c3)' : 'linear-gradient(135deg,#ede9fe,#e0e7ff)';
+        const rightColor   = oppMarkLabel === 'O' ? '#7c3aed' : '#d97706';
+        const rightBg      = oppMarkLabel === 'O' ? 'linear-gradient(135deg,#ede9fe,#e0e7ff)' : 'linear-gradient(135deg,#fef3c7,#fef9c3)';
+        const leftSymbol   = myMarkLabel  === 'X' ? '✕' : '⭕';
+        const rightSymbol  = oppMarkLabel === 'O' ? '⭕' : '✕';
+        const leftLbl      = 'YOU (' + myMarkLabel  + ')';
+        const rightLbl     = isOnline ? (opponentLabel + ' (' + oppMarkLabel + ')') : 'AI';
 
-        // Cell click handlers
+        // Build board cells
+        const boardCells = b.map((cell,i)=>{
+            const wl=tttWinLine(b); const isW=wl&&wl.includes(i);
+            const bg=isW?(cell==='X'?'linear-gradient(135deg,#fde68a,#fbbf24)':'linear-gradient(135deg,#ddd6fe,#c4b5fd)'):cell?'#f8fafc':'linear-gradient(135deg,#f8fafc,#eef2ff)';
+            const bc=isW?(cell==='X'?'#f59e0b':'#8b5cf6'):cell?'#e2e8f0':'#c7d2fe';
+            const clickable=!cell&&!winner&&!isDraw&&(state.tttMode!=='online'||myTurn);
+            const cellContent = cell==='X'?'✕':cell==='O'?'⭕':'';
+            const cellColor   = cell==='X'?'#d97706':cell==='O'?'#7c3aed':'transparent';
+            let hoverAttr = '';
+            if(clickable){ hoverAttr = ' onmouseover="this.style.background=\'#e0e7ff\';this.style.borderColor=\'#818cf8\';this.style.transform=\'scale(1.06)\'" onmouseout="this.style.background=\'linear-gradient(135deg,#f8fafc,#eef2ff)\';this.style.borderColor=\'#c7d2fe\';this.style.transform=\'scale(1)\'"'; }
+            return '<button class="ttt-c" data-i="'+i+'" style="width:100%;aspect-ratio:1;min-height:72px;border-radius:13px;border:2.5px solid '+bc+';background:'+bg+';font-size:1.8rem;font-weight:900;color:'+cellColor+';cursor:'+(clickable?'pointer':'default')+';box-shadow:'+(isW?'0 0 0 3px '+(cell==='X'?'rgba(245,158,11,.3)':'rgba(139,92,246,.3)'):'0 2px 8px rgba(0,0,0,.06)')+';transition:all .18s ease;display:flex;align-items:center;justify-content:center;line-height:1;"'+hoverAttr+'>'+cellContent+'</button>';
+        }).join('');
+
+        c.innerHTML = '<div style="width:100%;">'
+            + '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">'
+            + '<div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">❌⭕ Tic-Tac-Toe '+(isOnline?'<span style="font-size:.65rem;background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:999px;margin-left:4px;">ONLINE</span>':'')+'</div>'
+            + '<button onclick="window.bkGoMenu()" style="font-size:.68rem;color:#64748b;background:#f1f5f9;border:none;padding:4px 10px;border-radius:999px;cursor:pointer;">← Menu</button>'
+            + '</div>'
+            // Scoreboard — left = You, middle = Draws, right = Opponent
+            + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;width:100%;">'
+            + '<div style="text-align:center;background:'+leftBg+';border-radius:11px;padding:8px;border:1.5px solid '+(state.tttTurn===myMarkLabel&&!winner&&!isDraw?'#f59e0b':'transparent')+';"><div style="font-size:1.1rem;font-weight:900;color:'+leftColor+';">'+leftSymbol+'</div><div style="font-size:1.1rem;font-weight:900;color:#92400e;">'+leftScore+'</div><div style="font-size:.58rem;color:#a16207;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+leftLbl+'">'+leftLbl+'</div></div>'
+            + '<div style="text-align:center;background:#f8fafc;border-radius:11px;padding:8px;border:1.5px solid #e2e8f0;"><div style="font-size:.9rem;">🤝</div><div style="font-size:1.1rem;font-weight:900;color:#374151;">'+sc.draws+'</div><div style="font-size:.6rem;color:#9ca3af;font-weight:700;">DRAWS</div></div>'
+            + '<div style="text-align:center;background:'+rightBg+';border-radius:11px;padding:8px;border:1.5px solid '+(state.tttTurn===oppMarkLabel&&!winner&&!isDraw?'#8b5cf6':'transparent')+';"><div style="font-size:1.1rem;font-weight:900;color:'+rightColor+';">'+rightSymbol+'</div><div style="font-size:1.1rem;font-weight:900;color:#5b21b6;">'+rightScore+'</div><div style="font-size:.58rem;color:#6d28d9;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+rightLbl+'">'+rightLbl+'</div></div>'
+            + '</div>'
+            // Status bar
+            + '<div style="text-align:center;padding:10px;border-radius:10px;background:'+statusBg+';font-weight:800;font-size:.85rem;color:#1e1b4b;margin-bottom:12px;min-height:40px;display:flex;align-items:center;justify-content:center;">'+statusText+'</div>'
+            // Board
+            + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;width:100%;max-width:310px;margin-left:auto;margin-right:auto;">'
+            + boardCells
+            + '</div>'
+            + '<button id="ttt-new" style="width:100%;padding:11px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.85rem;">🔄 New Round</button>'
+            + '</div>';
+
         document.querySelectorAll('.ttt-c').forEach(btn=>{
             btn.onclick=()=>tttMove(parseInt(btn.dataset.i), gameId);
         });
         document.getElementById('ttt-new').onclick=()=>{
+            state._confettiShown = false;
             if(isOnline&&gameId){ resetOnlineTTT(gameId); }
-            else { state.tttBoard=Array(9).fill(null);state.tttTurn='X';renderTTT(null,null); }
+            else { state.tttBoard=Array(9).fill(null);state.tttTurn='X';state.gameActive=true;renderTTT(null,null,null,false); }
         };
         window.bkGoMenu = showMainMenu;
     }
+
 
     function tttMove(idx, gameId=null) {
         const b=state.tttBoard;
@@ -480,8 +839,8 @@
             UD()(DC()(db(),'ttt_games',gameId), update).catch(e=>console.warn('TTT update:',e));
         } else {
             // Local / AI
-            if(wl){ state.tttScores[state.tttTurn]++; renderTTT(wl,null); saveScore(state.tttScores.X,'Tic-Tac-Toe'); return; }
-            if(isDraw){ state.tttScores.draws++; renderTTT('draw',null); return; }
+            if(wl){ state.tttScores[state.tttTurn]++; renderTTT(wl,null,state.tttTurn,true); saveScore(state.tttScores.X,'Tic-Tac-Toe'); return; }
+            if(isDraw){ state.tttScores.draws++; renderTTT(null,null,null,true); return; }
             state.tttTurn=nextTurn;
             renderTTT(null,null);
             if(state.tttMode==='ai'&&state.tttTurn==='O') setTimeout(tttAI,380);
@@ -518,53 +877,35 @@
         const el=document.getElementById(elId);
         if(!el) return;
         el.innerHTML='<div style="color:#9ca3af;text-align:center;font-size:.75rem;padding:8px;">Loading…</div>';
-        if(!db()){ el.innerHTML='<div style="color:#d1d5db;font-size:.72rem;text-align:center;padding:8px;">Offline — Firebase unavailable</div>'; return; }
+        if(!db()){ el.innerHTML='<div style="color:#d1d5db;font-size:.72rem;text-align:center;padding:8px;">Offline</div>'; return; }
         try {
             let snap;
             if(C()&&Q()&&W()&&GD()){
-                // Query by game only (no orderBy) to avoid requiring a composite Firestore index.
-                // Sort by score client-side instead.
                 snap=await GD()(Q()(C()(db(),'leaderboard'),W()('game','==',game)));
             } else if(db().collection){
                 snap=await db().collection('leaderboard').where('game','==',game).get();
             } else { el.innerHTML='<div style="color:#d1d5db;font-size:.72rem;text-align:center;">Unavailable</div>'; return; }
-            // Sort client-side by score descending, take top 5
             const docs=(snap.docs||[]).sort((a,b)=>(b.data().score||0)-(a.data().score||0)).slice(0,5);
-            if(!docs.length){ el.innerHTML='<div style="color:#9ca3af;font-style:italic;font-size:.75rem;text-align:center;padding:8px;">No scores yet — be first!</div>'; return; }
-            const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+            if(!docs.length){ el.innerHTML='<div style="color:#9ca3af;font-style:italic;font-size:.75rem;text-align:center;padding:8px;">No scores yet</div>'; return; }
+            // Best-effort: resolve real names from tutors collection
+            const nameMap = {};
+            try {
+                if(C()&&GD()) {
+                    const tSnap = await GD()(C()(db(),'tutors'));
+                    tSnap.forEach(d=>{ const t=d.data(); const uid=t.tutorUid||d.id; if(uid&&(t.name||t.displayName)) nameMap[uid]=(t.name||t.displayName); });
+                }
+            } catch(e){ /* non-critical */ }
+            const medals=['\u{1F947}','\u{1F948}','\u{1F949}','4\uFE0F\u20E3','5\uFE0F\u20E3'];
             el.innerHTML=docs.map((d,i)=>{
                 const dat=d.data();
+                let displayName = nameMap[dat.userId] || dat.userName || 'Tutor';
+                if(displayName.includes('@') && !displayName.includes(' ')) displayName = displayName.split('@')[0];
                 return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:${i===0?'linear-gradient(135deg,#fef3c7,#fef9c3)':'#f8fafc'};margin-bottom:4px;">
-                    <span style="font-weight:700;color:${i===0?'#92400e':'#374151'};font-size:.78rem;display:flex;align-items:center;gap:5px;">${medals[i]} ${esc(dat.userName)}</span>
+                    <span style="font-weight:700;color:${i===0?'#92400e':'#374151'};font-size:.78rem;display:flex;align-items:center;gap:5px;">${medals[i]} ${esc(displayName)}</span>
                     <span style="font-weight:900;color:#6366f1;font-size:.85rem;">${dat.score}</span>
                 </div>`;
             }).join('');
         } catch(e){
-            el.innerHTML=`<div style="color:#d1d5db;font-size:.68rem;text-align:center;padding:6px;">Offline</div>`;
+            el.innerHTML='<div style="color:#d1d5db;font-size:.68rem;text-align:center;padding:6px;">Offline</div>';
         }
     }
-
-    /* ── helpers ─────────────────────────────────────── */
-    function container() { return document.getElementById('bk-game-container'); }
-    function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-    function stopAll() {
-        state.gameActive=false;
-        if(state.snakeInterval){clearInterval(state.snakeInterval);state.snakeInterval=null;}
-        if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;}
-        document.onkeydown=null;
-    }
-
-    /* ── bridge Firebase from tutor.js ──────────────── */
-    function bridge() {
-        try {
-            if(!window.__fbOnSnapshot && typeof onSnapshot!=='undefined') window.__fbOnSnapshot=onSnapshot;
-            if(!window.__fbDoc        && typeof doc!=='undefined')        window.__fbDoc=doc;
-            if(!window.__fbSetDoc     && typeof setDoc!=='undefined')     window.__fbSetDoc=setDoc;
-            if(!window.__fbUpdateDoc  && typeof updateDoc!=='undefined')  window.__fbUpdateDoc=updateDoc;
-            // Already bridged in tutor.js: collection, addDoc, getDocs, query, where, orderBy, limit
-        } catch(e){}
-    }
-
-    window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); });
-
-})();
