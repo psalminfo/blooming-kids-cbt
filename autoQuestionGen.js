@@ -42,8 +42,7 @@ function generateSessionId(grade, subject, state) {
     const studentName = params.get('studentName');
     const parentEmail = params.get('parentEmail');
     
-    const testSessionKey = `test-${grade}-${subject}-${state}-${studentName}-${parentEmail}`;
-    return testSessionKey;
+    return `test-${grade}-${subject}-${state}-${studentName}-${parentEmail}`;
 }
 
 function clearOtherStateSessions(currentSessionKey) {
@@ -138,7 +137,6 @@ function selectELAQuestions(allQuestions, passagesMap) {
 
 /**
  * GOD MODE FIX: Recursive Deep-Scanner
- * Scans every array inside the 'tests' collection to find the buried data.
  */
 async function fetchFromTestsCollection(grade, subject) {
     let allQuestions = [];
@@ -149,21 +147,17 @@ async function fetchFromTestsCollection(grade, subject) {
         const snapshot = await getDocs(collection(db, "tests"));
         
         if (snapshot.empty) {
-            console.log("⚠️ The 'tests' collection has zero documents in Firebase.");
             return { questions: [], passages: [] };
         }
 
         snapshot.forEach(docSnap => {
             const rawData = docSnap.data();
             
-            // Check every key in the document to see if it's an array containing tests
             Object.keys(rawData).forEach(key => {
                 if (Array.isArray(rawData[key])) {
                     rawData[key].forEach((item) => {
                         if (item && item.grade && item.subject) {
                             if (isGradeMatch(item.grade, grade) && isSubjectMatch(item.subject, subject)) {
-                                console.log(`✅ MATCH FOUND in document '${docSnap.id}' inside array '${key}'`);
-                                
                                 if (item.passages && Array.isArray(item.passages)) {
                                     item.passages.forEach(p => {
                                         p.passageId = p.passageId || p.id || p.passage_id;
@@ -188,7 +182,6 @@ async function fetchFromTestsCollection(grade, subject) {
                 }
             });
             
-            // Fallback for Root Level Tests
             if (rawData && rawData.grade && rawData.subject) {
                 if (isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
                     if (rawData.questions && Array.isArray(rawData.questions)) {
@@ -254,9 +247,7 @@ async function fetchFromAdminQuestions(grade, subject) {
                 allQuestions.push(normalizedQuestion);
             }
         });
-    } catch (err) {
-        console.error(`Error querying 'admin_questions':`, err);
-    }
+    } catch (err) { }
     return allQuestions;
 }
 
@@ -351,6 +342,8 @@ function optimizeImageUrl(originalUrl) {
 }
 
 export async function loadQuestions(subject, grade, state) {
+    console.log("%c🚀 BKH CBT SCRIPT: VERSION 5.0", "color: #00ff00; font-size: 16px; font-weight: bold; background: #000; padding: 4px;");
+    
     // FORCE CACHE WIPE ON EVERY RELOAD TO PREVENT GHOST CACHE
     sessionStorage.removeItem('currentTestSession');
     
@@ -397,7 +390,6 @@ export async function loadQuestions(subject, grade, state) {
             }
         }
 
-        // Deep mapping to ensure passageId links perfectly
         allQuestions = allQuestions.map((q, index) => {
             let pid = q.passageId || q.passage_id || null;
             if (pid) pid = String(pid).trim();
@@ -657,7 +649,6 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         const passage = passagesMap[passageId];
         const passageQuestions = questionsByPassage[passageId];
         
-        // STRATEGIC FIX: HIGH VISIBILITY PASSAGE UI
         const passageElement = document.createElement('div');
         passageElement.className = 'passage-container bg-blue-50 p-6 rounded-lg shadow-lg mb-8 border-l-8 border-blue-600';
         passageElement.innerHTML = `
