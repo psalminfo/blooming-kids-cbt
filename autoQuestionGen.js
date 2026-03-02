@@ -6,6 +6,38 @@ let currentSessionId = null;
 let saveTimeout = null;
 let saveTextTimeout = null;
 
+// ==========================================
+// REQUIRED EXPORTS
+// ==========================================
+export function getLoadedQuestions() { return loadedQuestions; }
+export function getAllLoadedQuestions() { return loadedQuestions; }
+
+export function getAnswerData() {
+    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
+    return savedAnswers ? JSON.parse(savedAnswers) : {};
+}
+
+export function clearAllTestSessions() {
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => sessionStorage.removeItem(key));
+}
+
+export function clearTestSession(forceClear = false) {
+    if (forceClear || ['completed', 'submitted'].includes(new URLSearchParams(window.location.search).get('state'))) {
+        sessionStorage.removeItem(currentSessionId);
+        sessionStorage.removeItem(`${currentSessionId}-answers`);
+    }
+}
+
+// ==========================================
+// MATCHING LOGIC
+// ==========================================
 function getAdminQuestionsSubject(testSubject) {
     const subjectMap = { 'ela': 'English', 'math': 'Mathematics', 'science': 'Science', 'socialstudies': 'Social Studies' };
     return subjectMap[testSubject.toLowerCase()] || testSubject;
@@ -31,24 +63,6 @@ function generateSessionId(grade, subject, state) {
     const params = new URLSearchParams(window.location.search);
     return `test-${grade}-${subject}-${state}-${params.get('studentName')}-${params.get('parentEmail')}`;
 }
-
-export function clearAllTestSessions() {
-    const keysToRemove = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
-            keysToRemove.push(key);
-        }
-    }
-    keysToRemove.forEach(key => sessionStorage.removeItem(key));
-}
-
-export function getAnswerData() {
-    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
-    return savedAnswers ? JSON.parse(savedAnswers) : {};
-}
-
-export function getAllLoadedQuestions() { return loadedQuestions; }
 
 function selectELAQuestions(allQuestions, passagesMap) {
     const questionsWithPassages = [];
@@ -101,57 +115,71 @@ function selectELAQuestions(allQuestions, passagesMap) {
     return selectedQuestions.slice(0, 15);
 }
 
-/**
- * GOD MODE FIX: Direct Snipe (Bypasses Firebase Collection List Rules)
- */
+// ==========================================
+// DATA FETCHING
+// ==========================================
 async function fetchFromTestsCollection(grade, subject) {
     let allQuestions = [];
     let allPassages = [];
-    
     try {
         const gradeNum = grade.replace(/[^0-9]/g, '');
         let subjectKey = (subject.toLowerCase() === 'english' || subject.toLowerCase() === 'reading') ? 'ela' : subject.toLowerCase();
         
-        // Target specific document IDs directly to bypass security rule blocks
-        const targetIds = [
-            `${gradeNum}-${subjectKey}`, 
-            `staar_reading_${gradeNum}_2022`,
-            `staar_grade_${gradeNum}_math_2018`
-        ];
-
-        console.log(`🎯 TARGET ACQUIRED: Direct sniping Firebase for documents:`, targetIds);
-
+        // 1. DIRECT SNIPE: Target exactly the document IDs you mentioned to avoid empty scans
+        const targetIds = [`${gradeNum}-${subjectKey}`, `staar_reading_${gradeNum}_2022`, `staar_grade_${gradeNum}_math_2018`];
+        
         for (const docId of targetIds) {
             try {
                 const docRef = doc(db, "tests", docId);
                 const docSnap = await getDoc(docRef);
-                
                 if (docSnap.exists()) {
-                    console.log(`✅ FIREBASE SUCCESS: Extracted live data from '${docId}'!`);
+                    console.log(`🎯 DIRECT SNIPE SUCCESS: Found document '${docId}'`);
                     const rawData = docSnap.data();
                     
-                    if (rawData.tests && Array.isArray(rawData.tests)) {
-                        rawData.tests.forEach(test => {
-                            if (test.passages) test.passages.forEach(p => {
-                                p.passageId = String(p.passageId || p.id).trim();
-                                p.content = p.content || p.text || p.body;
-                                allPassages.push(p);
+                    // Parse Arrays (like 'tests' array)
+                    Object.keys(rawData).forEach(key => {
+                        if (Array.isArray(rawData[key])) {
+                            rawData[key].forEach(item => {
+                                if (item.passages) {
+                                    item.passages.forEach(p => {
+                                        p.passageId = String(p.passageId || p.id).trim();
+                                        p.content = p.content || p.text || p.body;
+                                        allPassages.push(p);
+                                    });
+                                }
+                                if (item.questions) {
+                                    item.questions.forEach(q => {
+                                        q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                                        q.passageId = q.passageId ? String(q.passageId).trim() : null;
+                                        allQuestions.push(q);
+                                    });
+                                }
                             });
-                            if (test.questions) test.questions.forEach(q => {
-                                q.imageUrl = q.imageUrl || q.image_url || q.image || null;
-                                q.passageId = q.passageId ? String(q.passageId).trim() : null;
-                                allQuestions.push(q);
-                            });
+                        }
+                    });
+
+                    // Parse Root Level
+                    if (rawData.questions && Array.isArray(rawData.questions)) {
+                        rawData.questions.forEach(q => {
+                            q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                            q.passageId = q.passageId ? String(q.passageId).trim() : null;
+                            allQuestions.push(q);
                         });
                     }
-                    return { questions: allQuestions, passages: allPassages }; // Stop looking, we found it!
+                    if (rawData.passages && Array.isArray(rawData.passages)) {
+                        rawData.passages.forEach(p => {
+                            p.passageId = String(p.passageId || p.id).trim();
+                            p.content = p.content || p.text || p.body;
+                            allPassages.push(p);
+                        });
+                    }
+
+                    if (allQuestions.length > 0) return { questions: allQuestions, passages: allPassages };
                 }
-            } catch (innerErr) {
-                console.error(`Blocked reading ${docId}:`, innerErr.message);
-            }
+            } catch (e) {}
         }
-        
-        // Fallback Scanner
+
+        // 2. FALLBACK DEEP SCAN
         const snapshot = await getDocs(collection(db, "tests"));
         snapshot.forEach(docSnap => {
             const rawData = docSnap.data();
@@ -159,24 +187,28 @@ async function fetchFromTestsCollection(grade, subject) {
                 if (Array.isArray(rawData[key])) {
                     rawData[key].forEach((item) => {
                         if (item && item.grade && item.subject && isGradeMatch(item.grade, grade) && isSubjectMatch(item.subject, subject)) {
-                            if (item.passages) item.passages.forEach(p => {
-                                p.passageId = String(p.passageId || p.id).trim();
-                                p.content = p.content || p.text || p.body;
-                                allPassages.push(p);
-                            });
-                            if (item.questions) item.questions.forEach(q => {
-                                q.imageUrl = q.imageUrl || q.image_url || q.image || null;
-                                q.passageId = q.passageId ? String(q.passageId).trim() : null;
-                                allQuestions.push(q);
-                            });
+                            if (item.passages && Array.isArray(item.passages)) {
+                                item.passages.forEach(p => {
+                                    p.passageId = p.passageId || p.id || p.passage_id;
+                                    if (p.passageId) p.passageId = String(p.passageId).trim();
+                                    p.content = p.content || p.text || p.body;
+                                    allPassages.push(p);
+                                });
+                            }
+                            if (item.questions && Array.isArray(item.questions)) {
+                                item.questions.forEach(q => {
+                                    q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                                    q.passageId = q.passageId || q.passage_id || null;
+                                    if (q.passageId) q.passageId = String(q.passageId).trim();
+                                    allQuestions.push(q);
+                                });
+                            }
                         }
                     });
                 }
             });
         });
-    } catch (err) {
-        console.error("🔥 FIREBASE FATAL BLOCK:", err.message);
-    }
+    } catch (err) {}
     return { questions: allQuestions, passages: allPassages };
 }
 
@@ -252,7 +284,7 @@ function optimizeImageUrl(originalUrl) {
 }
 
 export async function loadQuestions(subject, grade, state) {
-    console.log("%c🚀 BKH CBT SCRIPT: VERSION 8.0 (FIREBASE DIRECT SNIPE)", "color: #00ffaa; font-size: 18px; font-weight: bold; background: #000; padding: 6px;");
+    console.log("%c🚀 BKH CBT SCRIPT: FULL PASSAGE RECOVERY ENABLED", "color: #00ffff; font-size: 16px; font-weight: bold; background: #000; padding: 4px;");
     sessionStorage.removeItem('currentTestSession'); 
     
     if (state === 'creative-writing' && !isSubjectMatch('ela', subject)) {
@@ -262,7 +294,7 @@ export async function loadQuestions(subject, grade, state) {
     const container = document.getElementById("question-container");
     const submitBtnContainer = document.getElementById("submit-button-container");
     if (!container) return;
-    container.innerHTML = `<p style="text-align:center; font-family:sans-serif; color:#666;">Deploying test data...</p>`;
+    container.innerHTML = `<p style="text-align:center; font-family:sans-serif; color:#666;">Please wait, organizing your test...</p>`;
     if (submitBtnContainer) submitBtnContainer.style.display = 'none';
 
     currentSessionId = generateSessionId(grade, subject, state);
@@ -277,7 +309,7 @@ export async function loadQuestions(subject, grade, state) {
 
         if (allQuestions.length === 0) {
             try {
-                console.log("⚠️ Firebase empty/blocked. Pulling from GitHub instead.");
+                console.log("⚠️ Fallback: Fetching from GitHub...");
                 const gitHubData = await fetchFromGitHub(grade, subject);
                 allQuestions = gitHubData.questions; allPassages = gitHubData.passages;
             } catch (err) { throw new Error("No questions found."); }
@@ -300,20 +332,51 @@ export async function loadQuestions(subject, grade, state) {
         if (isSubjectMatch('ela', subject) && state === 'creative-writing') {
             creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing' || q.topic === 'CREATIVE WRITING');
             if (!creativeWritingQuestion) {
-                container.innerHTML = `<p style="color:red; text-align:center;">Redirecting...</p>`;
+                container.innerHTML = `<p style="color:red; text-align:center;">Redirecting to multiple choice...</p>`;
                 setTimeout(() => { const u = new URL(window.location.href); u.searchParams.set('state', 'mcq'); window.location.href = u.toString(); }, 1500);
                 return;
             }
             loadedQuestions = [{ ...creativeWritingQuestion, id: creativeWritingQuestion.id || 'cw-0' }];
+            saveSession(loadedQuestions, passagesMap);
             displayCreativeWriting(creativeWritingQuestion);
         } else {
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing' && q.topic !== 'CREATIVE WRITING');
             if (filteredQuestions.length === 0) { container.innerHTML = `<p style="color:red; text-align:center;">❌ No MCQ found.</p>`; return; }
             loadedQuestions = isSubjectMatch('ela', subject) ? selectELAQuestions(filteredQuestions, passagesMap) : [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
+            saveSession(loadedQuestions, passagesMap);
             displayMCQQuestions(loadedQuestions, passagesMap);
             if (submitBtnContainer) submitBtnContainer.style.display = 'block';
         }
     } catch (err) { container.innerHTML = `<p style="color:red; text-align:center;">❌ Error: ${err.message}</p>`; }
+}
+
+function saveSession(questions, passagesMap) {
+    try {
+        const sessionData = { questions, passages: passagesMap, timestamp: Date.now(), sessionId: currentSessionId };
+        sessionStorage.setItem(currentSessionId, JSON.stringify(sessionData));
+    } catch (err) {}
+}
+
+function getSavedSession() {
+    if (!currentSessionId) return null;
+    try {
+        const saved = sessionStorage.getItem(currentSessionId);
+        return saved ? JSON.parse(saved) : null;
+    } catch (err) { return null; }
+}
+
+function restoreSavedAnswers() {
+    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
+    if (!savedAnswers) return;
+    try {
+        const answers = JSON.parse(savedAnswers);
+        Object.keys(answers).forEach(questionId => {
+            const radio = document.querySelector(`input[name="q${questionId}"][value="${answers[questionId]}"]`);
+            if (radio) radio.checked = true;
+            const textInput = document.querySelector(`#text-answer-${questionId}`);
+            if (textInput && answers[questionId]) textInput.value = answers[questionId];
+        });
+    } catch (err) {}
 }
 
 function saveAnswer(questionId, answer) {
@@ -336,6 +399,24 @@ function saveTextAnswer(questionId, answer) {
             sessionStorage.setItem(`${currentSessionId}-answers`, JSON.stringify(answers));
         } catch (err) {}
     }, 500);
+}
+
+function displayQuestionsBasedOnState(questions, state) {
+    const savedSession = getSavedSession();
+    let passagesMap = {};
+    if (savedSession && savedSession.passages) {
+        if (Array.isArray(savedSession.passages)) {
+            passagesMap = Object.fromEntries(savedSession.passages.map(p => [p.passageId, p]));
+        } else {
+            passagesMap = savedSession.passages; 
+        }
+    }
+    if (state === 'creative-writing') {
+        const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing' || q.topic === 'CREATIVE WRITING');
+        if (creativeWritingQuestion) displayCreativeWriting(creativeWritingQuestion);
+    } else {
+        displayMCQQuestions(questions, passagesMap);
+    }
 }
 
 function escapeHtml(unsafe) {
@@ -390,6 +471,11 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         }
     });
     
+    const hud = document.createElement('div');
+    hud.style.cssText = "background: #1e293b; color: #10b981; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 14px; margin-bottom: 20px; border: 1px solid #334155; max-width: 800px; margin: 0 auto 20px auto;";
+    hud.innerHTML = `<strong>GOD MODE HUD:</strong><br/>Questions Rendered: ${questions.length}<br/>Passages Loaded: ${Object.keys(questionsByPassage).length}`;
+    container.appendChild(hud);
+
     let globalIndex = 1; 
     
     Object.keys(questionsByPassage).forEach(pid => {
@@ -450,13 +536,6 @@ function createQuestionElement(q, index) {
         if (txt) txt.addEventListener('input', e => saveTextAnswer(q.id, e.target.value));
     }
     return el;
-}
-
-export function clearTestSession(forceClear = false) {
-    if (forceClear || ['completed', 'submitted'].includes(new URLSearchParams(window.location.search).get('state'))) {
-        sessionStorage.removeItem(currentSessionId);
-        sessionStorage.removeItem(`${currentSessionId}-answers`);
-    }
 }
 
 window.continueToMCQ = async (qId, sName, pEmail, tEmail, grade) => {
