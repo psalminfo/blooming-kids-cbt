@@ -207,39 +207,48 @@ class EnrollmentApp {
             }
             this.submitEnrollment();
         });
-
-        // Close invoice modal (X button)
-        document.getElementById('close-invoice').addEventListener('click', () => {
-            document.getElementById('invoice-modal').classList.remove('active');
-        });
-
-        // Close invoice modal by clicking the backdrop
-        document.getElementById('invoice-modal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
+        
+        // Invoice modal close button
+        const closeInvoiceBtn = document.getElementById('close-invoice');
+        if (closeInvoiceBtn) {
+            closeInvoiceBtn.addEventListener('click', () => {
                 document.getElementById('invoice-modal').classList.remove('active');
-            }
-        });
-
-        // View Invoice button (shown after save)
-        document.getElementById('view-invoice-btn').addEventListener('click', () => {
-            this.showInvoice();
-        });
-
-        // Copy resume link button
-        document.getElementById('copy-resume-link').addEventListener('click', (e) => {
-            this.copyResumeLink(e.currentTarget);
-        });
-
+            });
+        }
+        
+        // Invoice modal backdrop click to close
+        const invoiceModal = document.getElementById('invoice-modal');
+        if (invoiceModal) {
+            invoiceModal.addEventListener('click', (e) => {
+                if (e.target === invoiceModal) {
+                    invoiceModal.classList.remove('active');
+                }
+            });
+        }
+        
         // Print invoice
-        document.getElementById('print-invoice').addEventListener('click', () => {
-            window.print();
-        });
-
+        const printBtn = document.getElementById('print-invoice');
+        if (printBtn) {
+            printBtn.addEventListener('click', () => window.print());
+        }
+        
         // Download PDF
-        document.getElementById('download-pdf').addEventListener('click', () => {
-            this.downloadInvoicePDF();
-        });
-    }
+        const downloadBtn = document.getElementById('download-pdf');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => this.downloadInvoicePDF());
+        }
+        
+        // View invoice button (in save confirmation area)
+        const viewInvoiceBtn = document.getElementById('view-invoice-btn');
+        if (viewInvoiceBtn) {
+            viewInvoiceBtn.addEventListener('click', () => this.showInvoice());
+        }
+        
+        // Copy resume link button
+        const copyBtn = document.getElementById('copy-resume-link');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => this.copyResumeLink(copyBtn));
+        }
     
     // ==============================================
     // STUDENT MANAGEMENT
@@ -259,6 +268,11 @@ class EnrollmentApp {
         nextMonth.setMonth(nextMonth.getMonth() + 1);
         nextMonth.setDate(1);
         const defaultStartDate = nextMonth.toISOString().split('T')[0];
+        
+        // Calculate tomorrow's date for min attribute (no backdating)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         
         // Escape user-provided values for safe HTML insertion
         const safeName = prefillData?.name ? this.escapeHtml(prefillData.name) : '';
@@ -334,7 +348,7 @@ class EnrollmentApp {
             <div class="form-row">
                 <div class="form-group">
                     <label>Preferred Start Date <span class="required">*</span></label>
-                    <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
+                    <input type="date" class="form-control student-start-date" min="${tomorrowStr}" onkeydown="return false;" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
                     <div class="error-message student-start-date-error"></div>
                 </div>
             </div>
@@ -607,9 +621,10 @@ class EnrollmentApp {
                 `;
             }
 
-            const extracurricularDaysHTML = CONFIG.DAYS.map(day => `
-                <button class="day-btn extracurricular-day-btn" data-day="${day}" type="button">${day.substring(0, 3)}</button>
-            `).join('');
+            const extracurricularDaysHTML = CONFIG.DAYS.map(day => {
+                const isHidden = isGlobalDiscovery && day !== 'Saturday';
+                return `<button class="day-btn extracurricular-day-btn" data-day="${day}" type="button" style="${isHidden ? 'display:none;' : ''}">${day.substring(0, 3)}</button>`;
+            }).join('');
 
             return `
             <div class="extracurricular-card" data-activity-id="${activity.id}" data-student-id="${id}">
@@ -791,9 +806,6 @@ class EnrollmentApp {
                     if(card.classList.contains('selected') && !card.querySelector('.frequency-btn.selected')) {
                         const onceBtn = card.querySelector('[data-frequency="once"]');
                         if(onceBtn) onceBtn.classList.add('selected');
-                        // FIX: Apply day visibility rules immediately so Global Discovery
-                        // hides non-Saturday days as soon as the card is first selected
-                        this.handleExtracurricularFrequency(card, 'once');
                     }
                     // Clear buttons if deselected
                     if (!card.classList.contains('selected')) {
@@ -814,6 +826,39 @@ class EnrollmentApp {
                     card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
                     btn.classList.add('selected');
                     
+                    // Reset day button states when frequency changes
+                    const newFreq = btn.dataset.frequency;
+                    const newMaxDays = newFreq === 'twice' ? 2 : 1;
+                    const currentSelected = card.querySelectorAll('.extracurricular-day-btn.selected');
+                    // If more days selected than new limit, deselect extras
+                    if (currentSelected.length > newMaxDays) {
+                        Array.from(currentSelected).slice(newMaxDays).forEach(b => b.classList.remove('selected'));
+                    }
+                    // Re-enable all buttons then re-apply limit
+                    card.querySelectorAll('.extracurricular-day-btn').forEach(dayBtn => {
+                        dayBtn.style.opacity = '';
+                        dayBtn.style.pointerEvents = '';
+                    });
+                    const nowSelected = card.querySelectorAll('.extracurricular-day-btn.selected');
+                    if (nowSelected.length >= newMaxDays) {
+                        card.querySelectorAll('.extracurricular-day-btn').forEach(dayBtn => {
+                            if (!dayBtn.classList.contains('selected')) {
+                                dayBtn.style.opacity = '0.4';
+                                dayBtn.style.pointerEvents = 'none';
+                            }
+                        });
+                    }
+                    // Update counter
+                    let counter = card.querySelector('.day-selection-counter');
+                    if (!counter) {
+                        counter = document.createElement('div');
+                        counter.className = 'day-selection-counter';
+                        counter.style.cssText = 'font-size:12px;color:#666;margin-top:5px;';
+                        const daysContainer = card.querySelector('.extracurricular-details .available-days');
+                        if (daysContainer) daysContainer.after(counter);
+                    }
+                    counter.textContent = `${nowSelected.length} of ${newMaxDays} day(s) selected`;
+                    
                     // Handle day visibility based on frequency
                     this.handleExtracurricularFrequency(card, btn.dataset.frequency);
                     
@@ -822,45 +867,74 @@ class EnrollmentApp {
                 });
             });
 
-            // Extracurricular Days Selection - UPDATED WITH 2-DAY LIMIT
+            // Extracurricular Days Selection - UPDATED WITH FREQUENCY-BASED LIMITS
             card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     
                     const activityId = card.dataset.activityId;
                     const isGlobalDiscovery = activityId === 'global_discovery';
-                    const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
                     
                     if (isGlobalDiscovery) {
                         // For Global Discovery, only allow Saturday
                         if (btn.dataset.day === 'Saturday') {
-                            // Deselect all other days first
                             card.querySelectorAll('.extracurricular-day-btn.selected').forEach(otherBtn => {
                                 otherBtn.classList.remove('selected');
                             });
                             btn.classList.add('selected');
-                        }
-                    } else {
-                        // For regular activities: limit based on selected frequency
-                        const selectedFrequency = card.querySelector('.frequency-btn.selected')?.dataset.frequency || 'once';
-                        const maxDays = selectedFrequency === 'twice' ? 2 : 1;
-
-                        if (btn.classList.contains('selected')) {
-                            // Deselect if already selected
-                            btn.classList.remove('selected');
-                        } else if (selectedDays.length < maxDays) {
-                            // Select if under the limit
-                            btn.classList.add('selected');
                         } else {
-                            // Over the limit
-                            this.showAlert(
-                                maxDays === 1
-                                    ? "Once weekly allows only 1 day. Switch to Twice Weekly to select 2 days."
-                                    : "Maximum 2 days per week for extracurricular activities",
-                                "warning"
-                            );
+                            this.showAlert('Global Discovery Club is Saturdays only.', 'warning');
                             return;
                         }
+                    } else {
+                        // Get frequency limit
+                        const frequencyBtn = card.querySelector('.frequency-btn.selected');
+                        const frequency = frequencyBtn ? frequencyBtn.dataset.frequency : 'once';
+                        const maxDays = frequency === 'twice' ? 2 : 1;
+                        
+                        if (btn.classList.contains('selected')) {
+                            // Deselect
+                            btn.classList.remove('selected');
+                        } else {
+                            const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
+                            if (selectedDays.length >= maxDays) {
+                                this.showAlert(`${frequency === 'twice' ? 'Twice' : 'Once'} weekly allows maximum ${maxDays} day(s). Please deselect a day first.`, 'warning');
+                                return;
+                            }
+                            btn.classList.add('selected');
+                        }
+                        
+                        // Update counter and disable/enable buttons
+                        const selectedDaysNow = card.querySelectorAll('.extracurricular-day-btn.selected');
+                        const newCount = selectedDaysNow.length;
+                        
+                        // Update or create counter
+                        let counter = card.querySelector('.day-selection-counter');
+                        if (!counter) {
+                            counter = document.createElement('div');
+                            counter.className = 'day-selection-counter';
+                            counter.style.cssText = 'font-size:12px;color:#666;margin-top:5px;';
+                            const daysContainer = card.querySelector('.extracurricular-details .available-days');
+                            if (daysContainer) daysContainer.after(counter);
+                        }
+                        counter.textContent = `${newCount} of ${maxDays} day(s) selected`;
+                        counter.style.color = newCount >= maxDays ? '#28A745' : '#666';
+                        
+                        // Disable remaining unselected buttons when limit reached
+                        card.querySelectorAll('.extracurricular-day-btn').forEach(dayBtn => {
+                            if (!dayBtn.classList.contains('selected')) {
+                                if (newCount >= maxDays) {
+                                    dayBtn.style.opacity = '0.4';
+                                    dayBtn.style.pointerEvents = 'none';
+                                } else {
+                                    dayBtn.style.opacity = '';
+                                    dayBtn.style.pointerEvents = '';
+                                }
+                            } else {
+                                dayBtn.style.opacity = '';
+                                dayBtn.style.pointerEvents = '';
+                            }
+                        });
                     }
                     
                     if(!card.classList.contains('selected')) card.classList.add('selected');
@@ -868,7 +942,8 @@ class EnrollmentApp {
                     this.checkCourseSelectionRequirement(id);
                     
                     // Validate days selection
-                    this.validateExtracurricularDays(card, activityId, id);
+                    const activityId2 = card.dataset.activityId;
+                    this.validateExtracurricularDays(card, activityId2, id);
                 });
             });
 
@@ -2608,14 +2683,14 @@ class EnrollmentApp {
                 this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
             }, 2000);
 
-            // STEP 4: Open Parent Portal in a new tab immediately after user confirmation
-            const openPortal = confirm("Your enrollment is complete! Click OK to open the parent portal now.");
-            if (openPortal) {
-                window.open("parent.html", "_blank");
-            }
+            // STEP 4: Auto-redirect to Parent Portal after 1.5 seconds
+            this.showAlert("Enrollment complete! Redirecting you to the parent portal...", "success");
+            setTimeout(() => {
+                window.location.href = "parent.html";
+            }, 1500);
 
-            btn.innerHTML = 'Success!';
-            btn.disabled = false;
+            btn.innerHTML = 'Enrollment Complete! Redirecting...';
+            btn.disabled = true;
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2787,7 +2862,9 @@ class EnrollmentApp {
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         referralCode: newReferralCode,
                         referralEarnings: 0,
-                        uid: user.uid
+                        uid: user.uid,
+                        passwordResetComplete: false,
+                        firstLoginCompleted: false
                     });
                 } else {
                     // If no DB, still return the password but note that profile may not persist
