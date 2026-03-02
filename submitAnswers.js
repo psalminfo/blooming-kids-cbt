@@ -1,6 +1,46 @@
 import { db } from './firebaseConfig.js';
-import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"; // Fixed version
+import { collection, addDoc, Timestamp, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"; // Added more imports
 import { getLoadedQuestions } from './autoQuestionGen.js';
+
+/**
+ * Fetches creative writing submission from tutor_submissions
+ */
+async function getCreativeWritingSubmission(studentName, parentEmail) {
+    try {
+        console.log("🔍 Checking for creative writing submission...");
+        
+        // Query tutor_submissions for creative writing by this student
+        const q = query(
+            collection(db, "tutor_submissions"),
+            where("studentName", "==", studentName),
+            where("parentEmail", "==", parentEmail),
+            where("type", "==", "creative_writing"),
+            orderBy("submittedAt", "desc"),
+            limit(1)
+        );
+        
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            console.log("✅ Found creative writing submission");
+            
+            return {
+                type: 'creative-writing',
+                studentAnswer: data.textAnswer || '',
+                fileUrl: data.fileUrl || null,
+                tutorReport: data.tutorReport || 'Pending review',
+                submittedAt: data.submittedAt || new Date().toISOString()
+            };
+        } else {
+            console.log("ℹ️ No creative writing submission found");
+            return null;
+        }
+    } catch (error) {
+        console.error("❌ Error fetching creative writing:", error);
+        return null; // Fail silently - don't block test submission
+    }
+}
 
 /**
  * Submits the multiple-choice test results to Firebase.
@@ -115,9 +155,16 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         });
     }
 
+    // FETCH CREATIVE WRITING SUBMISSION (if any)
+    const creativeWriting = await getCreativeWritingSubmission(studentName, parentEmail);
+    if (creativeWriting) {
+        answers.push(creativeWriting);
+        console.log("✅ Added creative writing to answers");
+    }
+
     console.log("📊 FINAL SCORING SUMMARY:");
     console.log(`✅ Score: ${score}/${totalScoreableQuestions}`);
-    console.log(`📝 Total answers: ${answers.length}`);
+    console.log(`📝 Total answers: ${answers.length} (includes creative writing if present)`);
 
     const timestamp = Timestamp.now();
 
@@ -142,20 +189,23 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         phone: parentPhone || '',
         contactPhone: parentPhone || '',
         
-        // Tutor info (ADDED TUTOR NAME HERE)
+        // Tutor info
         tutorEmail,
         tutor_email: tutorEmail,
-        tutorName: tutorName,  // ← FIX 1: Added tutor name
+        tutorName: tutorName,
         
         // Location
         studentCountry,
         country: studentCountry,
         
-        // Test results
+        // Test results (now includes creative writing if found)
         answers,
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
         total_questions: totalScoreableQuestions,
+        
+        // Does this test include creative writing?
+        hasCreativeWriting: !!creativeWriting,
         
         // Multiple timestamp formats for parent portal matching
         submittedAt: timestamp,
