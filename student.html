@@ -282,7 +282,7 @@
 
     <script type="module">
         // --- MODULE IMPORTS MUST BE FIRST IN A MODULE SCRIPT ---
-        import { loadQuestions, clearTestSession } from './autoQuestionGen.js';
+        import { loadQuestions, clearTestSession, clearAllTestSessions } from './autoQuestionGen.js';
         import { submitTestToFirebase } from './submitAnswers.js';
         import { db as firestoreDb } from './firebaseConfig.js';
         import { collection, query, where, limit, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -371,7 +371,12 @@
             const urlParams = new URLSearchParams(window.location.search);
             
             const subject = urlParams.get('subject');
-            const grade = urlParams.get('grade');
+            // Normalise grade to always be in "grade4" format regardless of what the URL contains.
+            // Handles: "4" → "grade4", "Grade4" → "grade4", "grade4" → "grade4"
+            const rawGrade = urlParams.get('grade') || '';
+            const grade = rawGrade.toLowerCase().startsWith('grade')
+                ? rawGrade.toLowerCase()
+                : `grade${rawGrade.toLowerCase()}`;
             const studentName = urlParams.get('studentName');
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
@@ -432,8 +437,9 @@
                 }
 
                 await loadQuestions(subject, grade, state);
-                document.getElementById("submit-button-container").style.display = 'flex';
-                
+                // NOTE: submit-button-container visibility is managed by autoQuestionGen.js
+                // (hidden for creative-writing state, shown for mcq state) — do NOT override here.
+
                 // Initialize keyboard handler after questions are loaded
                 setupKeyboardHandler();
 
@@ -511,7 +517,7 @@
 
         // --- FIXED LOGOUT: Always go to tutor.html, even if clearTestSession tries to redirect elsewhere ---
         window.logout = () => {
-            clearTestSession(true);
+            clearAllTestSessions();
             setTimeout(() => {
                 window.location.href = 'tutor.html';
             }, 50);
