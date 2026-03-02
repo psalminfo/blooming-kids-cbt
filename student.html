@@ -372,11 +372,10 @@
             
             const subject = urlParams.get('subject');
             // Normalise grade to always be in "grade4" format regardless of what the URL contains.
-            // Handles: "4" → "grade4", "Grade4" → "grade4", "grade4" → "grade4"
-            const rawGrade = urlParams.get('grade') || '';
-            const grade = rawGrade.toLowerCase().startsWith('grade')
-                ? rawGrade.toLowerCase()
-                : `grade${rawGrade.toLowerCase()}`;
+            // Strips spaces/special chars first, then ensures the "grade" prefix is present.
+            // Handles: "4" → "grade4", "Grade 3" → "grade3", "Grade+3" → "grade3", "grade4" → "grade4"
+            const rawGrade = (urlParams.get('grade') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const grade = rawGrade.startsWith('grade') ? rawGrade : `grade${rawGrade}`;
             const studentName = urlParams.get('studentName');
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
