@@ -21,11 +21,15 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     // Get studentId from student data stored by tutor dashboard
     const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
     const studentId = studentData.studentUid || localStorage.getItem('studentUid') || '';
+    
+    // Get tutor name from studentData or create from email
+    const tutorName = studentData.tutorName || tutorEmail.split('@')[0] || 'Tutor';
 
     console.log("🚀 Starting test submission...");
     console.log("📋 Loaded questions:", loadedQuestions.length);
     console.log("👤 Student:", studentName);
     console.log("📞 Parent Phone:", parentPhone);
+    console.log("👨‍🏫 Tutor Name:", tutorName);
 
     // Validation to ensure all questions are answered (either MC or text)
     for (let i = 0; i < loadedQuestions.length; i++) {
@@ -138,9 +142,10 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         phone: parentPhone || '',
         contactPhone: parentPhone || '',
         
-        // Tutor info
+        // Tutor info (ADDED TUTOR NAME HERE)
         tutorEmail,
         tutor_email: tutorEmail,
+        tutorName: tutorName,  // ← FIX 1: Added tutor name
         
         // Location
         studentCountry,
