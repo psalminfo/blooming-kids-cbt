@@ -157,7 +157,11 @@
         const storedData = localStorage.getItem('studentData');
         if (storedData) {
             studentData = JSON.parse(storedData);
-            loadSubjects(parseInt(studentData.grade));
+            // Normalise grade string before parsing — tutor.js stores grades as
+            // "Grade 5", "GRADE 5", "grade5" etc. Strip the word "grade" first so
+            // parseInt always gets a plain number regardless of format.
+            const gradeNum = parseInt(String(studentData.grade).toLowerCase().replace('grade', '').trim(), 10);
+            loadSubjects(gradeNum);
         } else {
             // If no data is found, redirect to login
             alert("Session expired or missing data. Please log in again.");
@@ -173,4 +177,3 @@
 </script>
 </body>
 </html>
-
