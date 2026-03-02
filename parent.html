@@ -45,11 +45,11 @@
         var app;
         try { app = firebase.app(APP_NAME); } catch (e) { app = firebase.initializeApp(config, APP_NAME); }
         var authInst = firebase.auth(app);
-        authInst.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(err){ console.warn('Auth persistence:', err.message); });
+        authInst.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(err){ /* persistence config */ });
         window.db      = firebase.firestore(app);
         window.auth    = authInst;
         window.storage = firebase.storage(app);
-        console.log('Parent portal bridge ready |', isDev ? 'DEV' : 'PROD');
+        // Parent portal initialised
     })();
     </script>
 
