@@ -1448,13 +1448,8 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
         monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
         
-            assessments: assessmentResults.length,
-            monthly: monthlyResults.length,
-            parentSuffix: parentSuffix
-        });
-        
     } catch (error) {
-        console.error("❌ Suffix-matching search error:", error);
+        console.error("Suffix-matching search error:", error);
     }
     
     return { assessmentResults, monthlyResults };
@@ -5364,20 +5359,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         // Sort by timestamp (newest first)
         uniqueAssessments.sort((a, b) => b.timestamp - a.timestamp);
         uniqueMonthly.sort((a, b) => b.timestamp - a.timestamp);
-        
-            original: {
-                assessments: originalResults.assessmentResults.length,
-                monthly: originalResults.monthlyResults.length
-            },
-            shared: {
-                assessments: sharedResults.assessmentResults.length,
-                monthly: sharedResults.monthlyResults.length
-            },
-            combined: {
-                assessments: uniqueAssessments.length,
-                monthly: uniqueMonthly.length
-            }
-        });
         
         return {
             assessmentResults: uniqueAssessments,
