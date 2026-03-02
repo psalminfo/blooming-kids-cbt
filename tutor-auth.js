@@ -394,19 +394,6 @@ function init() {
         if (!validatePassword(name, password)) return;
 
         setButtonLoading(signupBtn, true);
-        showMessage('Checking your registration…', 'info');
-
-        // ★ GATE: Email must exist in tutors collection first
-        const approved = await isTutorEmailRegistered(email);
-        if (!approved) {
-            showMessage(
-                'This email is not registered as a Blooming Kids House tutor. ' +
-                'Please contact your administrator to be added before signing up.',
-                'error'
-            );
-            setButtonLoading(signupBtn, false);
-            return;
-        }
 
         try {
             await setPersistence(auth, browserLocalPersistence);
