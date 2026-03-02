@@ -192,6 +192,22 @@ function selectELAQuestions(allQuestions, passagesMap) {
  * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
 export async function loadQuestions(subject, grade, state) {
+    // ── NORMALISE GRADE ───────────────────────────────────────────────────────
+    // Incoming grade can be "Grade 3", "GRADE3", "grade 3", or plain "3".
+    // Normalise to "grade3" (lowercase, no space) so all downstream paths
+    // (Firestore queries, GitHub filename, isGrade3Plus) receive a consistent value.
+    grade = 'grade' + parseInt(
+        String(grade).toLowerCase().replace('grade', '').trim(), 10
+    );
+    // If parseInt produced NaN (e.g. "Preschool"), keep the original string so
+    // error messages are meaningful rather than silently using "gradeNaN".
+    if (grade === 'gradeNaN') {
+        console.error('[loadQuestions] Could not parse grade number from:', grade);
+        grade = String(arguments[1]).toLowerCase().replace(/\s+/g, '');
+    }
+    console.log('[loadQuestions] Normalised grade →', grade);
+    // ─────────────────────────────────────────────────────────────────────────
+
     // STRONG VALIDATION: CREATIVE WRITING ONLY FOR ELA, GRADES 3-12
     if (state === 'creative-writing') {
         if (subject.toLowerCase() !== 'ela') {
