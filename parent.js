@@ -4740,104 +4740,8 @@ window.triggerCloudinaryUpload = triggerCloudinaryUpload;
 window.unsubmitHomework = unsubmitHomework;
 
 // ============================================================================
-// SECTION 21: SIGNUP SUCCESS HANDLER (RACE CONDITION FIX)
+// SECTION 21: SIGNUP SUCCESS HANDLER
 // ============================================================================
-
-// Override the original handleSignUpFull to fix race condition
-const originalHandleSignUpFull = window.handleSignUpFull;
-
-window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
-    const requestId = `signup_${Date.now()}`;
-    pendingRequests.add(requestId);
-    
-    try {
-        let fullPhoneInput = localPhone;
-        if (!localPhone.startsWith('+')) {
-            fullPhoneInput = countryCode + localPhone;
-        }
-        
-        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
-        
-        if (!normalizedResult.valid) {
-            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-        }
-        
-        const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
-
-        // DUPLICATE CHECK: verify no account already exists with this email
-        const existingUsers = await db.collection('parent_users')
-            .where('email', '==', email)
-            .limit(1)
-            .get();
-        
-        if (!existingUsers.empty) {
-            throw new Error('An account with this email already exists. Please sign in instead.');
-        }
-
-        // Step 1: Create user in Firebase Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-
-        // Step 2: Generate referral code
-        const referralCode = await generateReferralCode();
-
-        // Step 3: Create user profile in Firestore
-        await db.collection('parent_users').doc(user.uid).set({
-            email: email,
-            phone: finalPhone,
-            normalizedPhone: finalPhone,
-            parentName: 'Parent',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            referralCode: referralCode,
-            referralEarnings: 0,
-            uid: user.uid,
-            passwordResetComplete: true,  // Self-registered: they chose their own password
-            firstLoginCompleted: true,
-            registrationMethod: 'self_signup'
-        });
-
-        console.log("✅ Account created and profile saved");
-        
-        // CRITICAL FIX: DO NOT reload the page - let onAuthStateChanged handle it
-        showMessage('Account created successfully! Loading your portal...', 'success');
-        
-        // Reset button state
-        if (signUpBtn) signUpBtn.disabled = false;
-        const signUpText = document.getElementById('signUpText');
-        const signUpSpinner = document.getElementById('signUpSpinner');
-        if (signUpText) signUpText.textContent = 'Create Account';
-        if (signUpSpinner) signUpSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
-        
-        // onAuthStateChanged will detect the login and call loadUserDashboard automatically
-        
-    } catch (error) {
-        if (!pendingRequests.has(requestId)) return;
-        
-        let errorMessage = "Failed to create account.";
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = "This email is already registered. Please sign in instead.";
-        } else if (error.code === 'auth/weak-password') {
-            errorMessage = "Password should be at least 6 characters.";
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-
-        showMessage(errorMessage, 'error');
-
-        if (signUpBtn) signUpBtn.disabled = false;
-        
-        const signUpText = document.getElementById('signUpText');
-        const signUpSpinner = document.getElementById('signUpSpinner');
-        
-        if (signUpText) signUpText.textContent = 'Create Account';
-        if (signUpSpinner) signUpSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
-    } finally {
-        pendingRequests.delete(requestId);
-    }
-};
 
 // ============================================================================
 // SECTION 22: AUTH MANAGER ENHANCEMENT (PROFILE NOT FOUND FIX)
@@ -5184,72 +5088,7 @@ function hideSignupProgress() {
     }
 }
 
-// ============================================================================
-// SECTION 25: SIGNUP FLOW ENHANCEMENT
-// ============================================================================
-
-// Override the entire signup button handler for better UX
-const originalSignupHandler = document.querySelector('#signUpBtn')?.onclick;
-if (document.querySelector('#signUpBtn')) {
-    document.querySelector('#signUpBtn').onclick = async function(e) {
-        e.preventDefault();
-        
-        // Show step 1
-        showSignupProgress(1);
-        
-        // Call the enhanced handleSignUpFull
-        const countryCode = document.getElementById('countryCode')?.value;
-        const localPhone = document.getElementById('signupPhone')?.value.trim();
-        const email = document.getElementById('signupEmail')?.value.trim();
-        const password = document.getElementById('signupPassword')?.value;
-        const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
-        const authLoader = document.getElementById('authLoader');
-        
-        if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
-            showMessage('Please fill in all fields', 'error');
-            hideSignupProgress();
-            return;
-        }
-        
-        if (password !== confirmPassword) {
-            showMessage('Passwords do not match', 'error');
-            hideSignupProgress();
-            return;
-        }
-        
-        // Update button state
-        const signUpBtn = this;
-        signUpBtn.disabled = true;
-        document.getElementById('signUpText').textContent = 'Creating...';
-        document.getElementById('signUpSpinner').classList.remove('hidden');
-        if (authLoader) authLoader.classList.remove('hidden');
-        
-        try {
-            // Show step 2
-            setTimeout(() => showSignupProgress(2), 1000);
-            
-            // Call the enhanced signup function
-            await window.handleSignUpFull(
-                countryCode, 
-                localPhone, 
-                email, 
-                password, 
-                confirmPassword, 
-                signUpBtn, 
-                authLoader
-            );
-            
-            // Show step 3
-            setTimeout(() => showSignupProgress(3), 2500);
-            
-        } catch (error) {
-            hideSignupProgress();
-            console.error('Signup error:', error);
-        }
-    };
-}
-
-console.log("✅ Signup race condition fixes installed");
+console.log("✅ Signup handlers ready");
 
 // ============================================================================
 // SILENT UNLIMITED SEARCH FIX (NO PROGRESS MESSAGES)
@@ -6006,53 +5845,8 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
     }
 
     // ============================================================================
-    // 4. ENHANCED SIGNUP WITH AUTO-LINKING
+    // 4. SHARED CONTACT AUTO-LINKING (runs after signup via onAuthStateChanged)
     // ============================================================================
-
-    // Check for existing signup function and enhance it
-    if (typeof window.handleSignUpFull === 'function') {
-        const originalSignupFunction = window.handleSignUpFull;
-        
-        window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
-            try {
-                let fullPhoneInput = localPhone;
-                if (!localPhone.startsWith('+')) {
-                    fullPhoneInput = countryCode + localPhone;
-                }
-                
-                const normalizedResult = normalizePhoneNumber(fullPhoneInput);
-                
-                if (!normalizedResult.valid) {
-                    throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-                }
-                
-                const finalPhone = normalizedResult.normalized;
-                
-                // Check if this phone/email exists as a shared contact
-                console.log("🔍 Checking for shared contact links...");
-                const linkedStudents = await findLinkedStudentsForContact(finalPhone, email);
-                
-                // Call original signup function
-                await originalSignupFunction(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
-                
-                // If linked students were found, update the parent profile
-                if (linkedStudents.length > 0) {
-                    const user = auth.currentUser;
-                    if (user) {
-                        await updateParentWithSharedAccess(user.uid, finalPhone, email, linkedStudents);
-                        
-                        // Show special message for shared access
-                        const studentNames = linkedStudents.map(s => s.studentName).join(', ');
-                        showMessage(`Account created! You now have access to ${studentNames} as a shared contact.`, 'success');
-                    }
-                }
-                
-            } catch (error) {
-                console.error("Enhanced signup error:", error);
-                throw error;
-            }
-        };
-    }
 
     // Find students linked to a contact
     async function findLinkedStudentsForContact(phone, email) {
