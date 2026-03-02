@@ -249,6 +249,7 @@ class EnrollmentApp {
         if (copyBtn) {
             copyBtn.addEventListener('click', () => this.copyResumeLink(copyBtn));
         }
+    }
     
     // ==============================================
     // STUDENT MANAGEMENT

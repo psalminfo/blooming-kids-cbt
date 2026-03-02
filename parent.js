@@ -4792,8 +4792,9 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
             referralCode: referralCode,
             referralEarnings: 0,
             uid: user.uid,
-            passwordResetComplete: true, // Self-registered users set their own password
-            firstLoginCompleted: true
+            passwordResetComplete: true,  // Self-registered: they chose their own password
+            firstLoginCompleted: true,
+            registrationMethod: 'self_signup'
         });
 
         console.log("✅ Account created and profile saved");
@@ -6713,7 +6714,10 @@ function _updateSiblingFeeSummary() {
     updateAddStudentFees();
 }
 
-
+/**
+ * hideAddStudentModal()
+ */
+function hideAddStudentModal() {
     const modal = document.getElementById('addStudentModal');
     if (modal) modal.classList.add('hidden');
 }
