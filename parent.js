@@ -930,6 +930,46 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         const finalPhone = normalizedResult.normalized;
         console.log("📱 Processing signup with normalized phone:", finalPhone);
 
+        // ── GUARD: Verify this phone/email exists in enrollments before creating account ──
+        // Parents can ONLY get a portal account through the enrollment process.
+        let enrollmentExists = false;
+        try {
+            // Check by phone match (try multiple fields)
+            const phoneSuffix = extractPhoneSuffix(finalPhone);
+            const enrollmentSnap = await db.collection('enrollments').limit(500).get();
+            enrollmentSnap.forEach(doc => {
+                const d = doc.data();
+                const parentFields = [
+                    d.parent?.phone, d.parent?.email,
+                    d.parentPhone, d.parentEmail
+                ];
+                // Check email match
+                if (d.parent?.email === email || d.parentEmail === email) {
+                    enrollmentExists = true;
+                }
+                // Check phone match
+                if (!enrollmentExists) {
+                    for (const p of parentFields) {
+                        if (p && typeof p === 'string' && extractPhoneSuffix(p) === phoneSuffix) {
+                            enrollmentExists = true;
+                            break;
+                        }
+                    }
+                }
+            });
+        } catch (checkErr) {
+            console.warn('Enrollment check failed:', checkErr.message);
+            // If check fails, be conservative and block signup
+            enrollmentExists = false;
+        }
+
+        if (!enrollmentExists) {
+            throw new Error(
+                "No enrollment found for this email or phone number. " +
+                "Please complete the enrollment form first at enrollment.html, or contact support."
+            );
+        }
+
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
@@ -2893,16 +2933,47 @@ class UnifiedAuthManager {
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
             
             if (!userDoc.exists) {
-                throw new Error("User profile not found");
+                // Sign out unregistered users — they authenticated but have no portal profile
+                console.warn('⛔ No parent_users profile found for uid:', user.uid);
+                await auth.signOut();
+                showMessage("No parent account found. Please complete enrollment first, or contact support.", 'error');
+                this.showAuthScreen();
+                return;
             }
 
             const userData = userDoc.data();
+            const userPhone = userData.normalizedPhone || userData.phone || '';
+
+            // ── Resolve parentName: prefer students collection match over parent_users ──
+            let resolvedParentName = userData.parentName || 'Parent';
+            if (userPhone) {
+                try {
+                    const phoneSuffix = extractPhoneSuffix(userPhone);
+                    const studentsSnap = await db.collection('students')
+                        .orderBy('createdAt', 'desc')
+                        .limit(200)
+                        .get();
+                    studentsSnap.forEach(doc => {
+                        const d = doc.data();
+                        const phoneFields = [d.normalizedPhone, d.normalizedParentPhone, d.parentPhone];
+                        for (const p of phoneFields) {
+                            if (p && extractPhoneSuffix(p) === phoneSuffix && d.parentName) {
+                                resolvedParentName = d.parentName;
+                                return; // break inner forEach
+                            }
+                        }
+                    });
+                } catch (lookupErr) {
+                    console.warn('Could not resolve parentName from students:', lookupErr.message);
+                }
+            }
+
             this.currentUser = {
                 uid: user.uid,
                 email: userData.email,
-                phone: userData.phone,
-                normalizedPhone: userData.normalizedPhone || userData.phone,
-                parentName: userData.parentName || 'Parent',
+                phone: userPhone,
+                normalizedPhone: userData.normalizedPhone || userPhone,
+                parentName: resolvedParentName,
                 referralCode: userData.referralCode
             };
 
@@ -4788,12 +4859,12 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
         
         // CRITICAL FIX: Wait for Firestore write to propagate
         console.log("⏳ Waiting for profile to sync...");
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Step 4: Show success message
-        showMessage('Account created successfully! Redirecting...', 'success');
+        showMessage('Account created successfully! Loading your dashboard...', 'success');
         
-        // Step 5: Clear form
+        // Step 5: Reset form state
         if (signUpBtn) signUpBtn.disabled = false;
         const signUpText = document.getElementById('signUpText');
         const signUpSpinner = document.getElementById('signUpSpinner');
@@ -4801,17 +4872,13 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
         if (signUpSpinner) signUpSpinner.classList.add('hidden');
         if (authLoader) authLoader.classList.add('hidden');
         
-        // Step 6: Force auth state refresh
-        console.log("🔄 Refreshing auth state...");
-        
-        // Method 1: Reload page (most reliable)
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
-        
-        // Method 2: Alternative - trigger auth refresh without reload
-        // await auth.currentUser.reload();
-        // console.log("🔄 Auth state refreshed");
+        // Step 6: Let onAuthStateChanged handle the dashboard transition — NO page reload
+        // Firebase auth state listener will fire and call loadUserDashboard automatically
+        if (window.authManager) {
+            window.authManager.isProcessing = false;
+            window.authManager.lastProcessTime = 0;
+        }
+        console.log("✅ Signup complete — dashboard will load via auth state listener");
         
     } catch (error) {
         if (!pendingRequests.has(requestId)) return;
@@ -4841,124 +4908,9 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
 };
 
 // ============================================================================
-// SECTION 22: AUTH MANAGER ENHANCEMENT (PROFILE NOT FOUND FIX)
+// SECTION 22: REMOVED — loadUserDashboard is now correctly implemented
+// inside the UnifiedAuthManager class definition above.
 // ============================================================================
-
-// Store original loadUserDashboard
-const originalLoadUserDashboard = UnifiedAuthManager.prototype.loadUserDashboard;
-
-// Override with enhanced version
-UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
-    console.log("📊 Loading ENHANCED dashboard for user");
-    
-    const authArea = document.getElementById("authArea");
-    const reportArea = document.getElementById("reportArea");
-    const authLoader = document.getElementById("authLoader");
-    
-    if (authLoader) authLoader.classList.remove("hidden");
-    
-    try {
-        // ENHANCED: Add retry logic for new users
-        console.log("🔍 Checking user profile...");
-        
-        let userDoc;
-        let retryCount = 0;
-        const maxRetries = 4;
-        
-        while (retryCount < maxRetries) {
-            try {
-                userDoc = await db.collection('parent_users').doc(user.uid).get();
-                
-                if (userDoc.exists) {
-                    console.log(`✅ User profile found on attempt ${retryCount + 1}`);
-                    break;
-                }
-                
-                retryCount++;
-                if (retryCount < maxRetries) {
-                    console.log(`🔄 Profile not found, retrying in ${retryCount * 500}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, retryCount * 500));
-                }
-            } catch (err) {
-                console.warn(`Retry ${retryCount + 1} failed:`, err.message);
-                retryCount++;
-            }
-        }
-        
-        if (!userDoc || !userDoc.exists) {
-            // ── SECURITY: No profile found = not a registered parent portal user ──
-            // Sign them out immediately. Only enrollment portal creates profiles.
-            console.warn("🚫 No parent_users profile found — signing out unregistered user.");
-            
-            try {
-                await auth.signOut();
-            } catch (signOutErr) {
-                console.error("Sign-out error:", signOutErr);
-            }
-
-            // Show auth screen with clear message
-            const authAreaEl = document.getElementById("authArea");
-            const reportAreaEl = document.getElementById("reportArea");
-            if (authAreaEl)   authAreaEl.classList.remove("hidden");
-            if (reportAreaEl) reportAreaEl.classList.add("hidden");
-
-            showMessage(
-                "Access denied. No account found for this email. " +
-                "Please enrol through the Enrollment Portal first.",
-                "error"
-            );
-            return;
-        }
-        
-        // Continue with original logic if profile exists
-        const userData = userDoc.data();
-        this.currentUser = {
-            uid: user.uid,
-            email: userData.email,
-            phone: userData.phone,
-            normalizedPhone: userData.normalizedPhone || userData.phone,
-            parentName: userData.parentName || 'Parent',
-            referralCode: userData.referralCode
-        };
-
-        console.log("👤 User data loaded:", this.currentUser.parentName);
-
-        // Update UI immediately
-        this.showDashboardUI();
-
-        // Load remaining data in parallel
-        await Promise.all([
-            loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid),
-            loadReferralRewards(user.uid),
-            loadAcademicsData()
-        ]);
-
-        // Setup monitoring and UI
-        this.setupRealtimeMonitoring();
-        this.setupUIComponents();
-
-        console.log("✅ Dashboard fully loaded");
-
-    } catch (error) {
-        console.error("❌ Enhanced dashboard load error:", error);
-        
-        // User-friendly error handling
-        if (error.message.includes("profile not found") || error.message.includes("not found")) {
-            showMessage("Almost there! Setting up your account...", "info");
-            
-            // Auto-retry after delay
-            setTimeout(() => {
-                console.log("🔄 Auto-retrying dashboard load...");
-                this.loadUserDashboard(user);
-            }, 3000);
-        } else {
-            showMessage("Temporary issue loading dashboard. Please refresh.", "error");
-            this.showAuthScreen();
-        }
-    } finally {
-        if (authLoader) authLoader.classList.add("hidden");
-    }
-};
 
 // ============================================================================
 // SECTION 23: TEMP SIGNUP DATA STORAGE
@@ -6273,7 +6225,12 @@ function showAddStudentModal() {
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     nextMonth.setDate(1);
     const el = document.getElementById('newStudentStartDate');
-    if (el) el.value = nextMonth.toISOString().split('T')[0];
+    if (el) {
+        el.min = new Date().toISOString().split('T')[0]; // Cannot go before today
+        el.value = nextMonth.toISOString().split('T')[0];
+        // Force calendar-only: prevent keyboard entry
+        el.addEventListener('keydown', function(e) { e.preventDefault(); });
+    }
 
     // Reset all picker chips
     document.querySelectorAll('#newStudentSubjects .picker-chip,#newStudentDays .picker-chip')
@@ -6287,84 +6244,7 @@ function showAddStudentModal() {
         if (el) el.value = '';
     });
 
-    // ── Init extracurricular cards if present in this modal ──
-    _initExtracurricularCards(modal);
-
     modal.classList.remove('hidden');
-}
-
-/**
- * _initExtracurricularCards(container)
- * Wires up extracurricular activity cards inside any container:
- *  - Global Discovery: hides all day buttons except Saturday
- *  - Frequency buttons: Once Weekly = 1 day max, Twice Weekly = 2 days max
- *  - Day buttons: enforced by chosen frequency
- * Safe to call multiple times — uses a flag to avoid double-binding.
- */
-function _initExtracurricularCards(container) {
-    if (!container) return;
-    const cards = container.querySelectorAll('.extracurricular-card,[data-activity-id]');
-    cards.forEach(card => {
-        if (card._bkhInited) return;
-        card._bkhInited = true;
-
-        const activityId = card.dataset.activityId || '';
-        const isGlobal   = activityId === 'global_discovery';
-
-        // Hide non-Saturday day buttons for Global Discovery
-        if (isGlobal) {
-            card.querySelectorAll('.extracurricular-day-btn,[data-day]').forEach(btn => {
-                if ((btn.dataset.day || '') !== 'Saturday') {
-                    btn.style.display = 'none';
-                }
-            });
-        }
-
-        // Frequency button click: enforce day limit
-        card.querySelectorAll('.frequency-btn').forEach(freqBtn => {
-            freqBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
-                this.classList.add('selected');
-
-                if (!isGlobal) {
-                    const maxDays = (this.dataset.frequency === 'twice') ? 2 : 1;
-                    const selected = card.querySelectorAll('.extracurricular-day-btn.selected,[data-day].selected');
-                    selected.forEach((b, idx) => { if (idx >= maxDays) b.classList.remove('selected'); });
-                }
-            });
-        });
-
-        // Day button click: enforce limit from chosen frequency
-        card.querySelectorAll('.extracurricular-day-btn,[data-day]').forEach(dayBtn => {
-            if (isGlobal && (dayBtn.dataset.day || '') !== 'Saturday') return;
-            dayBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                if (isGlobal) {
-                    card.querySelectorAll('.extracurricular-day-btn.selected,[data-day].selected')
-                        .forEach(b => b.classList.remove('selected'));
-                    this.classList.add('selected');
-                    return;
-                }
-                const freqBtn = card.querySelector('.frequency-btn.selected');
-                const freq    = freqBtn ? freqBtn.dataset.frequency : 'once';
-                const maxDays = (freq === 'twice') ? 2 : 1;
-                const nowSelected = card.querySelectorAll('.extracurricular-day-btn.selected,[data-day].selected');
-
-                if (this.classList.contains('selected')) {
-                    this.classList.remove('selected');
-                } else if (nowSelected.length < maxDays) {
-                    this.classList.add('selected');
-                } else {
-                    const msg = maxDays === 1
-                        ? "Once Weekly allows only 1 day. Choose 'Twice Weekly' for 2 days."
-                        : "Twice Weekly allows a maximum of 2 days.";
-                    if (typeof showMessage === 'function') showMessage(msg, 'error');
-                    else alert(msg);
-                }
-            });
-        });
-    });
 }
 
 /**
@@ -6378,9 +6258,41 @@ function hideAddStudentModal() {
 /**
  * togglePickerChip(el)
  * Toggles the "selected" class on subject/day picker chips.
+ * For day chips: enforces session-based day limits (once=1, twice=2, five=5).
+ * For Global Discovery activity chips: enforces Saturday-only.
  */
 function togglePickerChip(el) {
-    el.classList.toggle('selected');
+    const container = el.closest('[id]');
+    const containerId = container ? container.id : '';
+
+    // Handle day chip selection with session limit enforcement
+    if (containerId === 'newStudentDays' || el.dataset.day) {
+        const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+        const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
+        const dayLimits = { twice: 2, three: 3, five: 5 };
+        const maxDays = sessionType ? (dayLimits[sessionType] || 1) : 1;
+
+        if (el.classList.contains('selected')) {
+            // Always allow deselect
+            el.classList.remove('selected');
+        } else {
+            const currentCount = document.querySelectorAll('#newStudentDays .picker-chip.selected').length;
+            if (currentCount >= maxDays) {
+                const sessionLabel = {
+                    twice: '2 days (Twice Weekly)',
+                    three: '3 days (3× Weekly)',
+                    five: '5 days (Daily)'
+                };
+                showMessage(`Maximum ${sessionLabel[sessionType] || maxDays + ' day(s)'} for this session frequency.`, 'error');
+                return;
+            }
+            el.classList.add('selected');
+        }
+    } else {
+        // Default toggle for subjects and other chips
+        el.classList.toggle('selected');
+    }
+
     // Recalculate fees when subjects change (additional subject fee)
     updateAddStudentFees();
 }
@@ -6472,6 +6384,15 @@ function toggleSessionChip(el) {
         chip.classList.remove('selected');
     });
     el.classList.add('selected');
+
+    // Enforce day limit: trim excess selected days when session type changes
+    const dayLimits = { twice: 2, three: 3, five: 5 };
+    const newMax = dayLimits[el.dataset.sessions] || 1;
+    const selectedDays = Array.from(document.querySelectorAll('#newStudentDays .picker-chip.selected'));
+    if (selectedDays.length > newMax) {
+        selectedDays.slice(newMax).forEach(d => d.classList.remove('selected'));
+    }
+
     updateAddStudentFees();
 }
 
@@ -6832,6 +6753,16 @@ async function submitNewStudent() {
 
         if (!name) throw new Error('Student name is required.');
 
+        // Validate start date is not in the past
+        if (start) {
+            const startDateObj = new Date(start + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (startDateObj < today) {
+                throw new Error('Start date cannot be in the past. Please select a future date.');
+            }
+        }
+
         // ── Calculate fees using the same logic as enrollment portal ──
         const feeCalc = _calculateAddStudentFees();
 
@@ -6911,6 +6842,30 @@ async function submitNewStudent() {
         const docRef = await db.collection('enrollments').add(studentDoc);
 
         console.log('✅ New student saved to enrollments:', docRef.id);
+
+        // Send email notification — mirrors enrollment portal behavior
+        setTimeout(() => {
+            try {
+                const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKPivWuCyEywMCxgleEoP7MBNxT6ZEvd5WWomDNGYADZmDcBcsO4Eif-JyHSJ5mpXBaw/exec";
+                fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        action: "send_enrollment_notification",
+                        applicationId: docRef.id,
+                        parent: studentDoc.parent,
+                        students: 1,
+                        totalFee: studentDoc.summary.totalFee,
+                        studentName: studentDoc.studentName,
+                        startDate: studentDoc.startDate,
+                        addedFromPortal: true
+                    })
+                }).catch(err => console.warn('Email notification failed silently:', err.message));
+            } catch (emailErr) {
+                console.warn('Email setup failed:', emailErr.message);
+            }
+        }, 1500);
 
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
@@ -7190,7 +7145,6 @@ window.loadAcademicsData = async function(selectedStudent = null) {
 // ============================================================================
 
 window.showAddStudentModal  = showAddStudentModal;
-window._initExtracurricularCards = _initExtracurricularCards;
 window.hideAddStudentModal  = hideAddStudentModal;
 window.addStudentNext       = addStudentNext;
 window.addStudentPrev       = addStudentPrev;
