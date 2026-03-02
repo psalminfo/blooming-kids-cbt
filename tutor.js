@@ -4647,7 +4647,14 @@ function _renderDashboardReports(rtData, tutorEmail, statusFilter) {
 
         if (needsFeedback) {
             if (!statusFilter || statusFilter === 'pending') {
-                pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
+                pendingItems.push({
+                    studentName: data.studentName || 'Unknown',
+                    grade: data.grade || 'N/A',
+                    docId: docSnap.id,
+                    collection: 'student_results',
+                    answers: data.answers || [],
+                    subject: data.subject || data.grade || ''
+                });
                 pendingCount++;
             }
         } else {
@@ -4667,7 +4674,14 @@ function _renderDashboardReports(rtData, tutorEmail, statusFilter) {
 
         if (needsFeedback) {
             if (!statusFilter || statusFilter === 'pending') {
-                pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
+                pendingItems.push({
+                    studentName: data.studentName || 'Unknown',
+                    grade: data.grade || 'N/A',
+                    docId: docSnap.id,
+                    collection: 'tutor_submissions',
+                    textAnswer: data.textAnswer || '',
+                    subject: data.subject || data.type || 'Creative Writing'
+                });
                 pendingCount++;
             }
         } else {
@@ -4696,54 +4710,27 @@ function _renderDashboardReports(rtData, tutorEmail, statusFilter) {
                     ${pendingItems.map((item, i) => {
                         const initials = (item.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
                         const color = ACOLORS[(item.studentName||'').charCodeAt(0) % ACOLORS.length];
-
-                        // Check if this is a creative writing submission that needs feedback
-                        const isCreativeWriting = item.type === 'creative_writing' || item.answerType === 'creative-writing';
-
-                        if (isCreativeWriting) {
-                            // Show expanded card with feedback form
-                            return `
-                            <div class="creative-writing-pending" data-submission-id="${escapeHtml(item.id || '')}" data-student-id="${escapeHtml(item.studentId || '')}" data-student-name="${escapeHtml(item.studentName)}" style="border-bottom:1px solid #f1f5f9; padding:16px;">
-                                <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:12px;">
-                                    <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-                                    <div style="flex:1;">
-                                        <div style="font-size:.875rem;font-weight:700;color:#1e293b;">${escapeHtml(item.studentName)}</div>
-                                        <div style="font-size:.72rem;color:#94a3b8; margin-top:2px;">Creative Writing · Pending Review</div>
-                                    </div>
-                                    <div style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:800;padding:3px 8px;border-radius:999px;">NEEDS FEEDBACK</div>
-                                </div>
-
-                                <!-- Student's creative writing text -->
-                                <div style="background:#f9fafb; border-radius:8px; padding:12px; margin-bottom:12px; border-left:3px solid #f59e0b;">
-                                    <div style="font-size:.7rem; font-weight:700; color:#b45309; text-transform:uppercase; margin-bottom:6px;">Student's Writing:</div>
-                                    <div style="font-size:.85rem; color:#334155; font-style:italic; white-space:pre-wrap; max-height:120px; overflow-y:auto;">${escapeHtml(item.textAnswer || item.studentAnswer || 'No text provided')}</div>
-                                </div>
-
-                                <!-- Feedback input area -->
-                                <div style="margin-bottom:12px;">
-                                    <textarea id="cw-feedback-${i}" placeholder="Write your feedback, comments, and suggestions for this student..." style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:8px; font-size:.85rem; min-height:100px; resize:vertical;" onfocus="this.style.borderColor='#f59e0b'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
-                                </div>
-
-                                <!-- Submit button -->
-                                <div style="display:flex; gap:8px; justify-content:flex-end;">
-                                    <button class="submit-cw-feedback-btn" data-index="${i}" data-submission-id="${escapeHtml(item.id || '')}" data-student-id="${escapeHtml(item.studentId || '')}" data-student-name="${escapeHtml(item.studentName)}" data-parent-email="${escapeHtml(item.parentEmail || '')}" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border:none; border-radius:8px; padding:10px 20px; font-size:.8rem; font-weight:700; cursor:pointer;">✏️ Submit Feedback</button>
-                                    <button class="skip-cw-btn" data-index="${i}" style="background:#f1f5f9; color:#64748b; border:none; border-radius:8px; padding:10px 16px; font-size:.8rem; font-weight:600; cursor:pointer;">Skip for now</button>
-                                </div>
-                            </div>`;
-                        } else {
-                            // Regular pending item (non-creative writing) - show simple card
-                            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                                <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-                                <div style="flex:1;min-width:0;">
-                                    <div style="font-size:.875rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.studentName)}</div>
-                                    ${item.grade && item.grade !== 'N/A' ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(item.grade)}</div>` : ''}
-                                </div>
-                                <div style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:800;padding:3px 8px;border-radius:999px;">PENDING</div>
-                            </div>`;
-                        }
+                        const safeIdx = i;
+                        return `<div data-pending-idx="${safeIdx}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}transition:background .1s;cursor:pointer;" onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''">
+                            <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:.875rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.studentName)}</div>
+                                ${item.grade && item.grade !== 'N/A' ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(item.grade)}</div>` : ''}
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <div style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:800;padding:3px 8px;border-radius:999px;flex-shrink:0;">PENDING</div>
+                                <div style="color:#3b82f6;font-size:.72rem;font-weight:700;">Tap to respond →</div>
+                            </div>
+                        </div>`;
                     }).join('')}
                 </div>
             </div>`;
+
+        // Attach click listeners to each pending row
+        pendingItems.forEach((item, i) => {
+            const row = pendingReportsContainer.querySelector(`[data-pending-idx="${i}"]`);
+            if (row) row.addEventListener('click', () => openPendingFeedbackModal(item));
+        });
     }
 
     if (gradedReportsContainer) {
@@ -4754,133 +4741,6 @@ function _renderDashboardReports(rtData, tutorEmail, statusFilter) {
     // Attach submit feedback listeners
     attachSubmitReportListeners();
 }
-
-// Function to handle creative writing feedback submission
-async function submitCreativeWritingFeedback(submissionId, studentId, studentName, parentEmail, feedbackText) {
-    if (!feedbackText.trim()) {
-        showCustomAlert('Please enter feedback before submitting.');
-        return false;
-    }
-
-    try {
-        // Show loading state
-        const btn = event?.target;
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '⏳ Saving...';
-        }
-
-        // 1. Update the tutor_submissions document
-        const submissionRef = doc(db, "tutor_submissions", submissionId);
-        await updateDoc(submissionRef, {
-            tutorReport: feedbackText,
-            gradedAt: new Date(),
-            status: 'graded'
-        });
-
-        // 2. Find and update the corresponding student_results document
-        const resultsQuery = query(
-            collection(db, "student_results"),
-            where("studentName", "==", studentName),
-            where("parentEmail", "==", parentEmail),
-            orderBy("submittedAt", "desc"),
-            limit(5)
-        );
-
-        const resultsSnapshot = await getDocs(resultsQuery);
-
-        if (!resultsSnapshot.empty) {
-            for (const docSnap of resultsSnapshot.docs) {
-                const data = docSnap.data();
-                const answers = data.answers || [];
-
-                const hasCreativeWriting = answers.some(a => a.type === 'creative-writing');
-
-                if (hasCreativeWriting) {
-                    const updatedAnswers = answers.map(a => {
-                        if (a.type === 'creative-writing') {
-                            return { ...a, tutorReport: feedbackText, gradedAt: new Date() };
-                        }
-                        return a;
-                    });
-
-                    await updateDoc(doc(db, "student_results", docSnap.id), {
-                        answers: updatedAnswers
-                    });
-
-                    console.log("✅ Updated student_results with feedback");
-                    break;
-                }
-            }
-        }
-
-        // 3. Refresh the dashboard
-        showCustomAlert('✅ Feedback submitted successfully! Parents will now see your comments.');
-
-        if (btn) {
-            const parentDiv = btn.closest('.creative-writing-pending');
-            if (parentDiv) {
-                parentDiv.style.opacity = '0.5';
-                parentDiv.innerHTML = '<div style="padding:16px; text-align:center; color:#10b981;"><span style="font-size:1.2rem;">✅</span> Feedback submitted! Refreshing...</div>';
-                setTimeout(() => {
-                    if (window.tutorData?.email) {
-                        loadTutorReports(window.tutorData.email);
-                    }
-                }, 1500);
-            }
-        }
-
-        return true;
-
-    } catch (error) {
-        console.error("Error submitting creative writing feedback:", error);
-        showCustomAlert('❌ Error submitting feedback. Please try again.');
-
-        const btn = event?.target;
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '✏️ Submit Feedback';
-        }
-        return false;
-    }
-}
-
-// Event listeners for creative writing feedback buttons
-document.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('submit-cw-feedback-btn')) {
-        e.preventDefault();
-
-        const index = e.target.dataset.index;
-        const submissionId = e.target.dataset.submissionId;
-        const studentId = e.target.dataset.studentId;
-        const studentName = e.target.dataset.studentName;
-        const parentEmail = e.target.dataset.parentEmail;
-
-        const feedbackTextarea = document.getElementById(`cw-feedback-${index}`);
-
-        if (!feedbackTextarea) {
-            showCustomAlert('Could not find feedback field. Please refresh.');
-            return;
-        }
-
-        const feedback = feedbackTextarea.value;
-
-        await submitCreativeWritingFeedback(
-            submissionId,
-            studentId,
-            studentName,
-            parentEmail,
-            feedback
-        );
-    }
-
-    if (e.target.classList.contains('skip-cw-btn')) {
-        const parentDiv = e.target.closest('.creative-writing-pending');
-        if (parentDiv) {
-            parentDiv.style.display = 'none';
-        }
-    }
-});
 
 // Helper: Build a standard report card HTML string
 function buildReportCard(docRef, data, needsFeedback) {
@@ -4948,6 +4808,141 @@ function buildCreativeWritingCard(docRef, data) {
             </div>` : ''}
         </div>
     </div>`;
+}
+
+/**
+ * Opens a modal showing the student's creative writing and a response textarea.
+ * Saves the tutor's feedback to the correct Firestore collection:
+ *   - student_results  → updates answers[n].tutorReport for the creative-writing answer
+ *   - tutor_submissions → updates the tutorReport field directly
+ */
+function openPendingFeedbackModal(item) {
+    // Build writing preview
+    let writingHTML = '';
+    if (item.collection === 'student_results') {
+        // Find the creative-writing answers
+        const cwAnswers = (item.answers || []).filter(a => a.type === 'creative-writing');
+        if (cwAnswers.length > 0) {
+            writingHTML = cwAnswers.map((a, idx) => `
+                <div style="background:#f0f9ff;border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:3px solid #60a5fa;">
+                    <div style="font-size:.72rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">
+                        ${escapeHtml(a.question || `Creative Writing ${idx + 1}`)}
+                    </div>
+                    <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.6;white-space:pre-wrap;">${escapeHtml(a.textAnswer || 'No response provided')}</p>
+                </div>`).join('');
+        } else {
+            writingHTML = `<p style="color:#94a3b8;font-style:italic;">No creative writing answers found.</p>`;
+        }
+    } else {
+        // tutor_submissions — single textAnswer field
+        writingHTML = `
+            <div style="background:#fdf4ff;border-radius:10px;padding:12px 14px;border-left:3px solid #a855f7;">
+                <div style="font-size:.72rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Student Writing</div>
+                <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.6;white-space:pre-wrap;">${escapeHtml(item.textAnswer || 'No response provided')}</p>
+            </div>`;
+    }
+
+    const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+    const color = ACOLORS[(item.studentName||'').charCodeAt(0) % ACOLORS.length];
+    const initials = (item.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:18px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;">
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:16px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+                <div style="width:42px;height:42px;border-radius:12px;background:${color};color:#fff;font-weight:900;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="color:#fff;font-weight:800;font-size:.95rem;">${escapeHtml(item.studentName)}</div>
+                    <div style="color:#bfdbfe;font-size:.75rem;margin-top:2px;">${escapeHtml(item.grade)} · ${escapeHtml(item.subject)}</div>
+                </div>
+                <button id="pfm-close" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;width:32px;height:32px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;">&times;</button>
+            </div>
+            <!-- Body -->
+            <div style="flex:1;overflow-y:auto;padding:18px 20px;">
+                <div style="font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">📖 Student's Submission</div>
+                ${writingHTML}
+                <!-- Response tab -->
+                <div style="margin-top:16px;">
+                    <div style="font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">💬 Your Response / Feedback</div>
+                    <textarea id="pfm-feedback" rows="5" placeholder="Write your feedback for this student here…"
+                        style="width:100%;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 12px;font-size:.875rem;line-height:1.5;resize:vertical;font-family:inherit;box-sizing:border-box;transition:border-color .15s;"
+                        onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#d1d5db'"></textarea>
+                    <div id="pfm-status" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:.8rem;font-weight:600;text-align:center;"></div>
+                </div>
+            </div>
+            <!-- Footer -->
+            <div style="padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;background:#fafafa;">
+                <button id="pfm-cancel" style="background:#f1f5f9;color:#475569;border:none;border-radius:10px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:.875rem;">Cancel</button>
+                <button id="pfm-save" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:10px;padding:10px 24px;font-weight:700;cursor:pointer;font-size:.875rem;">✅ Save Feedback</button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+
+    function closePFM() { overlay.remove(); document.body.style.overflow = ''; }
+    overlay.querySelector('#pfm-close').addEventListener('click', closePFM);
+    overlay.querySelector('#pfm-cancel').addEventListener('click', closePFM);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closePFM(); });
+
+    overlay.querySelector('#pfm-save').addEventListener('click', async () => {
+        const saveBtn = overlay.querySelector('#pfm-save');
+        const statusEl = overlay.querySelector('#pfm-status');
+        const feedback = overlay.querySelector('#pfm-feedback').value.trim();
+
+        if (!feedback) {
+            statusEl.style.display = 'block';
+            statusEl.style.cssText = 'display:block;padding:8px 12px;border-radius:8px;font-size:.8rem;font-weight:600;text-align:center;background:#fee2e2;color:#991b1b;margin-top:8px;';
+            statusEl.textContent = '❌ Please write feedback before saving.';
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = '⏳ Saving…';
+        statusEl.style.display = 'none';
+
+        try {
+            const docRef2 = doc(db, item.collection, item.docId);
+
+            if (item.collection === 'student_results') {
+                // Re-fetch the latest answers to avoid overwriting concurrent changes
+                const snap = await getDoc(docRef2);
+                if (snap.exists()) {
+                    const answers = [...(snap.data().answers || [])];
+                    // Update tutorReport on every creative-writing answer that's still blank
+                    let updated = false;
+                    answers.forEach(a => {
+                        if (a.type === 'creative-writing' && (!a.tutorReport || a.tutorReport.trim() === '')) {
+                            a.tutorReport = feedback;
+                            updated = true;
+                        }
+                    });
+                    if (updated) {
+                        await updateDoc(docRef2, { answers, gradedAt: new Date() });
+                    }
+                }
+            } else {
+                // tutor_submissions — save directly to tutorReport field
+                await updateDoc(docRef2, { tutorReport: feedback, gradedAt: new Date() });
+            }
+
+            statusEl.style.cssText = 'display:block;padding:8px 12px;border-radius:8px;font-size:.8rem;font-weight:600;text-align:center;background:#d1fae5;color:#065f46;margin-top:8px;';
+            statusEl.textContent = '✅ Feedback saved successfully!';
+            saveBtn.textContent = '✅ Saved!';
+            saveBtn.style.background = 'linear-gradient(135deg,#059669,#047857)';
+
+            // Refresh the dashboard report list
+            try { if (window.tutorData) loadTutorReports(window.tutorData.email); } catch(e) {}
+            setTimeout(closePFM, 1400);
+        } catch (err) {
+            console.error('Feedback save error:', err);
+            statusEl.style.cssText = 'display:block;padding:8px 12px;border-radius:8px;font-size:.8rem;font-weight:600;text-align:center;background:#fee2e2;color:#991b1b;margin-top:8px;';
+            statusEl.textContent = '❌ Save failed: ' + err.message;
+            saveBtn.disabled = false;
+            saveBtn.textContent = '✅ Save Feedback';
+        }
+    });
 }
 
 function attachSubmitReportListeners() {
