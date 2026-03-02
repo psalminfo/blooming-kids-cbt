@@ -282,7 +282,7 @@
 
     <script type="module">
         // --- MODULE IMPORTS MUST BE FIRST IN A MODULE SCRIPT ---
-        import { loadQuestions, clearTestSession, clearAllTestSessions } from './autoQuestionGen.js';
+        import { loadQuestions, clearTestSession } from './autoQuestionGen.js';
         import { submitTestToFirebase } from './submitAnswers.js';
         import { db as firestoreDb } from './firebaseConfig.js';
         import { collection, query, where, limit, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -371,11 +371,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             
             const subject = urlParams.get('subject');
-            // Normalise grade to always be in "grade4" format regardless of what the URL contains.
-            // Strips spaces/special chars first, then ensures the "grade" prefix is present.
-            // Handles: "4" → "grade4", "Grade 3" → "grade3", "Grade+3" → "grade3", "grade4" → "grade4"
-            const rawGrade = (urlParams.get('grade') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const grade = rawGrade.startsWith('grade') ? rawGrade : `grade${rawGrade}`;
+            const grade = urlParams.get('grade');
             const studentName = urlParams.get('studentName');
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
@@ -436,9 +432,8 @@
                 }
 
                 await loadQuestions(subject, grade, state);
-                // NOTE: submit-button-container visibility is managed by autoQuestionGen.js
-                // (hidden for creative-writing state, shown for mcq state) — do NOT override here.
-
+                document.getElementById("submit-button-container").style.display = 'flex';
+                
                 // Initialize keyboard handler after questions are loaded
                 setupKeyboardHandler();
 
@@ -516,7 +511,7 @@
 
         // --- FIXED LOGOUT: Always go to tutor.html, even if clearTestSession tries to redirect elsewhere ---
         window.logout = () => {
-            clearAllTestSessions();
+            clearTestSession(true);
             setTimeout(() => {
                 window.location.href = 'tutor.html';
             }, 50);
