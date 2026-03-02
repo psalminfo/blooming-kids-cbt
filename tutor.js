@@ -1850,6 +1850,28 @@ function showHomeworkModal(student) {
                 }
             }
 
+            // *** CUSTOM SUBJECT PERSISTENCE ***
+            // If the tutor typed a new subject via "Other", add it to the student's
+            // subjects array so it appears in the dropdown on future homework assignments.
+            if (subjectSelect && subjectSelect.value === '__other__' && subject) {
+                const currentSubjects = Array.isArray(student.subjects) ? student.subjects : [];
+                if (!currentSubjects.includes(subject)) {
+                    try {
+                        const studentColl = student.collection || 'students';
+                        await updateDoc(doc(db, studentColl, student.id), {
+                            subjects: [...currentSubjects, subject]
+                        });
+                        // Update local object so re-opens of the modal reflect the new subject immediately
+                        student.subjects = [...currentSubjects, subject];
+                        console.log(`Custom subject "${subject}" added to student profile.`);
+                    } catch (subjectUpdateError) {
+                        // Non-fatal — homework is still saved, subject just won't persist
+                        console.warn('Could not persist custom subject to student profile:', subjectUpdateError.message);
+                    }
+                }
+            }
+
+
             // --- STEP 2: UPLOAD FILES ---
             saveBtn.innerHTML = `Uploading files...`;
             let attachments = [];
@@ -5036,11 +5058,25 @@ async function renderStudentDatabase(container, tutor) {
     
     // Queries - fetch by tutorEmail OR tutorId (management assigns via tutorId)
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
+    const allResultsQuery     = query(collection(db, "student_results"),   where("tutorEmail", "==", tutor.email));
 
-    const [allStudentDocs, allSubmissionsSnapshot] = await Promise.all([
+    const [allStudentDocs, allSubmissionsSnapshot, allResultsSnapshot] = await Promise.all([
         fetchStudentsForTutor(tutor, "students"),
-        getDocs(allSubmissionsQuery)
+        getDocs(allSubmissionsQuery),
+        getDocs(allResultsQuery)
     ]);
+
+    // Build Sets for fast O(1) lookup inside the render loop.
+    // Matches by studentId (preferred) AND by lowercased studentName (fallback for
+    // older results written before studentId was stored).
+    const studentsWithResults     = new Set();
+    const studentsWithResultNames = new Set();
+    allResultsSnapshot.forEach(d => {
+        const r = d.data();
+        if (r.studentId)   studentsWithResults.add(r.studentId);
+        if (r.studentName) studentsWithResultNames.add(r.studentName.trim().toLowerCase());
+    });
+    console.log(`[Placement] student_results fetched: ${allResultsSnapshot.size} docs | ids: ${studentsWithResults.size} | names: ${studentsWithResultNames.size}`);
 
     // Process Students - ONLY APPROVED STUDENTS
     let approvedStudents = allStudentDocs
@@ -5114,6 +5150,9 @@ async function renderStudentDatabase(container, tutor) {
         } else {
             studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
 
+            // Placement test cutoff: only students added on/after this date are eligible.
+            const PLACEMENT_CUTOFF = new Date('2026-02-26T00:00:00');
+
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
@@ -5178,13 +5217,37 @@ async function renderStudentDatabase(container, tutor) {
                     actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                 }
 
-                // ── SETTING 5: Placement Test (independent — gated by global toggle + grade eligibility + completion status) ──
-                // Only students added ON or AFTER Feb 26 2026 are eligible — older students are exempt
-                const PLACEMENT_CUTOFF = new Date('2026-02-26T00:00:00');
-                const studentCreatedAt = student.createdAt?.toDate ? student.createdAt.toDate() : (student.createdAt ? new Date(student.createdAt) : null);
-                const isNewEnoughForPlacement = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
+                // ── SETTING 5: Placement Test ──────────────────────────────────────────────
+                // Show for ANY grade 3–12 student who:
+                //   • Was added on or after Feb 26 2026 (createdAt cutoff)
+                //   • Has a grade between 3 and 12
+                //   • Has NO result in student_results (checked by id OR name)
+                //   • Does NOT have placementTestStatus='completed' on their doc
+                // No admin toggle required — this is always active from Feb 26 2026.
+                const studentCreatedAt = student.createdAt?.toDate
+                    ? student.createdAt.toDate()
+                    : (student.createdAt ? new Date(student.createdAt) : null);
+                const _isNewEnough      = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
+                const _hasResult        = studentsWithResults.has(student.id) ||
+                    studentsWithResultNames.has((student.studentName || '').trim().toLowerCase());
+                const _gradeOk          = isPlacementTestEligible(student.grade);
+                const _notDone          = (student.placementTestStatus || '') !== 'completed';
+                const _showPlacementBtn = _isNewEnough && _gradeOk && !_hasResult && _notDone;
 
-                if (isPlacementTestEnabled && isNewEnoughForPlacement && isPlacementTestEligible(student.grade) && (student.placementTestStatus || '') !== 'completed') {
+                // ── DEBUG — logs every grade 3–12 student so you can see exactly why
+                //            the button is/isn't showing. Check browser console.
+                if (_gradeOk) {
+                    console.log(
+                        `[Placement] ${student.studentName}` +
+                        ` | grade="${student.grade}" gradeOk=${_gradeOk}` +
+                        ` | createdAt=${studentCreatedAt ? studentCreatedAt.toISOString() : 'MISSING ⚠️'} newEnough=${_isNewEnough}` +
+                        ` | hasResult=${_hasResult} (byId:${studentsWithResults.has(student.id)} byName:${studentsWithResultNames.has((student.studentName||'').trim().toLowerCase())})` +
+                        ` | placementTestStatus="${student.placementTestStatus||''}" notDone=${_notDone}` +
+                        ` | ➡ SHOW BUTTON: ${_showPlacementBtn}`
+                    );
+                }
+
+                if (_showPlacementBtn) {
                     actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
                         data-student-id="${escapeHtml(student.id)}"
                         data-student-name="${escapeHtml(student.studentName)}"
@@ -5726,8 +5789,11 @@ async function renderStudentDatabase(container, tutor) {
             );
 
             window._prevPlacementResultsUnsub = onSnapshot(_resultsQ, (snapshot) => {
-                snapshot.forEach(d => {
-                    const data = d.data();
+                // Bug #1 fix: only process newly-added docs, not pre-existing ones
+                // on the initial load (which would fire for ALL existing results).
+                snapshot.docChanges().forEach(change => {
+                    if (change.type !== 'added') return;
+                    const data = change.doc.data();
                     const sid = _matchResultToStudent(data);
                     if (sid && _placementBtnMap[sid]) {
                         // A result exists for this student — mark done and remove button
@@ -5745,6 +5811,9 @@ async function renderStudentDatabase(container, tutor) {
                 try { window._bkh_placement_bc.close(); } catch (_) {}
             }
             const globalBc = new BroadcastChannel('bkh_placement_complete');
+            // Bug #3 fix: assign to window immediately after creation (before onmessage)
+            // so the next re-render can always close the correct reference.
+            window._bkh_placement_bc = globalBc;
             globalBc.onmessage = (event) => {
                 if (event.data?.type === 'PLACEMENT_COMPLETED' && event.data?.studentUid) {
                     const sid = event.data.studentUid;
@@ -5753,7 +5822,6 @@ async function renderStudentDatabase(container, tutor) {
                     }
                 }
             };
-            window._bkh_placement_bc = globalBc;
         } catch (_) {
             // BroadcastChannel not supported — onSnapshot above is the fallback
         }
@@ -7029,8 +7097,12 @@ function getHomeworkCutoffDate() {
 // ==========================================
 // 2. LOAD HOMEWORK INBOX – per-student card format with accordion
 // ==========================================
-async function loadHomeworkInbox(tutorEmail) {
-    const container = document.getElementById('homework-inbox-container');
+async function loadHomeworkInbox(tutorEmail, containerId) {
+    // Bug #4 fix: accept an explicit containerId so the dashboard widget
+    // ('homework-inbox-container-dashboard') and the Homework tab
+    // ('homework-inbox-container') each get their own element.
+    const targetId = containerId || 'homework-inbox-container';
+    const container = document.getElementById(targetId);
     if (!container) return;
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
 
@@ -7093,6 +7165,17 @@ function _renderHomeworkInbox(container, snapshot) {
             studentMap[sid] = { name: data.studentName || 'Unknown', assignments: [] };
         }
         studentMap[sid].assignments.push(data);
+    });
+
+    // Bug #5 fix: apply the cutoff — per the comment "inbox auto-clears on the 4th
+    // of the month", filter out assignments from before getHomeworkCutoffDate().
+    const _hwCutoff = getHomeworkCutoffDate();
+    Object.values(studentMap).forEach(s => {
+        s.assignments = s.assignments.filter(a => {
+            const raw = a.assignedDate || a.createdAt;
+            const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
+            return !isNaN(d.getTime()) && d >= _hwCutoff;
+        });
     });
 
     // Count pending submissions
@@ -7746,12 +7829,14 @@ const inboxObserver = new MutationObserver(() => {
         div.innerHTML = `
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-gray-800">📥 Homework Inbox</h3>
-                <button onclick="loadHomeworkInbox(window.tutorData.email)" class="text-sm text-blue-600 hover:underline">Refresh</button>
+                <button onclick="loadHomeworkInbox(window.tutorData.email, 'homework-inbox-container-dashboard')" class="text-sm text-blue-600 hover:underline">Refresh</button>
             </div>
-            <div id="homework-inbox-container"></div>
+            <div id="homework-inbox-container-dashboard"></div>
         `;
         hero.after(div);
-        if (window.tutorData) loadHomeworkInbox(window.tutorData.email);
+        // Bug #4 fix: use a distinct container ID for the dashboard widget so it
+        // doesn't collide with the identical id on the Homework tab (line ~4101).
+        if (window.tutorData) loadHomeworkInbox(window.tutorData.email, 'homework-inbox-container-dashboard');
     }
 });
 inboxObserver.observe(document.body, { childList: true, subtree: true });
