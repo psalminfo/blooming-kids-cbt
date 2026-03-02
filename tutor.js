@@ -5136,9 +5136,6 @@ async function renderStudentDatabase(container, tutor) {
         } else {
             studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
 
-            // Bug #2 fix: define PLACEMENT_CUTOFF once outside the loop
-            const PLACEMENT_CUTOFF = new Date('2026-02-26T00:00:00');
-
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
@@ -5203,13 +5200,29 @@ async function renderStudentDatabase(container, tutor) {
                     actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                 }
 
-                // ── SETTING 5: Placement Test (independent — gated by global toggle + grade eligibility + completion status) ──
-                // Only students added ON or AFTER Feb 26 2026 are eligible — older students are exempt
-                // (PLACEMENT_CUTOFF is defined once above the loop — Bug #2 fix)
-                const studentCreatedAt = student.createdAt?.toDate ? student.createdAt.toDate() : (student.createdAt ? new Date(student.createdAt) : null);
-                const isNewEnoughForPlacement = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
+                // ── SETTING 5: Placement Test ──────────────────────────────────────────────
+                // Show for ANY grade 3–12 student who has not yet done a placement test.
+                // Logic (no admin toggle needed — always on from Feb 28 2026):
+                //   • Grade must be 3–12 (isPlacementTestEligible)
+                //   • Student must NOT already have a result in student_results
+                //   • placementTestStatus on the student doc must not be 'completed'
+                const _hasResult = studentsWithResults.has(student.id) ||
+                    studentsWithResultNames.has((student.studentName || '').trim().toLowerCase());
+                const _gradeOk   = isPlacementTestEligible(student.grade);
+                const _notDone   = (student.placementTestStatus || '') !== 'completed';
+                const _showPlacementBtn = _gradeOk && !_hasResult && _notDone;
 
-                if (isPlacementTestEnabled && isNewEnoughForPlacement && isPlacementTestEligible(student.grade) && (student.placementTestStatus || '') !== 'completed') {
+                // ── DEBUG PANEL (remove once confirmed working) ──────────────────────────
+                if (_gradeOk) {
+                    console.log(
+                        `[Placement] ${student.studentName} | grade="${student.grade}" gradeOk=${_gradeOk} | ` +
+                        `hasResult=${_hasResult} (id:${studentsWithResults.has(student.id)} name:${studentsWithResultNames.has((student.studentName||'').trim().toLowerCase())}) | ` +
+                        `placementTestStatus="${student.placementTestStatus||''}" notDone=${_notDone} | ` +
+                        `SHOW BUTTON: ${_showPlacementBtn}`
+                    );
+                }
+
+                if (_showPlacementBtn) {
                     actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
                         data-student-id="${escapeHtml(student.id)}"
                         data-student-name="${escapeHtml(student.studentName)}"
