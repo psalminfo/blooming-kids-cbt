@@ -15,9 +15,7 @@ function getAdminQuestionsSubject(testSubject) {
         'math': 'Mathematics', 
         'science': 'Science',
         'socialstudies': 'Social Studies'
-        // Add more subject mappings as needed
     };
-    
     return subjectMap[testSubject.toLowerCase()] || testSubject;
 }
 
@@ -29,25 +27,17 @@ function generateSessionId(grade, subject, state) {
     const studentName = params.get('studentName');
     const parentEmail = params.get('parentEmail');
     
-    // Create a unique session ID for THIS SPECIFIC TEST AND STATE
     const testSessionKey = `test-${grade}-${subject}-${state}-${studentName}-${parentEmail}`;
-    
-    // Try to get existing session for THIS TEST AND STATE
     const existingSessionId = sessionStorage.getItem('currentTestSession');
     
-    // Only reuse session if it's for the EXACT same test AND state
     if (existingSessionId && existingSessionId === testSessionKey) {
         console.log("Reusing session for current test and state:", testSessionKey);
-        return testSessionKey; // FIX: return testSessionKey, not existingSessionId (same value but semantically correct)
+        return testSessionKey;
     }
     
-    // New test session - clear any old sessions for different states
     clearOtherStateSessions(testSessionKey);
-    
-    // Set new session for current test and state
     sessionStorage.setItem('currentTestSession', testSessionKey);
     console.log("Started new test session for state:", testSessionKey);
-    
     return testSessionKey;
 }
 
@@ -59,13 +49,11 @@ function clearOtherStateSessions(currentSessionKey) {
     for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
         if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
-            // Only remove if it's NOT the current session
             if (key !== currentSessionKey && key !== `currentTestSession` && !key.includes(`${currentSessionKey}-answers`)) {
                 keysToRemove.push(key);
             }
         }
     }
-    
     keysToRemove.forEach(key => {
         sessionStorage.removeItem(key);
         console.log("Cleared other state session:", key);
@@ -76,7 +64,6 @@ function clearOtherStateSessions(currentSessionKey) {
  * Clear all test sessions (call on logout)
  */
 export function clearAllTestSessions() {
-    // Clear all session storage related to tests
     const keysToRemove = [];
     for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
@@ -84,22 +71,18 @@ export function clearAllTestSessions() {
             keysToRemove.push(key);
         }
     }
-    
     keysToRemove.forEach(key => {
         sessionStorage.removeItem(key);
         console.log("Cleared session:", key);
     });
-    
     console.log("All test sessions cleared - ready for new test");
 }
 
-// Export function to get answer data for submission
 export function getAnswerData() {
     const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
     return savedAnswers ? JSON.parse(savedAnswers) : {};
 }
 
-// Export function to get all loaded questions
 export function getAllLoadedQuestions() {
     return loadedQuestions;
 }
@@ -111,7 +94,6 @@ function selectELAQuestions(allQuestions, passagesMap) {
     const questionsWithPassages = [];
     const questionsWithoutPassages = [];
     
-    // Separate questions with and without passages
     allQuestions.forEach(question => {
         if (question.passageId && passagesMap[question.passageId]) {
             questionsWithPassages.push(question);
@@ -120,7 +102,6 @@ function selectELAQuestions(allQuestions, passagesMap) {
         }
     });
     
-    // Group questions by passage
     const questionsByPassage = {};
     questionsWithPassages.forEach(question => {
         if (!questionsByPassage[question.passageId]) {
@@ -131,10 +112,8 @@ function selectELAQuestions(allQuestions, passagesMap) {
     
     const selectedQuestions = [];
     const selectedPassageIds = [];
-    
     const passageIds = Object.keys(questionsByPassage);
     
-    // Step 1: Select first random passage with all its questions
     if (passageIds.length > 0) {
         const firstPassageId = passageIds[Math.floor(Math.random() * passageIds.length)];
         selectedQuestions.push(...questionsByPassage[firstPassageId]);
@@ -142,18 +121,15 @@ function selectELAQuestions(allQuestions, passagesMap) {
         console.log(`Selected first passage ${firstPassageId} with ${questionsByPassage[firstPassageId].length} questions`);
     }
     
-    // Step 2: Check if we can reach 15 with non-passage questions
     const questionsNeeded = 15 - selectedQuestions.length;
     const availableNonPassageQuestions = Math.min(questionsWithoutPassages.length, questionsNeeded);
     
     if (availableNonPassageQuestions >= questionsNeeded) {
-        // We have enough non-passage questions to reach 15 - use them
         const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
         const additionalQuestions = shuffledNonPassage.slice(0, questionsNeeded);
         selectedQuestions.push(...additionalQuestions);
         console.log(`Added ${additionalQuestions.length} non-passage questions to reach 15 total`);
     } else if (passageIds.length > 1) {
-        // Not enough non-passage questions - add a second passage instead
         const remainingPassageIds = passageIds.filter(id => !selectedPassageIds.includes(id));
         if (remainingPassageIds.length > 0) {
             const secondPassageId = remainingPassageIds[Math.floor(Math.random() * remainingPassageIds.length)];
@@ -161,7 +137,6 @@ function selectELAQuestions(allQuestions, passagesMap) {
             selectedPassageIds.push(secondPassageId);
             console.log(`Added second passage ${secondPassageId} with ${questionsByPassage[secondPassageId].length} questions (not enough non-passage questions)`);
             
-            // If we still have room after second passage, add available non-passage questions
             const remainingSlots = 15 - selectedQuestions.length;
             if (remainingSlots > 0 && questionsWithoutPassages.length > 0) {
                 const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
@@ -171,24 +146,67 @@ function selectELAQuestions(allQuestions, passagesMap) {
             }
         }
     } else {
-        // Only one passage available - add whatever non-passage questions we have
         const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
         const additionalQuestions = shuffledNonPassage.slice(0, availableNonPassageQuestions);
         selectedQuestions.push(...additionalQuestions);
         console.log(`Added ${additionalQuestions.length} non-passage questions (only one passage available)`);
     }
     
-    // Final selection - take only 15 questions max
     const finalSelection = selectedQuestions.slice(0, 15);
     console.log(`Final ELA selection: ${finalSelection.length} questions (includes ${selectedPassageIds.length} passages)`);
-    
     return finalSelection;
 }
 
 /**
+ * Attempt to fetch from GitHub with multiple filename variations
+ */
+async function fetchFromGitHub(grade, subject) {
+    // grade is expected to be like "grade3" (with 'grade' prefix)
+    // subject is like "math"
+    const baseUrl = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/';
+    
+    // Extract just the number from grade (e.g., "grade3" → "3")
+    const gradeNumber = grade.replace('grade', '');
+    
+    // Define possible filename patterns
+    const patterns = [
+        `${grade}-${subject}.json`,           // grade3-math.json
+        `${grade}${subject}.json`,             // grade3math.json
+        `${gradeNumber}-${subject}.json`,      // 3-math.json
+        `${gradeNumber}${subject}.json`,       // 3math.json
+        `${grade}-${subject}`.toLowerCase(),   // already lowercase
+        `${grade}${subject}`.toLowerCase(),
+        `${gradeNumber}-${subject}`.toLowerCase(),
+        `${gradeNumber}${subject}`.toLowerCase(),
+        // Some possible capitalizations
+        `${grade.charAt(0).toUpperCase() + grade.slice(1)}-${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`, // Grade3-Math.json
+        `${grade.charAt(0).toUpperCase() + grade.slice(1)}${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`  // Grade3Math.json
+    ];
+    
+    // Remove duplicates
+    const uniquePatterns = [...new Set(patterns)];
+    
+    for (const pattern of uniquePatterns) {
+        const url = baseUrl + pattern;
+        try {
+            console.log(`Trying GitHub URL: ${url}`);
+            const response = await fetch(url);
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Successfully fetched from GitHub using pattern: ${pattern}`);
+                return data;
+            }
+        } catch (e) {
+            // Ignore individual fetch errors
+        }
+    }
+    throw new Error('No GitHub file found with any pattern');
+}
+
+/**
  * The entry point to load and display questions for a test.
- * @param {string} subject The subject of the test (e.g., 'ela').
- * @param {string} grade The grade level of the test (e.g., 'grade4').
+ * @param {string} subject The subject of the test (e.g., 'math').
+ * @param {string} grade The grade level of the test (e.g., 'grade3').
  * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
 export async function loadQuestions(subject, grade, state) {
@@ -201,7 +219,6 @@ export async function loadQuestions(subject, grade, state) {
             window.location.search = params.toString();
             return;
         }
-        
         if (!isGrade3Plus(grade)) {
             console.error("Security violation: Creative writing attempted for invalid grade:", grade);
             const params = new URLSearchParams(window.location.search);
@@ -214,7 +231,6 @@ export async function loadQuestions(subject, grade, state) {
     const container = document.getElementById("question-container");
     const submitBtnContainer = document.getElementById("submit-button-container");
     
-    // Validate required DOM elements exist
     if (!container) {
         console.error("CRITICAL: question-container element not found in DOM");
         return;
@@ -225,7 +241,7 @@ export async function loadQuestions(subject, grade, state) {
         submitBtnContainer.style.display = 'none';
     }
 
-    // Generate session ID for current test AND STATE
+    // Generate session ID
     currentSessionId = generateSessionId(grade, subject, state);
 
     // Check if we have saved questions for THIS SPECIFIC TEST AND STATE
@@ -240,9 +256,6 @@ export async function loadQuestions(subject, grade, state) {
         }
         return;
     }
-
-    const fileName = `${grade}-${subject}`.toLowerCase();
-    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
     let allQuestions = [];
     let allPassages = [];
@@ -260,16 +273,16 @@ export async function loadQuestions(subject, grade, state) {
                 where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
             )),
             
-            // Fetch from admin_questions collection - BY SUBJECT AND GRADE
+            // Fetch from admin_questions collection - BY SUBJECT AND GRADE NUMBER
             getDocs(query(
                 collection(db, "admin_questions"),
-                where("grade", "==", grade.replace('grade', '')),
+                where("grade", "==", grade.replace('grade', '')), // e.g., "3"
                 where("subject", "==", getAdminQuestionsSubject(subject))
             ))
         ]);
 
         console.log(`📊 TESTS Collection: Found ${testsSnapshot.size} documents for ${grade}-${subject}`);
-        console.log(`📊 ADMIN_QUESTIONS Collection: Found ${adminSnapshot.size} documents for ${grade} ${getAdminQuestionsSubject(subject)}`);
+        console.log(`📊 ADMIN_QUESTIONS Collection: Found ${adminSnapshot.size} documents for grade ${grade.replace('grade', '')} ${getAdminQuestionsSubject(subject)}`);
 
         // 2. PROCESS TESTS COLLECTION
         if (!testsSnapshot.empty) {
@@ -289,20 +302,18 @@ export async function loadQuestions(subject, grade, state) {
             console.log(`❌ No documents found in TESTS collection for ${grade}-${subject}`);
         }
 
-        // 3. PROCESS ADMIN_QUESTIONS COLLECTION (ONLY FOR CURRENT SUBJECT)
+        // 3. PROCESS ADMIN_QUESTIONS COLLECTION
         if (!adminSnapshot.empty) {
             const adminQuestions = [];
             adminSnapshot.forEach(doc => {
                 try {
                     const questionData = doc.data();
                     
-                    // Validate required question structure AND SUBJECT MATCH
                     if (!questionData || (!questionData.question && !questionData.type)) {
                         console.warn('Skipping invalid admin question (missing fields):', doc.id);
                         return;
                     }
                     
-                    // DOUBLE CHECK: Ensure the question is for the correct subject
                     const questionSubject = questionData.subject?.toLowerCase();
                     const expectedSubject = getAdminQuestionsSubject(subject).toLowerCase();
                     
@@ -311,12 +322,11 @@ export async function loadQuestions(subject, grade, state) {
                         return;
                     }
                     
-                    // Normalize the data to match your system
                     const normalizedQuestion = {
                         ...questionData,
                         firebaseId: doc.id,
                         id: doc.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        subject: subject.toLowerCase(), // Use the test subject, not the stored one
+                        subject: subject.toLowerCase(),
                         grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
                     };
                     
@@ -328,19 +338,16 @@ export async function loadQuestions(subject, grade, state) {
             });
             console.log(`✅ Loaded ${adminQuestions.length} valid ${subject} questions from ADMIN_QUESTIONS`);
             
-            // Merge admin questions with existing questions
             allQuestions = [...allQuestions, ...adminQuestions];
         } else {
-            console.log(`❌ No documents found in ADMIN_QUESTIONS for ${grade} ${getAdminQuestionsSubject(subject)}`);
+            console.log(`❌ No documents found in ADMIN_QUESTIONS for grade ${grade.replace('grade', '')} ${getAdminQuestionsSubject(subject)}`);
         }
 
         // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
         if (allQuestions.length === 0) {
             console.log(`📦 No ${subject} questions found in Firebase, trying GitHub...`);
             try {
-                const gitHubRes = await fetch(GITHUB_URL);
-                if (!gitHubRes.ok) throw new Error("GitHub file not found.");
-                const rawData = await gitHubRes.json();
+                const rawData = await fetchFromGitHub(grade, subject);
 
                 let testArray = [];
                 if (rawData && rawData.tests) {
@@ -402,21 +409,16 @@ export async function loadQuestions(subject, grade, state) {
             saveSession(loadedQuestions, passagesMap);
             displayCreativeWriting(creativeWritingQuestion);
         } else {
-            // FOR ALL SUBJECTS: Filter out creative writing questions from MCQ display
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             if (filteredQuestions.length === 0) {
                 container.innerHTML = `<p class="text-red-600">❌ No ${subject} multiple-choice questions found.</p>`;
                 return;
             }
             
-            // NEW LOGIC: Different handling for ELA vs other subjects
             let selectedQuestions = [];
-            
             if (subject.toLowerCase() === 'ela') {
-                // For ELA: Prioritize one passage + non-passage questions to reach 15, OR 2 passages
                 selectedQuestions = selectELAQuestions(filteredQuestions, passagesMap);
             } else {
-                // For other subjects: Just take 15 random questions
                 selectedQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
             }
             
@@ -437,7 +439,7 @@ export async function loadQuestions(subject, grade, state) {
 }
 
 /**
- * Check if grade is 3 or higher for creative writing
+ * Check if grade is 3 or higher for creative writing (grade is normalized, e.g., "grade3")
  */
 function isGrade3Plus(grade) {
     try {
@@ -456,12 +458,9 @@ function optimizeImageUrl(originalUrl) {
     if (!originalUrl || !originalUrl.includes('cloudinary.com')) {
         return originalUrl;
     }
-    
-    // Check if URL already has transformations
     if (originalUrl.includes('/upload/') && !originalUrl.includes('/upload/q_')) {
         return originalUrl.replace('/upload/', '/upload/q_auto,f_auto,w_600,c_limit/');
     }
-    
     return originalUrl;
 }
 
@@ -506,13 +505,10 @@ function restoreSavedAnswers() {
     try {
         const answers = JSON.parse(savedAnswers);
         Object.keys(answers).forEach(questionId => {
-            // Handle radio buttons (multiple choice)
             const radio = document.querySelector(`input[name="q${questionId}"][value="${answers[questionId]}"]`);
             if (radio) {
                 radio.checked = true;
             }
-            
-            // Handle text inputs (open-ended questions)
             const textInput = document.querySelector(`#text-answer-${questionId}`);
             if (textInput && answers[questionId]) {
                 textInput.value = answers[questionId];
@@ -562,7 +558,6 @@ function saveTextAnswer(questionId, answer) {
  */
 function displayQuestionsBasedOnState(questions, state) {
     const passagesMap = getSavedSession()?.passages || {};
-    
     if (state === 'creative-writing') {
         const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing');
         if (creativeWritingQuestion) {
@@ -577,7 +572,6 @@ function displayQuestionsBasedOnState(questions, state) {
     }
 }
 
-// Alias for backwards compatibility
 export { getAllLoadedQuestions as getLoadedQuestions };
 
 /**
@@ -601,32 +595,23 @@ function getQuestionOptions(question) {
     if (!question || !question.options) {
         return [];
     }
-    
-    // If options is already an array, return it
     if (Array.isArray(question.options)) {
         return question.options;
     }
-    
-    // If options is a string, try to parse it as JSON or split by commas
     if (typeof question.options === 'string') {
         try {
-            // Try to parse as JSON
             const parsed = JSON.parse(question.options);
             if (Array.isArray(parsed)) {
                 return parsed;
             }
         } catch (e) {
-            // If JSON parsing fails, try splitting by commas
             console.log("Options was a string, attempting to split by commas:", question.options);
             return question.options.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
         }
     }
-    
-    // If options is an object, convert to array of values
     if (typeof question.options === 'object' && question.options !== null && !Array.isArray(question.options)) {
         return Object.values(question.options).filter(opt => opt !== null && opt !== undefined);
     }
-    
     return [];
 }
 
@@ -646,7 +631,6 @@ function displayCreativeWriting(question) {
     const tutorEmail = escapeHtml(params.get('tutorEmail') || '');
     const grade = escapeHtml(params.get('grade') || '');
     
-    // SAFE QUESTION ID - ensure it's a valid JavaScript variable name
     const safeQuestionId = question.id ? question.id.replace(/[^a-zA-Z0-9]/g, '_') : 'creative_writing_0';
     const safeQuestionText = escapeHtml(question.question || '');
     
@@ -682,7 +666,6 @@ function displayMCQQuestions(questions, passagesMap = {}) {
     
     container.innerHTML = '';
     
-    // Add CSS for optimal layout
     const style = document.createElement('style');
     style.textContent = `
         .question-container { max-width: 800px; margin: 0 auto; padding: 0 20px; }
@@ -719,11 +702,9 @@ function displayMCQQuestions(questions, passagesMap = {}) {
     
     container.className = 'question-container';
     
-    // Group questions by passage
     const questionsByPassage = {};
     const questionsWithoutPassage = [];
     
-    // First pass: group all questions by their passageId
     questions.forEach((question) => {
         if (question.passageId && passagesMap[question.passageId]) {
             if (!questionsByPassage[question.passageId]) {
@@ -735,14 +716,12 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         }
     });
     
-    let globalQuestionIndex = 1; // Continuous numbering across ALL questions
+    let globalQuestionIndex = 1;
     
-    // Display passages with their corresponding questions FIRST
     Object.keys(questionsByPassage).forEach(passageId => {
         const passage = passagesMap[passageId];
         const passageQuestions = questionsByPassage[passageId];
         
-        // Display the passage
         const passageElement = document.createElement('div');
         passageElement.className = 'passage-container bg-white p-6 rounded-lg shadow-md mb-6 border-l-4 border-green-500';
         passageElement.innerHTML = `
@@ -753,22 +732,20 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         `;
         container.appendChild(passageElement);
         
-        // Display questions for this passage with continuous numbering
         passageQuestions.forEach(q => {
             const questionElement = createQuestionElement(q, globalQuestionIndex);
             if (questionElement) {
                 container.appendChild(questionElement);
-                globalQuestionIndex++; // Increment for next question
+                globalQuestionIndex++;
             }
         });
     });
     
-    // Display questions without passages AFTER passage questions
     questionsWithoutPassage.forEach(q => {
         const questionElement = createQuestionElement(q, globalQuestionIndex);
         if (questionElement) {
             container.appendChild(questionElement);
-            globalQuestionIndex++; // Increment for next question
+            globalQuestionIndex++;
         }
     });
 }
@@ -777,7 +754,6 @@ function displayMCQQuestions(questions, passagesMap = {}) {
  * Creates a question element with optimized images and answer tracking
  */
 function createQuestionElement(q, displayIndex) {
-    // Validate the question object
     if (!q || typeof q !== 'object') {
         console.error('Invalid question object:', q);
         return null;
@@ -787,23 +763,18 @@ function createQuestionElement(q, displayIndex) {
     questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4';
     questionElement.setAttribute('data-question-id', q.id || `question-${displayIndex}`);
     
-    // Optimize the image URL
     const optimizedImageUrl = q.imageUrl ? optimizeImageUrl(q.imageUrl) : null;
     const showImageBefore = optimizedImageUrl && q.image_position !== 'after';
     const showImageAfter = optimizedImageUrl && q.image_position === 'after';
     
     const safeQuestionText = escapeHtml(q.question || '');
     
-    // Safely get options using the new helper function
     const questionOptions = getQuestionOptions(q);
     const hasOptions = questionOptions && questionOptions.length > 0;
-    const answerType = hasOptions ? 'multiple-choice' : 'text-answer';
     
-    // Escape options for display
     const safeOptions = questionOptions.map(opt => escapeHtml(opt));
     
     try {
-        // Store imageUrl as data attribute to avoid XSS in onclick
         const safeImageUrl = escapeHtml(q.imageUrl || '');
         const safeOptimizedUrl = escapeHtml(optimizedImageUrl || '');
 
@@ -857,9 +828,7 @@ function createQuestionElement(q, displayIndex) {
             </div>
         `;
         
-        // Add event listeners based on question type
         if (hasOptions) {
-            // Multiple choice: radio button event listeners
             const radioInputs = questionElement.querySelectorAll(`input[name="q${q.id || displayIndex}"]`);
             radioInputs.forEach(radio => {
                 radio.addEventListener('change', (e) => {
@@ -867,7 +836,6 @@ function createQuestionElement(q, displayIndex) {
                 });
             });
         } else {
-            // Text answer: input event listener with debouncing
             const textInput = questionElement.querySelector(`#text-answer-${q.id || displayIndex}`);
             if (textInput) {
                 textInput.addEventListener('input', (e) => {
@@ -876,7 +844,6 @@ function createQuestionElement(q, displayIndex) {
             }
         }
 
-        // Safe image open — uses data attribute instead of inline onclick
         questionElement.querySelectorAll('.js-open-image').forEach(img => {
             img.addEventListener('click', () => {
                 const url = img.getAttribute('data-full-url');
@@ -887,7 +854,6 @@ function createQuestionElement(q, displayIndex) {
         return questionElement;
     } catch (error) {
         console.error('Error creating question element:', error, q);
-        // Create a fallback question element
         const fallbackElement = document.createElement('div');
         fallbackElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4 border-red-300';
         fallbackElement.innerHTML = `
@@ -901,12 +867,10 @@ function createQuestionElement(q, displayIndex) {
     }
 }
 
-// Clear session storage when test is fully completed
 export function clearTestSession(forceClear = false) {
     const params = new URLSearchParams(window.location.search);
     const state = params.get('state');
     
-    // Only clear if we're actually finished or forced
     if (forceClear || state === 'completed' || state === 'submitted') {
         if (currentSessionId) {
             sessionStorage.removeItem(currentSessionId);
@@ -916,11 +880,10 @@ export function clearTestSession(forceClear = false) {
     }
 }
 
-// Continue to MCQ handler for creative writing submissions - UPDATED WITH SEPARATE SESSIONS
 window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, grade) => {
     const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
     const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
     
     const questionTextarea = document.getElementById(`creative-writing-text-${questionId}`);
     const fileInput = document.getElementById(`creative-writing-file-${questionId}`);
@@ -939,7 +902,6 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         continueBtn.disabled = true;
     }
     
-    // Validate that at least one method is used
     if (!textAnswer && !file) {
         alert("Please either write your response in the text area or upload an image before continuing.");
         if (continueBtn) {
@@ -949,7 +911,6 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         return;
     }
     
-    // Validate file size and type
     if (file) {
         if (file.size > MAX_FILE_SIZE) {
             alert("File is too large. Please select an image smaller than 5MB.");
@@ -993,7 +954,6 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
             }
         }
         
-        // Save creative writing submission to Firebase
         const submittedData = {
             questionId: questionId,
             textAnswer: textAnswer,
@@ -1013,34 +973,27 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         
         console.log("Creative writing submitted successfully, now redirecting to MCQ...");
         
-        // CRITICAL FIX: Clear creative writing session before redirecting to MCQ
-        // This ensures MCQ loads fresh questions instead of reusing creative writing session
         if (currentSessionId) {
             sessionStorage.removeItem(currentSessionId);
             sessionStorage.removeItem(`${currentSessionId}-answers`);
             console.log("Cleared creative writing session before MCQ load");
         }
         
-        // FIXED REDIRECT LOGIC
         setTimeout(() => {
             const currentUrl = window.location.href;
             
-            // Handle both encoded and unencoded parameters
             let newUrl;
             if (currentUrl.includes('state=creative-writing')) {
                 newUrl = currentUrl.replace('state=creative-writing', 'state=mcq');
             } else if (currentUrl.includes('state=creative%2Dwriting')) {
                 newUrl = currentUrl.replace('state=creative%2Dwriting', 'state=mcq');
             } else {
-                // Fallback: Use URLSearchParams
                 const url = new URL(currentUrl);
                 url.searchParams.set('state', 'mcq');
                 newUrl = url.toString();
             }
             
             console.log("Redirecting from creative writing to MCQ:", newUrl);
-            
-            // Force redirect
             window.location.href = newUrl;
         }, 500);
         
@@ -1054,7 +1007,6 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
     }
 };
 
-// Clear session when page is unloaded (test completed)
 window.addEventListener('beforeunload', function() {
     const params = new URLSearchParams(window.location.search);
     const state = params.get('state');
@@ -1063,10 +1015,8 @@ window.addEventListener('beforeunload', function() {
     }
 });
 
-// Logout handler
 window.handleLogout = function() {
     console.log("Logging out - clearing all test sessions");
     clearAllTestSessions();
-    // Then redirect to login page or wherever
     window.location.href = '/login.html';
 };
