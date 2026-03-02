@@ -1,16 +1,40 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, getDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let loadedQuestions = [];
 let currentSessionId = null;
 let saveTimeout = null;
 let saveTextTimeout = null;
 
-function getAdminQuestionsSubject(testSubject) {
-    const subjectMap = { 'ela': 'English', 'math': 'Mathematics', 'science': 'Science', 'socialstudies': 'Social Studies' };
-    return subjectMap[testSubject.toLowerCase()] || testSubject;
+// ==========================================
+// EXPORTS REQUIRED BY submitAnswers.js
+// ==========================================
+export function getLoadedQuestions() { return loadedQuestions; }
+export function getAllLoadedQuestions() { return loadedQuestions; }
+export function getAnswerData() {
+    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
+    return savedAnswers ? JSON.parse(savedAnswers) : {};
+}
+export function clearAllTestSessions() {
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => sessionStorage.removeItem(key));
+}
+export function clearTestSession(forceClear = false) {
+    if (forceClear || ['completed', 'submitted'].includes(new URLSearchParams(window.location.search).get('state'))) {
+        sessionStorage.removeItem(currentSessionId);
+        sessionStorage.removeItem(`${currentSessionId}-answers`);
+    }
 }
 
+// ==========================================
+// UTILITY & MATCHING FUNCTIONS
+// ==========================================
 function isSubjectMatch(docSubject, requestedSubject) {
     if (!docSubject || !requestedSubject) return false;
     const dbSub = String(docSubject).toLowerCase();
@@ -32,79 +56,65 @@ function generateSessionId(grade, subject, state) {
     return `test-${grade}-${subject}-${state}-${params.get('studentName')}-${params.get('parentEmail')}`;
 }
 
-export function clearAllTestSessions() {
-    const keysToRemove = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
-            keysToRemove.push(key);
-        }
-    }
-    keysToRemove.forEach(key => sessionStorage.removeItem(key));
+function optimizeImageUrl(originalUrl) {
+    if (!originalUrl) return null;
+    const urlString = String(originalUrl);
+    if (!urlString.includes('cloudinary.com')) return urlString;
+    if (urlString.includes('/upload/') && !urlString.includes('q_auto')) return urlString.replace('/upload/', '/upload/q_auto,f_auto/');
+    return urlString;
 }
 
-export function getAnswerData() {
-    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
-    return savedAnswers ? JSON.parse(savedAnswers) : {};
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-export function getAllLoadedQuestions() { return loadedQuestions; }
-
-function selectELAQuestions(allQuestions, passagesMap) {
-    const questionsWithPassages = [];
-    const questionsWithoutPassages = [];
-    allQuestions.forEach(question => {
-        const qPassageId = question.passageId ? String(question.passageId).trim() : null;
-        if (qPassageId && passagesMap[qPassageId]) questionsWithPassages.push(question);
-        else questionsWithoutPassages.push(question);
-    });
-    
-    const questionsByPassage = {};
-    questionsWithPassages.forEach(question => {
-        const qPassageId = String(question.passageId).trim();
-        if (!questionsByPassage[qPassageId]) questionsByPassage[qPassageId] = [];
-        questionsByPassage[qPassageId].push(question);
-    });
-    
-    const selectedQuestions = [];
-    const selectedPassageIds = [];
-    const passageIds = Object.keys(questionsByPassage);
-    
-    if (passageIds.length > 0) {
-        const firstPassageId = passageIds[Math.floor(Math.random() * passageIds.length)];
-        selectedQuestions.push(...questionsByPassage[firstPassageId]);
-        selectedPassageIds.push(firstPassageId);
+function getQuestionOptions(question) {
+    if (!question || !question.options) return [];
+    if (Array.isArray(question.options)) return question.options;
+    if (typeof question.options === 'string') {
+        try { return JSON.parse(question.options); } catch (e) { return question.options.split(',').map(o => o.trim()); }
     }
-    
-    const questionsNeeded = 15 - selectedQuestions.length;
-    const availableNonPassageQuestions = Math.min(questionsWithoutPassages.length, questionsNeeded);
-    
-    if (availableNonPassageQuestions >= questionsNeeded) {
-        const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
-        selectedQuestions.push(...shuffledNonPassage.slice(0, questionsNeeded));
-    } else if (passageIds.length > 1) {
-        const remainingPassageIds = passageIds.filter(id => !selectedPassageIds.includes(id));
-        if (remainingPassageIds.length > 0) {
-            const secondPassageId = remainingPassageIds[Math.floor(Math.random() * remainingPassageIds.length)];
-            selectedQuestions.push(...questionsByPassage[secondPassageId]);
-            selectedPassageIds.push(secondPassageId);
-            const remainingSlots = 15 - selectedQuestions.length;
-            if (remainingSlots > 0 && questionsWithoutPassages.length > 0) {
-                const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
-                selectedQuestions.push(...shuffledNonPassage.slice(0, remainingSlots));
-            }
-        }
-    } else {
-        const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
-        selectedQuestions.push(...shuffledNonPassage.slice(0, availableNonPassageQuestions));
-    }
-    return selectedQuestions.slice(0, 15);
+    return typeof question.options === 'object' ? Object.values(question.options) : [];
 }
 
+// ==========================================
+// DATA FETCHING FROM ALL 3 SOURCES
+// ==========================================
 async function fetchFromTestsCollection(grade, subject) {
     let allQuestions = [];
     let allPassages = [];
     try {
+        const gradeNum = grade.replace(/[^0-9]/g, '');
+        let subjectKey = (subject.toLowerCase() === 'english' || subject.toLowerCase() === 'reading') ? 'ela' : subject.toLowerCase();
+        
+        // 1. Direct Snipe (Checks specific documents fast)
+        const targetIds = [`${gradeNum}-${subjectKey}`, `staar_reading_${gradeNum}_2022`, `staar_grade_${gradeNum}_math_2018`];
+        for (const docId of targetIds) {
+            try {
+                const docSnap = await getDoc(doc(db, "tests", docId));
+                if (docSnap.exists()) {
+                    const rawData = docSnap.data();
+                    if (rawData.tests && Array.isArray(rawData.tests)) {
+                        rawData.tests.forEach(test => {
+                            if (test.passages) test.passages.forEach(p => {
+                                p.passageId = String(p.passageId || p.id).trim();
+                                p.content = p.content || p.text || p.body;
+                                allPassages.push(p);
+                            });
+                            if (test.questions) test.questions.forEach(q => {
+                                q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                                q.passageId = q.passageId || q.passage_id ? String(q.passageId || q.passage_id).trim() : null;
+                                allQuestions.push(q);
+                            });
+                        });
+                    }
+                    return { questions: allQuestions, passages: allPassages }; 
+                }
+            } catch (e) {}
+        }
+        
+        // 2. Deep Scan Fallback (Scans whole collection)
         const snapshot = await getDocs(collection(db, "tests"));
         snapshot.forEach(docSnap => {
             const rawData = docSnap.data();
@@ -112,47 +122,22 @@ async function fetchFromTestsCollection(grade, subject) {
                 if (Array.isArray(rawData[key])) {
                     rawData[key].forEach((item) => {
                         if (item && item.grade && item.subject && isGradeMatch(item.grade, grade) && isSubjectMatch(item.subject, subject)) {
-                            if (item.passages && Array.isArray(item.passages)) {
-                                item.passages.forEach(p => {
-                                    p.passageId = p.passageId || p.id || p.passage_id;
-                                    if (p.passageId) p.passageId = String(p.passageId).trim();
-                                    p.content = p.content || p.text || p.body;
-                                    allPassages.push(p);
-                                });
-                            }
-                            if (item.questions && Array.isArray(item.questions)) {
-                                item.questions.forEach(q => {
-                                    q.grade = item.grade; q.subject = item.subject;
-                                    q.imageUrl = q.imageUrl || q.image_url || q.image || null;
-                                    q.passageId = q.passageId || q.passage_id || null;
-                                    if (q.passageId) q.passageId = String(q.passageId).trim();
-                                    allQuestions.push(q);
-                                });
-                            }
+                            if (item.passages) item.passages.forEach(p => {
+                                p.passageId = String(p.passageId || p.id).trim();
+                                p.content = p.content || p.text || p.body;
+                                allPassages.push(p);
+                            });
+                            if (item.questions) item.questions.forEach(q => {
+                                q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                                q.passageId = q.passageId || q.passage_id ? String(q.passageId || q.passage_id).trim() : null;
+                                allQuestions.push(q);
+                            });
                         }
                     });
                 }
             });
-            if (rawData && rawData.grade && rawData.subject && isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
-                if (rawData.questions && Array.isArray(rawData.questions)) {
-                    rawData.questions.forEach(q => {
-                        q.imageUrl = q.imageUrl || q.image_url || q.image || null;
-                        q.passageId = q.passageId || q.passage_id || null;
-                        if (q.passageId) q.passageId = String(q.passageId).trim();
-                        allQuestions.push(q);
-                    });
-                }
-                if (rawData.passages && Array.isArray(rawData.passages)) {
-                    rawData.passages.forEach(p => {
-                        p.passageId = p.passageId || p.id || p.passage_id;
-                        if (p.passageId) p.passageId = String(p.passageId).trim();
-                        p.content = p.content || p.text || p.body;
-                        allPassages.push(p);
-                    });
-                }
-            }
         });
-    } catch (err) {}
+    } catch (err) { console.error("Firebase fetch error:", err); }
     return { questions: allQuestions, passages: allPassages };
 }
 
@@ -182,10 +167,10 @@ async function fetchFromAdminQuestions(grade, subject) {
 }
 
 async function fetchFromGitHub(grade, subject) {
-    const targetBranch = (window.location.hostname === 'localhost' || window.location.hostname.includes('staging')) ? 'main' : 'main'; 
+    const targetBranch = 'main'; 
     const baseUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${targetBranch}/`;
-    const gradeNumber = grade.replace('grade', '');
-    const patterns = [`${gradeNumber}-${subject}.json`, `${gradeNumber}-${subject}`.toLowerCase(), `${grade}-${subject}.json`, `${gradeNumber}${subject}.json`, `Grade ${gradeNumber}-${subject}.json`];
+    const gradeNumber = grade.replace(/[^0-9]/g, '');
+    const patterns = [`${gradeNumber}-${subject}.json`, `${gradeNumber}-${subject}`.toLowerCase(), `Grade ${gradeNumber}-${subject}.json`, `${gradeNumber}-ela.json`, `${gradeNumber}-math.json`];
     
     for (const pattern of [...new Set(patterns)]) {
         try {
@@ -193,6 +178,7 @@ async function fetchFromGitHub(grade, subject) {
             if (response.ok) {
                 const data = await response.json();
                 let questions = [], passages = [];
+                
                 if (Array.isArray(data)) questions = data;
                 else if (data && data.tests && Array.isArray(data.tests)) {
                     data.tests.forEach(test => { if (test.questions) questions.push(...test.questions); if (test.passages) passages.push(...test.passages); });
@@ -216,20 +202,14 @@ async function fetchFromGitHub(grade, subject) {
             }
         } catch (e) { }
     }
-    throw new Error('No GitHub file found');
+    return { questions: [], passages: [] };
 }
 
-function optimizeImageUrl(originalUrl) {
-    if (!originalUrl) return null;
-    const urlString = String(originalUrl);
-    if (!urlString.includes('cloudinary.com')) return urlString;
-    if (urlString.includes('/upload/') && !urlString.includes('q_auto')) return urlString.replace('/upload/', '/upload/q_auto,f_auto/');
-    return urlString;
-}
-
+// ==========================================
+// CORE LOADING LOGIC
+// ==========================================
 export async function loadQuestions(subject, grade, state) {
-    console.log("%c🚀 BKH CBT SCRIPT: VERSION 7.0 (FINAL BKH STRIKE)", "color: #00ffff; font-size: 18px; font-weight: bold; background: #000; padding: 6px;");
-    sessionStorage.removeItem('currentTestSession'); // Wipe Ghost Cache
+    console.log("%c🚀 BKH CBT SCRIPT: VERSION 10 (FINAL INTEGRATION)", "color: #00ffaa; font-size: 16px; font-weight: bold; background: #000; padding: 6px;");
     
     if (state === 'creative-writing' && !isSubjectMatch('ela', subject)) {
         const url = new URL(window.location.href); url.searchParams.set('state', 'mcq'); window.location.href = url.toString(); return;
@@ -238,28 +218,33 @@ export async function loadQuestions(subject, grade, state) {
     const container = document.getElementById("question-container");
     const submitBtnContainer = document.getElementById("submit-button-container");
     if (!container) return;
-    container.innerHTML = `<p style="text-align:center; font-family:sans-serif; color:#666;">Please wait, organizing your test...</p>`;
+    container.innerHTML = `<p style="text-align:center; font-family:sans-serif; color:#666;">Deploying test data from secure servers...</p>`;
     if (submitBtnContainer) submitBtnContainer.style.display = 'none';
 
     currentSessionId = generateSessionId(grade, subject, state);
-    let allQuestions = [], allPassages = [], creativeWritingQuestion = null;
+    let allQuestions = [], allPassages = [];
 
     try {
+        // 1. FETCH FROM FIREBASE TESTS
         const testsResult = await fetchFromTestsCollection(grade, subject);
-        allQuestions = testsResult.questions; allPassages = testsResult.passages;
+        allQuestions.push(...testsResult.questions);
+        allPassages.push(...testsResult.passages);
 
+        // 2. FETCH FROM FIREBASE ADMIN_QUESTIONS
         const adminQuestions = await fetchFromAdminQuestions(grade, subject);
-        if (adminQuestions.length > 0) allQuestions = [...allQuestions, ...adminQuestions];
+        if (adminQuestions.length > 0) allQuestions.push(...adminQuestions);
 
+        // 3. FETCH FROM GITHUB (Fallback if Firebase is empty)
         if (allQuestions.length === 0) {
-            try {
-                const gitHubData = await fetchFromGitHub(grade, subject);
-                allQuestions = gitHubData.questions; allPassages = gitHubData.passages;
-            } catch (err) { throw new Error("No questions found."); }
+            console.log("⚠️ Firebase empty. Pulling from GitHub.");
+            const gitHubData = await fetchFromGitHub(grade, subject);
+            allQuestions.push(...gitHubData.questions);
+            allPassages.push(...gitHubData.passages);
         }
 
+        // DEEP MAPPING
         allQuestions = allQuestions.map((q, idx) => ({
-            ...q, id: q.firebaseId || q.id || `question-${idx}`,
+            ...q, id: q.firebaseId || q.questionId || q.id || `question-${idx}`,
             imageUrl: q.image || q.imageUrl || q.image_url || null,
             passageId: q.passageId ? String(q.passageId).trim() : null,
             type: q.type || (q.options && q.options.length > 0 ? "mcq" : "creative-writing")
@@ -269,28 +254,64 @@ export async function loadQuestions(subject, grade, state) {
         allPassages.forEach(p => { if (p.passageId && p.content) passagesMap[p.passageId] = p; });
 
         if (allQuestions.length === 0) {
-            container.innerHTML = `<p style="color:red; text-align:center;">❌ No questions found.</p>`; return;
+            container.innerHTML = `<p style="color:red; text-align:center; font-weight:bold;">❌ No questions found for Grade ${grade} ${subject}. Check your Database connection.</p>`; return;
         }
 
         if (isSubjectMatch('ela', subject) && state === 'creative-writing') {
-            creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing' || q.topic === 'CREATIVE WRITING');
+            const creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing' || q.topic === 'CREATIVE WRITING');
             if (!creativeWritingQuestion) {
-                container.innerHTML = `<p style="color:red; text-align:center;">Redirecting...</p>`;
+                container.innerHTML = `<p style="color:red; text-align:center;">Redirecting to multiple choice...</p>`;
                 setTimeout(() => { const u = new URL(window.location.href); u.searchParams.set('state', 'mcq'); window.location.href = u.toString(); }, 1500);
                 return;
             }
             loadedQuestions = [{ ...creativeWritingQuestion, id: creativeWritingQuestion.id || 'cw-0' }];
-            displayCreativeWriting(creativeWritingQuestion);
+            displayCreativeWriting(loadedQuestions[0]);
         } else {
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing' && q.topic !== 'CREATIVE WRITING');
             if (filteredQuestions.length === 0) { container.innerHTML = `<p style="color:red; text-align:center;">❌ No MCQ found.</p>`; return; }
-            loadedQuestions = isSubjectMatch('ela', subject) ? selectELAQuestions(filteredQuestions, passagesMap) : [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
+            
+            if (isSubjectMatch('ela', subject)) {
+                const qByPassage = {};
+                const qNoPassage = [];
+                filteredQuestions.forEach(q => {
+                    const pid = q.passageId ? String(q.passageId).trim() : null;
+                    if (pid && passagesMap[pid]) {
+                        if (!qByPassage[pid]) qByPassage[pid] = [];
+                        qByPassage[pid].push(q);
+                    } else { qNoPassage.push(q); }
+                });
+                
+                const pIds = Object.keys(qByPassage);
+                let finalQ = [];
+                if (pIds.length > 0) {
+                    const firstP = pIds[Math.floor(Math.random() * pIds.length)];
+                    finalQ.push(...qByPassage[firstP]);
+                }
+                const needed = 15 - finalQ.length;
+                if (qNoPassage.length >= needed) {
+                    finalQ.push(...[...qNoPassage].sort(()=>Math.random()-0.5).slice(0, needed));
+                } else if (pIds.length > 1) {
+                    const secondP = pIds.find(id => id !== finalQ[0].passageId);
+                    if(secondP) finalQ.push(...qByPassage[secondP]);
+                    const remaining = 15 - finalQ.length;
+                    if(remaining > 0) finalQ.push(...[...qNoPassage].sort(()=>Math.random()-0.5).slice(0, remaining));
+                } else {
+                    finalQ.push(...qNoPassage);
+                }
+                loadedQuestions = finalQ.slice(0, 15);
+            } else {
+                loadedQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
+            }
+            
             displayMCQQuestions(loadedQuestions, passagesMap);
             if (submitBtnContainer) submitBtnContainer.style.display = 'block';
         }
     } catch (err) { container.innerHTML = `<p style="color:red; text-align:center;">❌ Error: ${err.message}</p>`; }
 }
 
+// ==========================================
+// UI RENDERERS & EVENT LISTENERS
+// ==========================================
 function saveAnswer(questionId, answer) {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
@@ -311,20 +332,6 @@ function saveTextAnswer(questionId, answer) {
             sessionStorage.setItem(`${currentSessionId}-answers`, JSON.stringify(answers));
         } catch (err) {}
     }, 500);
-}
-
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
-function getQuestionOptions(question) {
-    if (!question || !question.options) return [];
-    if (Array.isArray(question.options)) return question.options;
-    if (typeof question.options === 'string') {
-        try { return JSON.parse(question.options); } catch (e) { return question.options.split(',').map(o => o.trim()); }
-    }
-    return typeof question.options === 'object' ? Object.values(question.options) : [];
 }
 
 function displayCreativeWriting(question) {
@@ -427,13 +434,6 @@ function createQuestionElement(q, index) {
     return el;
 }
 
-export function clearTestSession(forceClear = false) {
-    if (forceClear || ['completed', 'submitted'].includes(new URLSearchParams(window.location.search).get('state'))) {
-        sessionStorage.removeItem(currentSessionId);
-        sessionStorage.removeItem(`${currentSessionId}-answers`);
-    }
-}
-
 window.continueToMCQ = async (qId, sName, pEmail, tEmail, grade) => {
     const txt = document.getElementById(`creative-writing-text-${qId}`)?.value.trim();
     const file = document.getElementById(`creative-writing-file-${qId}`)?.files[0];
@@ -458,4 +458,4 @@ window.continueToMCQ = async (qId, sName, pEmail, tEmail, grade) => {
 };
 
 window.addEventListener('beforeunload', () => clearTestSession(true));
-window.handleLogout = () => { clearAllTestSessions(); window.location.href = '/login.html'; }; this is the one you should update
+window.handleLogout = () => { clearAllTestSessions(); window.location.href = '/login.html'; };
