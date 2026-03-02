@@ -207,6 +207,48 @@ class EnrollmentApp {
             }
             this.submitEnrollment();
         });
+        
+        // Invoice modal close button
+        const closeInvoiceBtn = document.getElementById('close-invoice');
+        if (closeInvoiceBtn) {
+            closeInvoiceBtn.addEventListener('click', () => {
+                document.getElementById('invoice-modal').classList.remove('active');
+            });
+        }
+        
+        // Invoice modal backdrop click to close
+        const invoiceModal = document.getElementById('invoice-modal');
+        if (invoiceModal) {
+            invoiceModal.addEventListener('click', (e) => {
+                if (e.target === invoiceModal) {
+                    invoiceModal.classList.remove('active');
+                }
+            });
+        }
+        
+        // Print invoice
+        const printBtn = document.getElementById('print-invoice');
+        if (printBtn) {
+            printBtn.addEventListener('click', () => window.print());
+        }
+        
+        // Download PDF
+        const downloadBtn = document.getElementById('download-pdf');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => this.downloadInvoicePDF());
+        }
+        
+        // View invoice button (in save confirmation area)
+        const viewInvoiceBtn = document.getElementById('view-invoice-btn');
+        if (viewInvoiceBtn) {
+            viewInvoiceBtn.addEventListener('click', () => this.showInvoice());
+        }
+        
+        // Copy resume link button
+        const copyBtn = document.getElementById('copy-resume-link');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => this.copyResumeLink(copyBtn));
+        }
     }
     
     // ==============================================
@@ -227,6 +269,11 @@ class EnrollmentApp {
         nextMonth.setMonth(nextMonth.getMonth() + 1);
         nextMonth.setDate(1);
         const defaultStartDate = nextMonth.toISOString().split('T')[0];
+        
+        // Calculate tomorrow's date for min attribute (no backdating)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         
         // Escape user-provided values for safe HTML insertion
         const safeName = prefillData?.name ? this.escapeHtml(prefillData.name) : '';
@@ -302,7 +349,7 @@ class EnrollmentApp {
             <div class="form-row">
                 <div class="form-group">
                     <label>Preferred Start Date <span class="required">*</span></label>
-                    <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
+                    <input type="date" class="form-control student-start-date" min="${tomorrowStr}" onkeydown="return false;" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
                     <div class="error-message student-start-date-error"></div>
                 </div>
             </div>
@@ -575,9 +622,10 @@ class EnrollmentApp {
                 `;
             }
 
-            const extracurricularDaysHTML = CONFIG.DAYS.map(day => `
-                <button class="day-btn extracurricular-day-btn" data-day="${day}" type="button">${day.substring(0, 3)}</button>
-            `).join('');
+            const extracurricularDaysHTML = CONFIG.DAYS.map(day => {
+                const isHidden = isGlobalDiscovery && day !== 'Saturday';
+                return `<button class="day-btn extracurricular-day-btn" data-day="${day}" type="button" style="${isHidden ? 'display:none;' : ''}">${day.substring(0, 3)}</button>`;
+            }).join('');
 
             return `
             <div class="extracurricular-card" data-activity-id="${activity.id}" data-student-id="${id}">
@@ -779,6 +827,39 @@ class EnrollmentApp {
                     card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
                     btn.classList.add('selected');
                     
+                    // Reset day button states when frequency changes
+                    const newFreq = btn.dataset.frequency;
+                    const newMaxDays = newFreq === 'twice' ? 2 : 1;
+                    const currentSelected = card.querySelectorAll('.extracurricular-day-btn.selected');
+                    // If more days selected than new limit, deselect extras
+                    if (currentSelected.length > newMaxDays) {
+                        Array.from(currentSelected).slice(newMaxDays).forEach(b => b.classList.remove('selected'));
+                    }
+                    // Re-enable all buttons then re-apply limit
+                    card.querySelectorAll('.extracurricular-day-btn').forEach(dayBtn => {
+                        dayBtn.style.opacity = '';
+                        dayBtn.style.pointerEvents = '';
+                    });
+                    const nowSelected = card.querySelectorAll('.extracurricular-day-btn.selected');
+                    if (nowSelected.length >= newMaxDays) {
+                        card.querySelectorAll('.extracurricular-day-btn').forEach(dayBtn => {
+                            if (!dayBtn.classList.contains('selected')) {
+                                dayBtn.style.opacity = '0.4';
+                                dayBtn.style.pointerEvents = 'none';
+                            }
+                        });
+                    }
+                    // Update counter
+                    let counter = card.querySelector('.day-selection-counter');
+                    if (!counter) {
+                        counter = document.createElement('div');
+                        counter.className = 'day-selection-counter';
+                        counter.style.cssText = 'font-size:12px;color:#666;margin-top:5px;';
+                        const daysContainer = card.querySelector('.extracurricular-details .available-days');
+                        if (daysContainer) daysContainer.after(counter);
+                    }
+                    counter.textContent = `${nowSelected.length} of ${newMaxDays} day(s) selected`;
+                    
                     // Handle day visibility based on frequency
                     this.handleExtracurricularFrequency(card, btn.dataset.frequency);
                     
@@ -787,37 +868,74 @@ class EnrollmentApp {
                 });
             });
 
-            // Extracurricular Days Selection - UPDATED WITH 2-DAY LIMIT
+            // Extracurricular Days Selection - UPDATED WITH FREQUENCY-BASED LIMITS
             card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     
                     const activityId = card.dataset.activityId;
                     const isGlobalDiscovery = activityId === 'global_discovery';
-                    const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
                     
                     if (isGlobalDiscovery) {
                         // For Global Discovery, only allow Saturday
                         if (btn.dataset.day === 'Saturday') {
-                            // Deselect all other days first
                             card.querySelectorAll('.extracurricular-day-btn.selected').forEach(otherBtn => {
                                 otherBtn.classList.remove('selected');
                             });
                             btn.classList.add('selected');
-                        }
-                    } else {
-                        // For regular activities: limit to 2 days maximum
-                        if (btn.classList.contains('selected')) {
-                            // Deselect if already selected
-                            btn.classList.remove('selected');
-                        } else if (selectedDays.length < 2) {
-                            // Select if less than 2 days already selected
-                            btn.classList.add('selected');
                         } else {
-                            // Show message when trying to select more than 2 days
-                            this.showAlert("Maximum 2 days per week for extracurricular activities", "warning");
+                            this.showAlert('Global Discovery Club is Saturdays only.', 'warning');
                             return;
                         }
+                    } else {
+                        // Get frequency limit
+                        const frequencyBtn = card.querySelector('.frequency-btn.selected');
+                        const frequency = frequencyBtn ? frequencyBtn.dataset.frequency : 'once';
+                        const maxDays = frequency === 'twice' ? 2 : 1;
+                        
+                        if (btn.classList.contains('selected')) {
+                            // Deselect
+                            btn.classList.remove('selected');
+                        } else {
+                            const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
+                            if (selectedDays.length >= maxDays) {
+                                this.showAlert(`${frequency === 'twice' ? 'Twice' : 'Once'} weekly allows maximum ${maxDays} day(s). Please deselect a day first.`, 'warning');
+                                return;
+                            }
+                            btn.classList.add('selected');
+                        }
+                        
+                        // Update counter and disable/enable buttons
+                        const selectedDaysNow = card.querySelectorAll('.extracurricular-day-btn.selected');
+                        const newCount = selectedDaysNow.length;
+                        
+                        // Update or create counter
+                        let counter = card.querySelector('.day-selection-counter');
+                        if (!counter) {
+                            counter = document.createElement('div');
+                            counter.className = 'day-selection-counter';
+                            counter.style.cssText = 'font-size:12px;color:#666;margin-top:5px;';
+                            const daysContainer = card.querySelector('.extracurricular-details .available-days');
+                            if (daysContainer) daysContainer.after(counter);
+                        }
+                        counter.textContent = `${newCount} of ${maxDays} day(s) selected`;
+                        counter.style.color = newCount >= maxDays ? '#28A745' : '#666';
+                        
+                        // Disable remaining unselected buttons when limit reached
+                        card.querySelectorAll('.extracurricular-day-btn').forEach(dayBtn => {
+                            if (!dayBtn.classList.contains('selected')) {
+                                if (newCount >= maxDays) {
+                                    dayBtn.style.opacity = '0.4';
+                                    dayBtn.style.pointerEvents = 'none';
+                                } else {
+                                    dayBtn.style.opacity = '';
+                                    dayBtn.style.pointerEvents = '';
+                                }
+                            } else {
+                                dayBtn.style.opacity = '';
+                                dayBtn.style.pointerEvents = '';
+                            }
+                        });
                     }
                     
                     if(!card.classList.contains('selected')) card.classList.add('selected');
@@ -825,7 +943,8 @@ class EnrollmentApp {
                     this.checkCourseSelectionRequirement(id);
                     
                     // Validate days selection
-                    this.validateExtracurricularDays(card, activityId, id);
+                    const activityId2 = card.dataset.activityId;
+                    this.validateExtracurricularDays(card, activityId2, id);
                 });
             });
 
@@ -2533,46 +2652,37 @@ class EnrollmentApp {
 
             // Handle successful portal creation
             if (portalResult && portalResult.isNew) {
-                document.getElementById('temp-password').textContent = portalResult.password;
-                document.getElementById('temp-password-container').style.display = 'block';
-                this.showAlert(`Portal created! Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
-
-                if (portalResult.referralCode) {
-                    const referralContainer = document.createElement('div');
-                    referralContainer.id = 'referral-code-container';
-                    referralContainer.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
-                    referralContainer.innerHTML = `
-                        <p class="font-semibold text-green-800">Your Referral Code:</p>
-                        <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${this.escapeHtml(portalResult.referralCode)}</p>
-                        <p class="text-sm text-green-700 mt-2">Share this code with other parents to earn ₦5,000!</p>
-                    `;
-                    document.getElementById('temp-password-container').after(referralContainer);
-                }
+                // FIX: Show a blocking modal so the parent MUST save their password before proceeding
+                this._showPasswordModal(portalResult);
             } else if (portalResult && !portalResult.isNew) {
                 this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
+                // STEP 3: Fire-and-forget email notifications
+                setTimeout(() => {
+                    const invoiceElement = document.getElementById('invoice-content');
+                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+                }, 2000);
+                // Redirect existing user
+                this.showAlert("Redirecting you to the parent portal...", "success");
+                setTimeout(() => { window.location.href = "parent.html"; }, 2000);
+                btn.innerHTML = 'Enrollment Complete! Redirecting...';
+                btn.disabled = true;
             } else {
                 // STEP 2.5: ERROR RECOVERY - Enrollment saved, but portal failed.
                 this.showAlert("Enrollment successful, but we couldn't auto-login to your portal. Please contact support to link your account.", "warning");
                 btn.innerHTML = 'Enrollment Complete (Portal Setup Pending)';
                 btn.disabled = false;
-                return; // Halt execution here so we don't open the portal tab blindly
+                return;
             }
 
-            // STEP 3: Fire-and-forget email notifications
-            setTimeout(() => {
-                const invoiceElement = document.getElementById('invoice-content');
-                const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
-                this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-            }, 2000);
-
-            // STEP 4: Open Parent Portal in a new tab immediately after user confirmation
-            const openPortal = confirm("Your enrollment is complete! Click OK to open the parent portal now.");
-            if (openPortal) {
-                window.open("parent.html", "_blank");
+            // STEP 3: Fire-and-forget email notifications (for new users, called after modal confirm)
+            if (portalResult && portalResult.isNew) {
+                setTimeout(() => {
+                    const invoiceElement = document.getElementById('invoice-content');
+                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+                }, 2000);
             }
-
-            btn.innerHTML = 'Success!';
-            btn.disabled = false;
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2623,9 +2733,93 @@ class EnrollmentApp {
         }, 2000);
     }
 
-   // ==============================================
-   // REFERRAL CODE GENERATION (HIGH ENTROPY)
-   // ==============================================
+    // ==============================================
+    // PASSWORD MODAL — shown after successful enrollment
+    // Blocks redirect until parent confirms they've saved their credentials
+    // ==============================================
+    _showPasswordModal(portalResult) {
+        // Remove any existing modal
+        const existing = document.getElementById('bkh-password-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'bkh-password-modal';
+        modal.style.cssText = `
+            position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.7);
+            display:flex;align-items:center;justify-content:center;padding:16px;
+        `;
+        modal.innerHTML = `
+            <div style="background:#fff;border-radius:16px;padding:36px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+                <div style="font-size:48px;margin-bottom:16px;">🎉</div>
+                <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;">Enrollment Complete!</h2>
+                <p style="color:#555;margin:0 0 24px;font-size:14px;">Your parent portal account has been created. Save the credentials below — you'll need them to log in.</p>
+                
+                <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:20px;text-align:left;">
+                    <p style="margin:0 0 8px;font-size:13px;color:#555;font-weight:600;">📧 LOGIN EMAIL</p>
+                    <p id="bkh-modal-email" style="margin:0 0 16px;font-size:15px;font-weight:700;color:#1a1a2e;word-break:break-all;">${this.escapeHtml(portalResult.email || '')}</p>
+                    
+                    <p style="margin:0 0 8px;font-size:13px;color:#555;font-weight:600;">🔑 TEMPORARY PASSWORD</p>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <code id="bkh-modal-password" style="flex:1;background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:16px;letter-spacing:2px;font-weight:700;color:#1a1a2e;">${this.escapeHtml(portalResult.password)}</code>
+                        <button id="bkh-copy-pw" style="background:#22c55e;color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">Copy</button>
+                    </div>
+
+                    ${portalResult.referralCode ? `
+                    <p style="margin:16px 0 8px;font-size:13px;color:#555;font-weight:600;">🎁 YOUR REFERRAL CODE</p>
+                    <p style="margin:0;font-size:15px;font-weight:700;color:#16a34a;letter-spacing:2px;">${this.escapeHtml(portalResult.referralCode)}</p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">Share with other parents to earn ₦5,000 per referral</p>
+                    ` : ''}
+                </div>
+
+                <div style="background:#fefce8;border:1px solid #fbbf24;border-radius:8px;padding:12px;margin-bottom:24px;font-size:13px;color:#92400e;">
+                    ⚠️ You will be asked to set a new password when you first log in. Please copy or screenshot your temporary password now.
+                </div>
+
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:20px;text-align:left;">
+                    <input type="checkbox" id="bkh-saved-confirm" style="width:18px;height:18px;cursor:pointer;">
+                    <span style="font-size:14px;color:#374151;">I have saved my email and temporary password</span>
+                </label>
+
+                <button id="bkh-goto-portal" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;opacity:0.4;pointer-events:none;transition:opacity 0.2s;">
+                    Go to My Parent Portal →
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Wire up copy button
+        document.getElementById('bkh-copy-pw').addEventListener('click', () => {
+            navigator.clipboard?.writeText(portalResult.password).catch(() => {});
+            document.getElementById('bkh-copy-pw').textContent = '✓ Copied!';
+        });
+
+        // Fill email (available from sessionStorage payload)
+        try {
+            const stored = JSON.parse(sessionStorage.getItem('bkh_new_parent') || '{}');
+            if (stored.email) document.getElementById('bkh-modal-email').textContent = stored.email;
+        } catch(e) {}
+
+        // Unlock button only when checkbox is checked
+        const checkbox = document.getElementById('bkh-saved-confirm');
+        const goBtn = document.getElementById('bkh-goto-portal');
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                goBtn.style.opacity = '1';
+                goBtn.style.pointerEvents = 'auto';
+            } else {
+                goBtn.style.opacity = '0.4';
+                goBtn.style.pointerEvents = 'none';
+            }
+        });
+
+        // Redirect on confirm
+        goBtn.addEventListener('click', () => {
+            window.location.href = 'parent.html';
+        });
+    }
+
+
    async generateReferralCode() {
         // Helper: generate a cryptographically secure random suffix
         const _secureRandomSuffix = () => {
@@ -2744,7 +2938,9 @@ class EnrollmentApp {
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         referralCode: newReferralCode,
                         referralEarnings: 0,
-                        uid: user.uid
+                        uid: user.uid,
+                        passwordResetComplete: false,
+                        firstLoginCompleted: false
                     });
                 } else {
                     // If no DB, still return the password but note that profile may not persist
@@ -2757,6 +2953,18 @@ class EnrollmentApp {
                         parentUid: user.uid
                     });
                 }
+
+                // FIX: Sign the user in immediately so parent.html receives an authenticated session
+                await firebase.auth().signInWithEmailAndPassword(parentEmail, randomPassword);
+
+                // FIX: Store temp credentials in sessionStorage so parent.html can show the "set your password" prompt
+                sessionStorage.setItem('bkh_new_parent', JSON.stringify({
+                    email: parentEmail,
+                    tempPassword: randomPassword,
+                    referralCode: newReferralCode,
+                    parentName: parentName,
+                    isFirstLogin: true
+                }));
 
                 return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
             }
@@ -2771,13 +2979,25 @@ class EnrollmentApp {
 // INITIALIZE APPLICATION
 // ==============================================
 document.addEventListener('DOMContentLoaded', () => {
-    // firebaseConfig is already set by the module script (firebaseConfig.js)
-    if (window.firebaseConfig) {
-        window.enrollmentApp = new EnrollmentApp(window.firebaseConfig);
-    } else {
-        console.error('Firebase config not loaded. Make sure firebaseConfig.js is present and loaded as a module.');
-        // Optionally show a user-friendly message
-        document.getElementById('alert-area').innerHTML = 
-            '<div class="alert alert-danger">Configuration error. Please contact support.</div>';
+    // firebaseConfig.js loads as type="module" (async), so window.firebaseConfig
+    // may not be set yet when DOMContentLoaded fires.
+    // Poll briefly, then fall back to offline/localStorage mode so the portal
+    // always renders and addStudent() always runs.
+    let attempts = 0;
+    const maxAttempts = 20; // 20 x 100ms = 2s max wait
+
+    function tryInit() {
+        if (window.firebaseConfig) {
+            window.enrollmentApp = new EnrollmentApp(window.firebaseConfig);
+        } else if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(tryInit, 100);
+        } else {
+            // Config never arrived - run in offline/localStorage mode
+            console.warn('Firebase config not loaded - starting in offline mode.');
+            window.enrollmentApp = new EnrollmentApp(null);
+        }
     }
+
+    tryInit();
 });
