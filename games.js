@@ -930,6 +930,100 @@
         } catch(e){}
     }
 
+    /* ── Accept game challenge from notification ─────── */
+    window.bkAcceptGameChallenge = function(gameId, gameType, fromName) {
+        const modal = document.getElementById('bk-game-modal');
+        if(modal) modal.style.display='flex';
+
+        if(gameType==='ttt') {
+            stopAll();
+            state.tttBoard=Array(9).fill(null); state.tttTurn='X';
+            state.tttScores={X:0,O:0,draws:0}; state.gameActive=true;
+            state.tttMode='online'; state.tttGameId=gameId; state.tttMyMark='O';
+            state.tttOpponentName = fromName || 'Opponent';
+            state._confettiShown = false;
+            subscribeToOnlineTTT(gameId);
+        } else if(gameType==='word') {
+            stopAll();
+            state.gameActive=true;
+            state.wordMyRole='B';
+            subscribeToOnlineWordGame(gameId);
+        }
+    };
+
+    window.bkReduceChallengeBadge = function() {
+        state.pendingChallenges = Math.max(0, (state.pendingChallenges||1) - 1);
+        updateGameFloaterBadge(state.pendingChallenges);
+    };
+
+    /* ── Poll for incoming game challenges ───────────── */
+    function listenForIncomingChallenges() {
+        if(!db()||!C()||!Q()||!W()||!SN()||!DC()) return;
+        const myId    = state.currentUser.id||state.currentUser.email||'';
+        const myEmail = state.currentUser.email||'';
+        if(!myId && !myEmail) return;
+
+        // Watch ttt_games where I am player O and status=waiting
+        try {
+            const qTTT = Q()(C()(db(),'ttt_games'),
+                W()('players.O','==',myId),
+                W()('status','==','waiting')
+            );
+            SN()(qTTT, snap=>{
+                snap.docChanges().forEach(change=>{
+                    if(change.type==='added'){
+                        const g=change.doc.data();
+                        showGameChallengeBadge(change.doc.id,'ttt',g.playerNames?.X||'A tutor');
+                    }
+                });
+            });
+        } catch(e){ console.warn('TTT invite listen:',e); }
+
+        // Watch word_games where I am player B and status=waiting
+        try {
+            const qWord = Q()(C()(db(),'word_games'),
+                W()('players.B','==',myId),
+                W()('status','==','waiting')
+            );
+            SN()(qWord, snap=>{
+                snap.docChanges().forEach(change=>{
+                    if(change.type==='added'){
+                        const g=change.doc.data();
+                        showGameChallengeBadge(change.doc.id,'word',g.playerNames?.A||'A tutor');
+                    }
+                });
+            });
+        } catch(e){ console.warn('Word invite listen:',e); }
+    }
+
+    function showGameChallengeBadge(gameId, gameType, fromName) {
+        if(document.getElementById('bk-challenge-toast-'+gameId)) return;
+
+        playChallengeTone();
+
+        state.pendingChallenges = (state.pendingChallenges||0) + 1;
+        updateGameFloaterBadge(state.pendingChallenges);
+
+        const toast = document.createElement('div');
+        toast.id = 'bk-challenge-toast-'+gameId;
+        toast.style.cssText = 'position:fixed;bottom:220px;right:20px;z-index:9999999;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border-radius:16px;padding:12px 16px;box-shadow:0 8px 28px rgba(99,102,241,.5);cursor:pointer;max-width:260px;animation:bkToastIn .3s ease;';
+        const gameLabel = gameType==='ttt' ? 'Tic-Tac-Toe' : 'Word Builder';
+        toast.innerHTML = `
+            <div style="font-weight:900;font-size:.85rem;margin-bottom:3px;">🎮 Game Challenge!</div>
+            <div style="font-size:.75rem;opacity:.9;margin-bottom:8px;">${esc(fromName)} challenged you to ${gameLabel}</div>
+            <div style="display:flex;gap:6px;">
+                <button onclick="(function(){window.bkAcceptGameChallenge('${gameId}','${gameType}','${esc(fromName)}');var t=document.getElementById('bk-challenge-toast-${gameId}');if(t)t.remove();window.bkReduceChallengeBadge&&window.bkReduceChallengeBadge();})()" style="flex:1;background:#fff;color:#4338ca;border:none;border-radius:8px;padding:6px;font-weight:800;font-size:.75rem;cursor:pointer;">▶ Accept</button>
+                <button onclick="(function(){var t=document.getElementById('bk-challenge-toast-${gameId}');if(t)t.remove();window.bkReduceChallengeBadge&&window.bkReduceChallengeBadge();})()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:.75rem;">✕</button>
+            </div>`;
+        if(!document.getElementById('bk-toast-anim')) {
+            const s=document.createElement('style'); s.id='bk-toast-anim';
+            s.textContent='@keyframes bkToastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}';
+            document.head.appendChild(s);
+        }
+        document.body.appendChild(toast);
+        setTimeout(()=>{ if(toast.parentNode){ toast.remove(); window.bkReduceChallengeBadge&&window.bkReduceChallengeBadge(); } }, 30000);
+    }
+
     window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); setTimeout(listenForIncomingChallenges, 3000); });
 
 })();
