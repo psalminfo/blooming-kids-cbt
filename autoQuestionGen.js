@@ -1,5 +1,5 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, query, where, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let loadedQuestions = [];
 let currentSessionId = null;
@@ -7,21 +7,38 @@ let saveTimeout = null;
 let saveTextTimeout = null;
 
 /**
- * Convert test subject to admin_questions subject format
+ * STRATEGIC FIX: UNIVERSAL SUBJECT MATCHER
+ * Intelligently maps variations like "Reading" and "English" to "ELA"
  */
-function getAdminQuestionsSubject(testSubject) {
-    const subjectMap = {
-        'ela': 'English',
-        'math': 'Mathematics', 
-        'science': 'Science',
-        'socialstudies': 'Social Studies'
-    };
-    return subjectMap[testSubject.toLowerCase()] || testSubject;
+function isSubjectMatch(docSubject, requestedSubject) {
+    if (!docSubject || !requestedSubject) return false;
+    
+    const dbSub = String(docSubject).toLowerCase();
+    const reqSub = String(requestedSubject).toLowerCase();
+
+    // Map ELA to Reading, English, Writing
+    if (reqSub === 'ela') {
+        return dbSub.includes('ela') || dbSub.includes('english') || dbSub.includes('reading') || dbSub.includes('writing');
+    }
+    // Map Math to Mathematics
+    if (reqSub === 'math') {
+        return dbSub.includes('math') || dbSub.includes('mathematics');
+    }
+    
+    return dbSub.includes(reqSub) || reqSub.includes(dbSub);
 }
 
 /**
- * Generate unique session ID scoped to current test AND state
+ * STRATEGIC FIX: UNIVERSAL GRADE MATCHER
+ * Normalizes "Grade 3", "grade3", "3", 3 to match perfectly
  */
+function isGradeMatch(docGrade, requestedGrade) {
+    if (!docGrade || !requestedGrade) return false;
+    const dbGradeStr = String(docGrade).toLowerCase().replace(/[^0-9]/g, '');
+    const reqGradeStr = String(requestedGrade).toLowerCase().replace(/[^0-9]/g, '');
+    return dbGradeStr === reqGradeStr;
+}
+
 function generateSessionId(grade, subject, state) {
     const params = new URLSearchParams(window.location.search);
     const studentName = params.get('studentName');
@@ -31,19 +48,14 @@ function generateSessionId(grade, subject, state) {
     const existingSessionId = sessionStorage.getItem('currentTestSession');
     
     if (existingSessionId && existingSessionId === testSessionKey) {
-        console.log("Reusing session for current test and state:", testSessionKey);
         return testSessionKey;
     }
     
     clearOtherStateSessions(testSessionKey);
     sessionStorage.setItem('currentTestSession', testSessionKey);
-    console.log("Started new test session for state:", testSessionKey);
     return testSessionKey;
 }
 
-/**
- * Clear sessions for other states but keep current one
- */
 function clearOtherStateSessions(currentSessionKey) {
     const keysToRemove = [];
     for (let i = 0; i < sessionStorage.length; i++) {
@@ -54,15 +66,9 @@ function clearOtherStateSessions(currentSessionKey) {
             }
         }
     }
-    keysToRemove.forEach(key => {
-        sessionStorage.removeItem(key);
-        console.log("Cleared other state session:", key);
-    });
+    keysToRemove.forEach(key => sessionStorage.removeItem(key));
 }
 
-/**
- * Clear all test sessions (call on logout)
- */
 export function clearAllTestSessions() {
     const keysToRemove = [];
     for (let i = 0; i < sessionStorage.length; i++) {
@@ -71,11 +77,7 @@ export function clearAllTestSessions() {
             keysToRemove.push(key);
         }
     }
-    keysToRemove.forEach(key => {
-        sessionStorage.removeItem(key);
-        console.log("Cleared session:", key);
-    });
-    console.log("All test sessions cleared - ready for new test");
+    keysToRemove.forEach(key => sessionStorage.removeItem(key));
 }
 
 export function getAnswerData() {
@@ -87,9 +89,6 @@ export function getAllLoadedQuestions() {
     return loadedQuestions;
 }
 
-/**
- * Select ELA questions with priority: 1 passage + non-passage questions to reach 15, OR 2 passages
- */
 function selectELAQuestions(allQuestions, passagesMap) {
     const questionsWithPassages = [];
     const questionsWithoutPassages = [];
@@ -104,9 +103,7 @@ function selectELAQuestions(allQuestions, passagesMap) {
     
     const questionsByPassage = {};
     questionsWithPassages.forEach(question => {
-        if (!questionsByPassage[question.passageId]) {
-            questionsByPassage[question.passageId] = [];
-        }
+        if (!questionsByPassage[question.passageId]) questionsByPassage[question.passageId] = [];
         questionsByPassage[question.passageId].push(question);
     });
     
@@ -118,7 +115,6 @@ function selectELAQuestions(allQuestions, passagesMap) {
         const firstPassageId = passageIds[Math.floor(Math.random() * passageIds.length)];
         selectedQuestions.push(...questionsByPassage[firstPassageId]);
         selectedPassageIds.push(firstPassageId);
-        console.log(`Selected first passage ${firstPassageId} with ${questionsByPassage[firstPassageId].length} questions`);
     }
     
     const questionsNeeded = 15 - selectedQuestions.length;
@@ -126,195 +122,146 @@ function selectELAQuestions(allQuestions, passagesMap) {
     
     if (availableNonPassageQuestions >= questionsNeeded) {
         const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
-        const additionalQuestions = shuffledNonPassage.slice(0, questionsNeeded);
-        selectedQuestions.push(...additionalQuestions);
-        console.log(`Added ${additionalQuestions.length} non-passage questions to reach 15 total`);
+        selectedQuestions.push(...shuffledNonPassage.slice(0, questionsNeeded));
     } else if (passageIds.length > 1) {
         const remainingPassageIds = passageIds.filter(id => !selectedPassageIds.includes(id));
         if (remainingPassageIds.length > 0) {
             const secondPassageId = remainingPassageIds[Math.floor(Math.random() * remainingPassageIds.length)];
             selectedQuestions.push(...questionsByPassage[secondPassageId]);
             selectedPassageIds.push(secondPassageId);
-            console.log(`Added second passage ${secondPassageId} with ${questionsByPassage[secondPassageId].length} questions`);
             
             const remainingSlots = 15 - selectedQuestions.length;
             if (remainingSlots > 0 && questionsWithoutPassages.length > 0) {
                 const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
-                const finalQuestions = shuffledNonPassage.slice(0, remainingSlots);
-                selectedQuestions.push(...finalQuestions);
-                console.log(`Added ${finalQuestions.length} non-passage questions after second passage`);
+                selectedQuestions.push(...shuffledNonPassage.slice(0, remainingSlots));
             }
         }
     } else {
         const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
-        const additionalQuestions = shuffledNonPassage.slice(0, availableNonPassageQuestions);
-        selectedQuestions.push(...additionalQuestions);
-        console.log(`Added ${additionalQuestions.length} non-passage questions (only one passage available)`);
+        selectedQuestions.push(...shuffledNonPassage.slice(0, availableNonPassageQuestions));
     }
     
-    const finalSelection = selectedQuestions.slice(0, 15);
-    console.log(`Final ELA selection: ${finalSelection.length} questions`);
-    return finalSelection;
+    return selectedQuestions.slice(0, 15);
 }
 
 /**
- * Fetch from tests collection with proper nested structure handling
+ * STRATEGIC OMNI-FILTER: TESTS COLLECTION
+ * Bypasses Document ID constraints to find any matching test.
  */
 async function fetchFromTestsCollection(grade, subject) {
-    const subjectPrefix = subject.toLowerCase().slice(0, 3);
-    const gradeNumber = grade.replace('grade', '');
-    
-    const gradeFormats = [
-        gradeNumber,
-        `${gradeNumber}`,
-        grade,
-        grade.replace('grade', 'Grade ').trim(),
-    ];
-    
-    const idPrefixes = [];
-    gradeFormats.forEach(g => {
-        idPrefixes.push(`${g}-${subjectPrefix}`);
-        idPrefixes.push(`${g}${subjectPrefix}`);
-        idPrefixes.push(`${g}-${subject}`);
-        idPrefixes.push(`${g}${subject}`);
-    });
-    
-    const uniquePrefixes = [...new Set(idPrefixes)];
-    console.log("🔍 Searching tests collection with prefixes:", uniquePrefixes);
-    
     let allQuestions = [];
     let allPassages = [];
     
-    for (const prefix of uniquePrefixes) {
-        try {
-            const q = query(
-                collection(db, "tests"),
-                where(documentId(), '>=', prefix),
-                where(documentId(), '<', prefix + '\uf8ff')
-            );
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                for (const docSnap of snapshot.docs) {
-                    const rawData = docSnap.data();
-                    
-                    if (rawData && rawData.tests && Array.isArray(rawData.tests)) {
-                        rawData.tests.forEach((test) => {
-                            if (test.passages && Array.isArray(test.passages)) {
-                                test.passages.forEach(passage => {
-                                    if (passage && !passage.passageId && passage.id) passage.passageId = passage.id;
-                                    allPassages.push(passage);
-                                });
-                            }
-                            if (test.questions && Array.isArray(test.questions)) {
-                                test.questions.forEach(q => {
-                                    q.grade = test.grade || gradeNumber;
-                                    q.subject = test.subject || subject;
-                                    q.imageUrl = q.image || q.image_url || q.imageUrl || null;
-                                    q.passageId = q.passage_id || q.passageId || null;
-                                });
-                                allQuestions.push(...test.questions);
-                            }
-                        });
-                    } else if (rawData && rawData.questions) {
-                        if (Array.isArray(rawData.questions)) {
-                            rawData.questions.forEach(q => {
-                                q.imageUrl = q.image || q.image_url || q.imageUrl || null;
-                                q.passageId = q.passage_id || q.passageId || null;
+    try {
+        console.log(`🔍 Scanning 'tests' collection for Grade: ${grade}, Subject: ${subject}`);
+        const snapshot = await getDocs(collection(db, "tests"));
+        
+        snapshot.forEach(docSnap => {
+            const rawData = docSnap.data();
+            
+            // Handle Nested Tests Array (e.g. staar_reading_3_2022)
+            if (rawData && rawData.tests && Array.isArray(rawData.tests)) {
+                rawData.tests.forEach((test) => {
+                    // Check if this specific test matches grade and subject
+                    if (isGradeMatch(test.grade, grade) && isSubjectMatch(test.subject, subject)) {
+                        if (test.passages && Array.isArray(test.passages)) {
+                            test.passages.forEach(passage => {
+                                if (passage && !passage.passageId && passage.id) passage.passageId = passage.id;
+                                allPassages.push(passage);
                             });
-                            allQuestions.push(...rawData.questions);
                         }
-                        if (rawData.passages && Array.isArray(rawData.passages)) {
-                            allPassages.push(...rawData.passages);
+                        if (test.questions && Array.isArray(test.questions)) {
+                            test.questions.forEach(q => {
+                                q.grade = test.grade || grade;
+                                q.subject = test.subject || subject;
+                                q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                                q.passageId = q.passageId || q.passage_id || null;
+                            });
+                            allQuestions.push(...test.questions);
                         }
                     }
+                });
+            } 
+            // Handle Root Level Tests
+            else if (rawData && isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
+                if (rawData.questions && Array.isArray(rawData.questions)) {
+                    rawData.questions.forEach(q => {
+                        q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                        q.passageId = q.passageId || q.passage_id || null;
+                    });
+                    allQuestions.push(...rawData.questions);
                 }
-                if (allQuestions.length >= 30) break;
+                if (rawData.passages && Array.isArray(rawData.passages)) {
+                    allPassages.push(...rawData.passages);
+                }
             }
-        } catch (err) {
-            console.warn(`Error querying tests collection with prefix ${prefix}:`, err);
-        }
+        });
+        console.log(`✅ Extracted from 'tests': ${allQuestions.length} questions, ${allPassages.length} passages`);
+    } catch (err) {
+        console.error(`Error querying 'tests' collection:`, err);
     }
     return { questions: allQuestions, passages: allPassages };
 }
 
 /**
- * Fetch from admin_questions collection with proper field handling
+ * STRATEGIC OMNI-FILTER: ADMIN_QUESTIONS COLLECTION
  */
 async function fetchFromAdminQuestions(grade, subject) {
-    const gradeNumber = grade.replace('grade', '');
-    const adminSubject = getAdminQuestionsSubject(subject);
-    
-    const gradeFormats = [
-        gradeNumber,
-        parseInt(gradeNumber, 10),
-        `grade${gradeNumber}`,
-        `Grade ${gradeNumber}`,
-        grade,
-    ];
-    
     let allQuestions = [];
-    
-    for (const g of gradeFormats) {
-        try {
-            const q = query(
-                collection(db, "admin_questions"),
-                where("grade", "==", g),
-                where("subject", "==", adminSubject)
-            );
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                snapshot.forEach(doc => {
-                    try {
-                        const questionData = doc.data();
-                        if (!questionData || (!questionData.question && !questionData.type)) return;
-                        
-                        const normalizedQuestion = {
-                            ...questionData,
-                            firebaseId: doc.id,
-                            id: doc.id || `admin-${Date.now()}`,
-                            subject: subject.toLowerCase(),
-                            grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`,
-                            imageUrl: questionData.image || questionData.image_url || questionData.imageUrl || null,
-                            passageId: questionData.passage_id || questionData.passageId || null,
-                            image_position: questionData.image_position || questionData.imagePosition || 'before'
-                        };
-                        
-                        if (questionData.options) {
-                            if (Array.isArray(questionData.options)) {
-                                normalizedQuestion.options = questionData.options;
-                            } else if (typeof questionData.options === 'string') {
-                                try {
-                                    const parsed = JSON.parse(questionData.options);
-                                    normalizedQuestion.options = Array.isArray(parsed) ? parsed : [questionData.options];
-                                } catch (e) {
-                                    normalizedQuestion.options = [questionData.options];
-                                }
-                            } else {
-                                normalizedQuestion.options = [];
-                            }
-                        } else {
-                            normalizedQuestion.options = [];
+    try {
+        console.log(`🔍 Scanning 'admin_questions' for Grade: ${grade}, Subject: ${subject}`);
+        const snapshot = await getDocs(collection(db, "admin_questions"));
+        
+        snapshot.forEach(docSnap => {
+            const qData = docSnap.data();
+            
+            if (qData && isGradeMatch(qData.grade, grade) && isSubjectMatch(qData.subject, subject)) {
+                const normalizedQuestion = {
+                    ...qData,
+                    firebaseId: docSnap.id,
+                    id: docSnap.id || `admin-${Date.now()}`,
+                    imageUrl: qData.imageUrl || qData.image_url || qData.image || null,
+                    passageId: qData.passageId || qData.passage_id || null,
+                    type: qData.type || (qData.topic === 'CREATIVE WRITING' ? 'creative-writing' : 'mcq'),
+                    image_position: qData.image_position || qData.imagePosition || 'before'
+                };
+                
+                if (qData.options) {
+                    if (Array.isArray(qData.options)) {
+                        normalizedQuestion.options = qData.options;
+                    } else if (typeof qData.options === 'string') {
+                        try {
+                            const parsed = JSON.parse(qData.options);
+                            normalizedQuestion.options = Array.isArray(parsed) ? parsed : [qData.options];
+                        } catch (e) {
+                            normalizedQuestion.options = [qData.options];
                         }
-                        
-                        allQuestions.push(normalizedQuestion);
-                    } catch (err) {
-                        console.error('Error processing admin question:', doc.id, err);
+                    } else {
+                        normalizedQuestion.options = [];
                     }
-                });
-                break;
+                } else {
+                    normalizedQuestion.options = [];
+                }
+                
+                allQuestions.push(normalizedQuestion);
             }
-        } catch (err) {
-            console.warn(`Error querying admin_questions with grade ${g}:`, err);
-        }
+        });
+        console.log(`✅ Extracted from 'admin_questions': ${allQuestions.length} questions`);
+    } catch (err) {
+        console.error(`Error querying 'admin_questions':`, err);
     }
     return allQuestions;
 }
 
-/**
- * Fetch from GitHub with Adaptive Parsing (Handles Objects & Arrays)
- */
 async function fetchFromGitHub(grade, subject) {
-    const baseUrl = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/';
+    const hostname = window.location.hostname;
+    let targetBranch = 'main'; 
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('staging')) {
+        targetBranch = 'main'; 
+    }
+
+    const baseUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${targetBranch}/`;
     const gradeNumber = grade.replace('grade', '');
     
     const patterns = [
@@ -328,7 +275,6 @@ async function fetchFromGitHub(grade, subject) {
     ];
     
     const uniquePatterns = [...new Set(patterns)];
-    console.log("🔍 Trying GitHub patterns:", uniquePatterns);
     
     for (const pattern of uniquePatterns) {
         const url = baseUrl + pattern;
@@ -337,7 +283,6 @@ async function fetchFromGitHub(grade, subject) {
             
             if (response.ok) {
                 const data = await response.json();
-                console.log(`✅ Successfully fetched from GitHub using pattern: ${pattern}`);
                 
                 let questions = [];
                 let passages = [];
@@ -378,9 +323,6 @@ async function fetchFromGitHub(grade, subject) {
     throw new Error('No GitHub file found with any pattern');
 }
 
-/**
- * Optimizes Cloudinary image URLs with automatic transformations
- */
 function optimizeImageUrl(originalUrl) {
     if (!originalUrl) return null;
     const urlString = String(originalUrl);
@@ -394,18 +336,9 @@ function optimizeImageUrl(originalUrl) {
     return urlString;
 }
 
-/**
- * The entry point to load and display questions for a test.
- */
 export async function loadQuestions(subject, grade, state) {
     if (state === 'creative-writing') {
-        if (subject.toLowerCase() !== 'ela') {
-            const params = new URLSearchParams(window.location.search);
-            params.set('state', 'mcq');
-            window.location.search = params.toString();
-            return;
-        }
-        if (!isGrade3Plus(grade)) {
+        if (subject.toLowerCase() !== 'ela' && subject.toLowerCase() !== 'english' && subject.toLowerCase() !== 'reading') {
             const params = new URLSearchParams(window.location.search);
             params.set('state', 'mcq');
             window.location.search = params.toString();
@@ -456,11 +389,7 @@ export async function loadQuestions(subject, grade, state) {
             }
         }
 
-        if (subject.toLowerCase() !== 'ela') {
-            allQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
-        }
-
-        // Final Normalization Pass to ensure keys match UI expectations
+        // Final Normalization Pass
         allQuestions = allQuestions.map((q, index) => ({
             ...q,
             id: q.firebaseId || q.id || `question-${index}`,
@@ -481,8 +410,10 @@ export async function loadQuestions(subject, grade, state) {
             return;
         }
 
-        if (subject.toLowerCase() === 'ela' && state === 'creative-writing' && isGrade3Plus(grade)) {
-            creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing');
+        const isELASubject = isSubjectMatch('ela', subject);
+
+        if (isELASubject && state === 'creative-writing') {
+            creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing' || q.topic === 'CREATIVE WRITING');
             
             if (!creativeWritingQuestion) {
                 container.innerHTML = `<p class="text-red-600">❌ Creative writing question not found. Redirecting to multiple choice...</p>`;
@@ -497,14 +428,14 @@ export async function loadQuestions(subject, grade, state) {
             saveSession(loadedQuestions, passagesMap);
             displayCreativeWriting(creativeWritingQuestion);
         } else {
-            const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
+            const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing' && q.topic !== 'CREATIVE WRITING');
             if (filteredQuestions.length === 0) {
                 container.innerHTML = `<p class="text-red-600">❌ No ${subject} multiple-choice questions found.</p>`;
                 return;
             }
             
             let selectedQuestions = [];
-            if (subject.toLowerCase() === 'ela') {
+            if (isELASubject) {
                 selectedQuestions = selectELAQuestions(filteredQuestions, passagesMap);
             } else {
                 selectedQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
@@ -518,15 +449,6 @@ export async function loadQuestions(subject, grade, state) {
     } catch (err) {
         console.error("❌ Failed to load questions:", err);
         container.innerHTML = `<p class="text-red-600">❌ An error occurred: ${err.message}</p>`;
-    }
-}
-
-function isGrade3Plus(grade) {
-    try {
-        const gradeNumber = parseInt(grade.replace('grade', ''));
-        return !isNaN(gradeNumber) && gradeNumber >= 3 && gradeNumber <= 12;
-    } catch (err) {
-        return false;
     }
 }
 
@@ -591,7 +513,6 @@ function displayQuestionsBasedOnState(questions, state) {
     const savedSession = getSavedSession();
     let passagesMap = {};
 
-    // THE TACTICAL FIX: Handle both Array and Object correctly so .map doesn't crash
     if (savedSession && savedSession.passages) {
         if (Array.isArray(savedSession.passages)) {
             passagesMap = Object.fromEntries(savedSession.passages.map(p => [p.passageId, p]));
@@ -601,7 +522,7 @@ function displayQuestionsBasedOnState(questions, state) {
     }
     
     if (state === 'creative-writing') {
-        const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing');
+        const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing' || q.topic === 'CREATIVE WRITING');
         if (creativeWritingQuestion) {
             displayCreativeWriting(creativeWritingQuestion);
         } else {
