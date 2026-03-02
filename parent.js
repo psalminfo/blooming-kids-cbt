@@ -4765,6 +4765,16 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
         const finalPhone = normalizedResult.normalized;
         console.log("📱 Processing signup with normalized phone:", finalPhone);
 
+        // DUPLICATE CHECK: verify no account already exists with this email
+        const existingUsers = await db.collection('parent_users')
+            .where('email', '==', email)
+            .limit(1)
+            .get();
+        
+        if (!existingUsers.empty) {
+            throw new Error('An account with this email already exists. Please sign in instead.');
+        }
+
         // Step 1: Create user in Firebase Auth
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
@@ -4781,19 +4791,18 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             referralCode: referralCode,
             referralEarnings: 0,
-            uid: user.uid
+            uid: user.uid,
+            passwordResetComplete: true,  // Self-registered: they chose their own password
+            firstLoginCompleted: true,
+            registrationMethod: 'self_signup'
         });
 
         console.log("✅ Account created and profile saved");
         
-        // CRITICAL FIX: Wait for Firestore write to propagate
-        console.log("⏳ Waiting for profile to sync...");
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // CRITICAL FIX: DO NOT reload the page - let onAuthStateChanged handle it
+        showMessage('Account created successfully! Loading your portal...', 'success');
         
-        // Step 4: Show success message
-        showMessage('Account created successfully! Redirecting...', 'success');
-        
-        // Step 5: Clear form
+        // Reset button state
         if (signUpBtn) signUpBtn.disabled = false;
         const signUpText = document.getElementById('signUpText');
         const signUpSpinner = document.getElementById('signUpSpinner');
@@ -4801,17 +4810,7 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
         if (signUpSpinner) signUpSpinner.classList.add('hidden');
         if (authLoader) authLoader.classList.add('hidden');
         
-        // Step 6: Force auth state refresh
-        console.log("🔄 Refreshing auth state...");
-        
-        // Method 1: Reload page (most reliable)
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
-        
-        // Method 2: Alternative - trigger auth refresh without reload
-        // await auth.currentUser.reload();
-        // console.log("🔄 Auth state refreshed");
+        // onAuthStateChanged will detect the login and call loadUserDashboard automatically
         
     } catch (error) {
         if (!pendingRequests.has(requestId)) return;
@@ -4858,7 +4857,6 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
     if (authLoader) authLoader.classList.remove("hidden");
     
     try {
-        // ENHANCED: Add retry logic for new users
         console.log("🔍 Checking user profile...");
         
         let userDoc;
@@ -4868,15 +4866,12 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
         while (retryCount < maxRetries) {
             try {
                 userDoc = await db.collection('parent_users').doc(user.uid).get();
-                
                 if (userDoc.exists) {
                     console.log(`✅ User profile found on attempt ${retryCount + 1}`);
                     break;
                 }
-                
                 retryCount++;
                 if (retryCount < maxRetries) {
-                    console.log(`🔄 Profile not found, retrying in ${retryCount * 500}ms...`);
                     await new Promise(resolve => setTimeout(resolve, retryCount * 500));
                 }
             } catch (err) {
@@ -4886,36 +4881,16 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
         }
         
         if (!userDoc || !userDoc.exists) {
-            console.log("🆕 Creating missing user profile...");
-            
-            // Create a basic profile
-            const minimalProfile = {
-                email: user.email || '',
-                phone: user.phoneNumber || '',
-                normalizedPhone: user.phoneNumber || '',
-                parentName: 'Parent',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                uid: user.uid,
-                // Try to get from recent signup
-                ...window.tempSignupData
-            };
-            
-            await db.collection('parent_users').doc(user.uid).set(minimalProfile);
-            
-            console.log("✅ Created missing profile");
-            
-            // Show user-friendly message
-            showMessage('Welcome! Finishing your account setup...', 'success');
-            
-            // Short delay then reload
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-            
+            // BLOCK: No profile = not enrolled through enrollment portal
+            console.log("🚫 No parent profile found - unauthorized access");
+            if (authLoader) authLoader.classList.add("hidden");
+            await auth.signOut();
+            if (authArea) authArea.classList.remove("hidden");
+            if (reportArea) reportArea.classList.add("hidden");
+            showMessage("No account found. Please complete enrollment first at our enrollment portal.", "error");
             return;
         }
         
-        // Continue with original logic if profile exists
         const userData = userDoc.data();
         this.currentUser = {
             uid: user.uid,
@@ -4923,13 +4898,20 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
             phone: userData.phone,
             normalizedPhone: userData.normalizedPhone || userData.phone,
             parentName: userData.parentName || 'Parent',
-            referralCode: userData.referralCode
+            referralCode: userData.referralCode,
+            passwordResetComplete: userData.passwordResetComplete
         };
 
         console.log("👤 User data loaded:", this.currentUser.parentName);
 
         // Update UI immediately
         this.showDashboardUI();
+
+        // CHECK: First-time login - show non-dismissible password reset modal
+        if (userData.passwordResetComplete === false) {
+            console.log("🔐 First-time login - showing password reset modal");
+            showFirstTimePasswordModal(user.uid);
+        }
 
         // Load remaining data in parallel
         await Promise.all([
@@ -4938,7 +4920,6 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
             loadAcademicsData()
         ]);
 
-        // Setup monitoring and UI
         this.setupRealtimeMonitoring();
         this.setupUIComponents();
 
@@ -4946,24 +4927,187 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
 
     } catch (error) {
         console.error("❌ Enhanced dashboard load error:", error);
-        
-        // User-friendly error handling
-        if (error.message.includes("profile not found") || error.message.includes("not found")) {
-            showMessage("Almost there! Setting up your account...", "info");
-            
-            // Auto-retry after delay
-            setTimeout(() => {
-                console.log("🔄 Auto-retrying dashboard load...");
-                this.loadUserDashboard(user);
-            }, 3000);
-        } else {
-            showMessage("Temporary issue loading dashboard. Please refresh.", "error");
-            this.showAuthScreen();
-        }
+        showMessage("Temporary issue loading dashboard. Please refresh.", "error");
+        this.showAuthScreen();
     } finally {
         if (authLoader) authLoader.classList.add("hidden");
     }
 };
+
+// ============================================================================
+// FIRST-TIME PASSWORD RESET MODAL (Non-dismissible)
+// ============================================================================
+function showFirstTimePasswordModal(uid) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('firstTimePasswordModal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'firstTimePasswordModal';
+    modal.style.cssText = `
+        position: fixed; inset: 0; z-index: 99999;
+        background: rgba(15,23,42,0.8); backdrop-filter: blur(6px);
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+    `;
+    // Prevent closing by clicking outside
+    modal.addEventListener('click', (e) => e.stopPropagation());
+    
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 1.5rem; width: 100%; max-width: 420px;
+                    box-shadow: 0 32px 72px rgba(0,0,0,0.3); overflow: hidden;">
+            <div style="background: linear-gradient(135deg, var(--sage, #4a7c59), var(--sage-dark, #2f5240));
+                        padding: 24px; text-align: center; color: white;">
+                <div style="font-size: 2.5rem; margin-bottom: 8px;">🔐</div>
+                <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 6px;">Set Your Password</h2>
+                <p style="opacity: 0.8; font-size: 0.85rem; margin: 0;">Welcome to your Parent Portal!</p>
+            </div>
+            <div style="padding: 24px;">
+                <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 20px; line-height: 1.6;">
+                    Please create a password for your account. You'll use this to log in next time.
+                </p>
+                <div id="firstTimePwdMsg" style="display:none; padding: 10px 14px; border-radius: 8px; 
+                     font-size: 0.82rem; margin-bottom: 14px;"></div>
+                <div style="margin-bottom: 14px;">
+                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#6b7873; 
+                                  margin-bottom:6px; text-transform:uppercase;">New Password</label>
+                    <input type="password" id="firstTimePwd" placeholder="Minimum 8 characters"
+                           style="width:100%; padding:12px 14px; border:1.5px solid #dde5de; border-radius:10px;
+                                  font-size:0.9rem; outline:none; transition:border-color 0.2s;"
+                           oninput="validateFirstTimePwd()">
+                    <div id="pwdStrengthBar" style="margin-top:6px; height:4px; border-radius:2px; 
+                         background:#e2e8f0; overflow:hidden;">
+                        <div id="pwdStrengthFill" style="height:100%; width:0%; transition:all 0.3s; border-radius:2px;"></div>
+                    </div>
+                    <div id="pwdStrengthText" style="font-size:0.72rem; color:#94a3b8; margin-top:3px;"></div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#6b7873; 
+                                  margin-bottom:6px; text-transform:uppercase;">Confirm Password</label>
+                    <input type="password" id="firstTimePwdConfirm" placeholder="Confirm your password"
+                           style="width:100%; padding:12px 14px; border:1.5px solid #dde5de; border-radius:10px;
+                                  font-size:0.9rem; outline:none; transition:border-color 0.2s;"
+                           oninput="validateFirstTimePwd()">
+                    <div id="pwdMatchText" style="font-size:0.72rem; margin-top:3px;"></div>
+                </div>
+                <button id="firstTimeSaveBtn" onclick="saveFirstTimePassword('${uid}')"
+                    style="width:100%; padding:14px; background:linear-gradient(135deg,#4a7c59,#2f5240);
+                           color:white; border:none; border-radius:10px; font-size:0.95rem; font-weight:700;
+                           cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span id="firstTimeSaveBtnText">SAVE PASSWORD</span>
+                    <div id="firstTimeSaveSpinner" style="display:none; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3);
+                         border-top-color:white; border-radius:50%; animation:spin 1s linear infinite;"></div>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+window.validateFirstTimePwd = function() {
+    const pwd = document.getElementById('firstTimePwd')?.value || '';
+    const confirm = document.getElementById('firstTimePwdConfirm')?.value || '';
+    
+    // Strength indicator
+    let strength = 0;
+    let strengthText = '';
+    let strengthColor = '';
+    if (pwd.length >= 8) strength += 25;
+    if (/[A-Z]/.test(pwd)) strength += 25;
+    if (/[0-9]/.test(pwd)) strength += 25;
+    if (/[^A-Za-z0-9]/.test(pwd)) strength += 25;
+    
+    if (strength <= 25) { strengthText = 'Weak'; strengthColor = '#ef4444'; }
+    else if (strength <= 50) { strengthText = 'Fair'; strengthColor = '#f97316'; }
+    else if (strength <= 75) { strengthText = 'Good'; strengthColor = '#eab308'; }
+    else { strengthText = 'Strong'; strengthColor = '#22c55e'; }
+    
+    const fill = document.getElementById('pwdStrengthFill');
+    const text = document.getElementById('pwdStrengthText');
+    if (fill) { fill.style.width = strength + '%'; fill.style.background = strengthColor; }
+    if (text) { text.textContent = pwd.length > 0 ? strengthText : ''; text.style.color = strengthColor; }
+    
+    // Match indicator
+    const matchEl = document.getElementById('pwdMatchText');
+    if (matchEl && confirm.length > 0) {
+        if (pwd === confirm) {
+            matchEl.textContent = '✓ Passwords match';
+            matchEl.style.color = '#22c55e';
+        } else {
+            matchEl.textContent = '✗ Passwords do not match';
+            matchEl.style.color = '#ef4444';
+        }
+    } else if (matchEl) {
+        matchEl.textContent = '';
+    }
+};
+
+window.saveFirstTimePassword = async function(uid) {
+    const pwd = document.getElementById('firstTimePwd')?.value || '';
+    const confirm = document.getElementById('firstTimePwdConfirm')?.value || '';
+    const msgEl = document.getElementById('firstTimePwdMsg');
+    const btn = document.getElementById('firstTimeSaveBtn');
+    const btnText = document.getElementById('firstTimeSaveBtnText');
+    const spinner = document.getElementById('firstTimeSaveSpinner');
+    
+    const showMsg = (text, isError) => {
+        if (msgEl) {
+            msgEl.textContent = text;
+            msgEl.style.display = 'block';
+            msgEl.style.background = isError ? '#fdf0f0' : '#edf7f1';
+            msgEl.style.color = isError ? '#b94040' : '#3a7a52';
+            msgEl.style.border = `1px solid ${isError ? '#f0c8c8' : '#bde0cc'}`;
+        }
+    };
+    
+    if (!pwd || pwd.length < 8) {
+        showMsg('Password must be at least 8 characters.', true);
+        return;
+    }
+    if (pwd !== confirm) {
+        showMsg('Passwords do not match. Please try again.', true);
+        return;
+    }
+    
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.textContent = 'Saving...';
+    if (spinner) spinner.style.display = 'block';
+    
+    try {
+        // Update Firebase Auth password
+        const user = auth.currentUser;
+        if (!user) throw new Error('Not authenticated');
+        
+        await user.updatePassword(pwd);
+        
+        // Update Firestore record
+        await db.collection('parent_users').doc(uid).update({
+            passwordResetComplete: true,
+            firstLoginCompleted: true,
+            passwordSetAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showMsg('Password saved successfully! Welcome to your portal!', false);
+        
+        setTimeout(() => {
+            const modal = document.getElementById('firstTimePasswordModal');
+            if (modal) modal.remove();
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Error saving password:', error);
+        let msg = 'Failed to save password. Please try again.';
+        if (error.code === 'auth/requires-recent-login') {
+            msg = 'Session expired. Please log out and log back in to set your password.';
+        }
+        showMsg(msg, true);
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = 'SAVE PASSWORD';
+        if (spinner) spinner.style.display = 'none';
+    }
+};
+
+
 
 // ============================================================================
 // SECTION 23: TEMP SIGNUP DATA STORAGE
@@ -6263,7 +6407,7 @@ let _addStudentStep = 1;
 
 /**
  * showAddStudentModal()
- * Opens the "Add Another Student" multi-step modal.
+ * Opens the "Add Sibling" multi-step modal.
  */
 function showAddStudentModal() {
     const modal = document.getElementById('addStudentModal');
@@ -6273,26 +6417,301 @@ function showAddStudentModal() {
     _addStudentStep = 1;
     _updateAddStudentStepUI();
 
-    // Set default start date to 1st of next month
+    // Set min date to TOMORROW (no backdating)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    // Also set default to 1st of next month
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     nextMonth.setDate(1);
     const el = document.getElementById('newStudentStartDate');
-    if (el) el.value = nextMonth.toISOString().split('T')[0];
+    if (el) {
+        el.min = tomorrowStr;
+        el.setAttribute('onkeydown', 'return false;');
+        el.value = nextMonth.toISOString().split('T')[0];
+    }
 
     // Reset all picker chips
     document.querySelectorAll('#newStudentSubjects .picker-chip,#newStudentDays .picker-chip')
         .forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('#newStudentSessions .picker-chip')
+        .forEach(c => c.classList.remove('selected'));
 
     // Clear text fields
-    ['newStudentName','newStudentDob','newStudentGender','newStudentActualGrade',
-     'newStudentFeeGroup','newStudentStartHour','newStudentEndHour',
-     'newStudentSessions','newStudentTutor'].forEach(id => {
+    ['newStudentFirstName','newStudentLastName','newStudentDob','newStudentGender','newStudentActualGrade',
+     'newStudentGradeLevel','newStudentStartHour','newStudentEndHour','newStudentTutor'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
 
+    // Initialize extracurricular and test prep grids
+    _initSiblingExtraGrid();
+    _initSiblingTestPrepGrid();
+
     modal.classList.remove('hidden');
+}
+
+/**
+ * Switch sibling tabs (Academic / Extracurricular / Test Prep)
+ */
+function switchSiblingTab(tab) {
+    ['academic', 'extra', 'testprep'].forEach(t => {
+        const btn = document.getElementById(`siblingTab_${t}`);
+        const panel = document.getElementById(`siblingPanel_${t}`);
+        const isActive = t === tab;
+        if (btn) {
+            btn.classList.toggle('active', isActive);
+            btn.style.borderBottomColor = isActive ? 'var(--sage,#4a7c59)' : 'transparent';
+            btn.style.color = isActive ? 'var(--sage-dark,#2f5240)' : '#94a3b8';
+            btn.style.fontWeight = isActive ? '700' : '600';
+        }
+        if (panel) panel.style.display = isActive ? 'block' : 'none';
+    });
+}
+window.switchSiblingTab = switchSiblingTab;
+
+/**
+ * Initialize the extracurricular activity grid for Add Sibling
+ */
+function _initSiblingExtraGrid() {
+    const container = document.getElementById('siblingExtraGrid');
+    if (!container) return;
+    
+    const EXTRA_FEES = [
+        { id: 'comic', name: 'COMIC BOOK DESIGN', fee: 35000 },
+        { id: 'graphics', name: 'GRAPHICS DESIGNING', fee: 35000 },
+        { id: 'ai', name: 'GENERATIVE AI', fee: 40000 },
+        { id: 'youtube', name: 'YOUTUBE FOR KIDS', fee: 40000 },
+        { id: 'animation', name: 'STOP MOTION ANIMATION', fee: 35000 },
+        { id: 'videography', name: 'VIDEOGRAPHY', fee: 40000 },
+        { id: 'music', name: 'KIDS MUSIC LESSON', fee: 45000 },
+        { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000 },
+        { id: 'sketch', name: 'SMART SKETCH', fee: 45000 },
+        { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000 },
+        { id: 'global_discovery', name: 'GLOBAL DISCOVERY CLUB', fee: 50000 },
+        { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000 },
+        { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000 },
+        { id: 'bible', name: 'BIBLE STUDY', fee: 35000 },
+        { id: 'chess', name: 'CHESS CLASS', fee: 40000 }
+    ];
+    
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    
+    container.innerHTML = '';
+    
+    EXTRA_FEES.forEach(activity => {
+        const isGD = activity.id === 'global_discovery';
+        
+        const freqHTML = isGD
+            ? `<button class="sibling-freq-btn selected" data-freq="once" data-activity="${activity.id}" 
+                style="width:100%;padding:6px;border:2px solid var(--sage,#4a7c59);border-radius:6px;background:var(--sage,#4a7c59);color:white;cursor:pointer;font-size:12px;font-family:inherit;">
+                Every Saturday (Monthly)
+              </button>`
+            : `<div style="display:flex;gap:6px;margin-top:8px;">
+                <button class="sibling-freq-btn" data-freq="once" data-activity="${activity.id}"
+                  style="flex:1;padding:6px;border:2px solid #dde5de;border-radius:6px;background:white;cursor:pointer;font-size:12px;font-family:inherit;">Once Weekly</button>
+                <button class="sibling-freq-btn" data-freq="twice" data-activity="${activity.id}"
+                  style="flex:1;padding:6px;border:2px solid #dde5de;border-radius:6px;background:white;cursor:pointer;font-size:12px;font-family:inherit;">Twice Weekly</button>
+              </div>`;
+        
+        const daysHTML = DAYS.map(day => {
+            const hidden = isGD && day !== 'Saturday';
+            return `<button class="sibling-extra-day-btn" data-day="${day}" data-activity="${activity.id}"
+                style="${hidden ? 'display:none;' : ''}padding:4px 8px;border:1.5px solid #dde5de;border-radius:6px;background:white;cursor:pointer;font-size:11px;font-family:inherit;transition:all 0.2s;">
+                ${day.substring(0,3)}</button>`;
+        }).join('');
+        
+        const card = document.createElement('div');
+        card.className = 'sibling-extra-card';
+        card.dataset.activityId = activity.id;
+        card.style.cssText = 'background:white;border:2px solid #dde5de;border-radius:10px;padding:12px;cursor:pointer;transition:all 0.2s;margin-bottom:10px;';
+        card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+                <div style="font-weight:700;color:#1a1f1c;font-size:14px;">${activity.name}</div>
+                <div style="font-weight:700;color:var(--sage,#4a7c59);font-size:14px;">₦${activity.fee.toLocaleString()}</div>
+            </div>
+            ${freqHTML}
+            <div class="sibling-extra-details" style="margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;">
+                <div style="font-size:12px;color:#6b7873;margin-bottom:6px;font-weight:600;">Select Days:</div>
+                <div class="sibling-extra-days" style="display:flex;flex-wrap:wrap;gap:5px;">${daysHTML}</div>
+                <div class="sibling-day-counter" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+        
+        // Card toggle
+        card.addEventListener('click', (e) => {
+            if (e.target.classList.contains('sibling-freq-btn') || e.target.classList.contains('sibling-extra-day-btn')) return;
+            card.classList.toggle('sibling-selected');
+            card.style.borderColor = card.classList.contains('sibling-selected') ? 'var(--sage,#4a7c59)' : '#dde5de';
+            card.style.background = card.classList.contains('sibling-selected') ? 'rgba(74,124,89,0.04)' : 'white';
+            if (card.classList.contains('sibling-selected') && !card.querySelector('.sibling-freq-btn.selected') && !isGD) {
+                const onceBtn = card.querySelector('[data-freq="once"]');
+                if (onceBtn) { onceBtn.classList.add('selected'); onceBtn.style.background = 'var(--sage,#4a7c59)'; onceBtn.style.borderColor = 'var(--sage,#4a7c59)'; onceBtn.style.color = 'white'; }
+            }
+            _updateSiblingFeeSummary();
+        });
+        
+        // Frequency buttons
+        card.querySelectorAll('.sibling-freq-btn').forEach(btn => {
+            if (isGD) return; // Global Discovery only has one button
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!card.classList.contains('sibling-selected')) {
+                    card.classList.add('sibling-selected');
+                    card.style.borderColor = 'var(--sage,#4a7c59)';
+                    card.style.background = 'rgba(74,124,89,0.04)';
+                }
+                card.querySelectorAll('.sibling-freq-btn').forEach(b => {
+                    b.classList.remove('selected');
+                    b.style.background = 'white';
+                    b.style.borderColor = '#dde5de';
+                    b.style.color = '';
+                });
+                btn.classList.add('selected');
+                btn.style.background = 'var(--sage,#4a7c59)';
+                btn.style.borderColor = 'var(--sage,#4a7c59)';
+                btn.style.color = 'white';
+                
+                // Update day limits
+                const newFreq = btn.dataset.freq;
+                const maxDays = newFreq === 'twice' ? 2 : 1;
+                // Remove excess selections
+                const selDays = card.querySelectorAll('.sibling-extra-day-btn.selected');
+                Array.from(selDays).slice(maxDays).forEach(d => {
+                    d.classList.remove('selected');
+                    d.style.background = 'white'; d.style.color = '';
+                });
+                _updateSiblingDayButtons(card, maxDays);
+                _updateSiblingFeeSummary();
+            });
+        });
+        
+        // Day buttons
+        card.querySelectorAll('.sibling-extra-day-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const aId = btn.dataset.activity;
+                const isGDCard = aId === 'global_discovery';
+                const freqBtn = card.querySelector('.sibling-freq-btn.selected');
+                const freq = freqBtn ? freqBtn.dataset.freq : 'once';
+                const maxDays = isGDCard ? 1 : (freq === 'twice' ? 2 : 1);
+                
+                if (isGDCard && btn.dataset.day !== 'Saturday') return;
+                
+                if (btn.classList.contains('selected')) {
+                    btn.classList.remove('selected');
+                    btn.style.background = 'white'; btn.style.color = '';
+                } else {
+                    const selCount = card.querySelectorAll('.sibling-extra-day-btn.selected').length;
+                    if (selCount >= maxDays) {
+                        showMessage(`Maximum ${maxDays} day(s) for this frequency. Deselect a day first.`, 'error');
+                        return;
+                    }
+                    btn.classList.add('selected');
+                    btn.style.background = 'var(--sage,#4a7c59)'; btn.style.color = 'white';
+                    if (!card.classList.contains('sibling-selected')) {
+                        card.classList.add('sibling-selected');
+                        card.style.borderColor = 'var(--sage,#4a7c59)';
+                        card.style.background = 'rgba(74,124,89,0.04)';
+                    }
+                }
+                _updateSiblingDayButtons(card, maxDays);
+                _updateSiblingFeeSummary();
+            });
+        });
+    });
+}
+
+function _updateSiblingDayButtons(card, maxDays) {
+    const selCount = card.querySelectorAll('.sibling-extra-day-btn.selected').length;
+    card.querySelectorAll('.sibling-extra-day-btn').forEach(btn => {
+        if (!btn.classList.contains('selected')) {
+            if (selCount >= maxDays) {
+                btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none';
+            } else {
+                btn.style.opacity = ''; btn.style.pointerEvents = '';
+            }
+        } else {
+            btn.style.opacity = ''; btn.style.pointerEvents = '';
+        }
+    });
+    const counter = card.querySelector('.sibling-day-counter');
+    if (counter) counter.textContent = selCount > 0 ? `${selCount} of ${maxDays} day(s) selected` : '';
+}
+
+/**
+ * Initialize the Test Prep grid for Add Sibling
+ */
+function _initSiblingTestPrepGrid() {
+    const container = document.getElementById('siblingTestPrepGrid');
+    if (!container) return;
+    
+    const TEST_PREP = [
+        { id: 'sat', name: 'SAT', rate: 20000 },
+        { id: 'igcse', name: 'IGCSE & GCSE', rate: 20000 },
+        { id: '11plus', name: '11+ Exam Prep', rate: 15000 }
+    ];
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    
+    container.innerHTML = '';
+    
+    TEST_PREP.forEach(test => {
+        const daysHTML = DAYS.map(day =>
+            `<button class="sibling-tp-day-btn" data-day="${day}" data-test="${test.id}"
+              style="padding:4px 8px;border:1.5px solid #dde5de;border-radius:6px;background:white;cursor:pointer;font-size:11px;font-family:inherit;transition:all 0.2s;">
+              ${day.substring(0,3)}</button>`
+        ).join('');
+        
+        const card = document.createElement('div');
+        card.className = 'sibling-tp-card';
+        card.dataset.testId = test.id;
+        card.style.cssText = 'background:white;border:2px solid #dde5de;border-radius:10px;padding:14px;margin-bottom:10px;';
+        card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <div style="font-weight:700;color:#1a1f1c;font-size:14px;">${test.name}</div>
+                <div style="font-weight:700;color:var(--sage,#4a7c59);">₦${test.rate.toLocaleString()}/hr</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <label style="font-size:12px;color:#6b7873;">Hours/session:</label>
+                <input type="number" class="sibling-tp-hours" min="0" max="8" step="0.5" value="0"
+                       style="width:70px;padding:6px;border:1.5px solid #dde5de;border-radius:6px;text-align:center;font-size:14px;"
+                       oninput="_updateSiblingFeeSummary()">
+                <span style="font-size:12px;color:#6b7873;">hrs</span>
+            </div>
+            <div style="font-size:12px;color:#6b7873;margin-bottom:6px;font-weight:600;">Select Days:</div>
+            <div class="sibling-tp-days" style="display:flex;flex-wrap:wrap;gap:5px;">${daysHTML}</div>
+        `;
+        container.appendChild(card);
+        
+        card.querySelectorAll('.sibling-tp-day-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.classList.toggle('selected');
+                btn.style.background = btn.classList.contains('selected') ? 'var(--sage,#4a7c59)' : 'white';
+                btn.style.color = btn.classList.contains('selected') ? 'white' : '';
+                const hoursInput = card.querySelector('.sibling-tp-hours');
+                if (btn.classList.contains('selected') && hoursInput && parseFloat(hoursInput.value) === 0) {
+                    hoursInput.value = 1;
+                }
+                _updateSiblingFeeSummary();
+            });
+        });
+    });
+}
+
+/**
+ * Update fee summary to include extracurricular and test prep
+ */
+function _updateSiblingFeeSummary() {
+    // If we're on step 3, update the fee summary display
+    if (_addStudentStep >= 3) {
+        _updateFeeSummary();
+    }
+    // Always trigger updateAddStudentFees for real-time feedback
+    updateAddStudentFees();
 }
 
 /**
@@ -6329,8 +6748,7 @@ function _getOrdinalSuffix(n) {
 /**
  * _calculateAddStudentFees()
  * Computes the full fee breakdown for the Add Student form.
- * Uses the SAME logic as enrollment portal CONFIG.
- * Returns an object with all fee components.
+ * Includes Academic + Extracurricular + Test Prep fees.
  */
 function _calculateAddStudentFees() {
     const ACADEMIC_FEES = {
@@ -6341,6 +6759,7 @@ function _calculateAddStudentFees() {
     };
     const ADDITIONAL_SUBJECT_FEE = 40000;
     const BASE_SUBJECTS_INCLUDED = 2;
+    const WEEKS_PER_MONTH = 4;
 
     const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
     const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
@@ -6359,35 +6778,96 @@ function _calculateAddStudentFees() {
         gradeTier: gradeTier || '',
         sessionType: sessionType || '',
         subjectCount: subjectCount,
-        extraSubjects: 0
+        extraSubjects: 0,
+        extracurricularFee: 0,
+        testPrepFee: 0,
+        totalFee: 0
     };
 
-    if (!gradeTier || !sessionType || !ACADEMIC_FEES[gradeTier] || !ACADEMIC_FEES[gradeTier][sessionType]) {
-        return result;
-    }
+    // ── Academic fees ──
+    if (gradeTier && sessionType && ACADEMIC_FEES[gradeTier] && ACADEMIC_FEES[gradeTier][sessionType]) {
+        result.baseFee = ACADEMIC_FEES[gradeTier][sessionType];
+        result.extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
+        result.additionalSubjectFee = result.extraSubjects * ADDITIONAL_SUBJECT_FEE;
+        result.fullMonthlyFee = result.baseFee + result.additionalSubjectFee;
+        result.proratedFee = result.fullMonthlyFee;
 
-    result.baseFee = ACADEMIC_FEES[gradeTier][sessionType];
-    result.extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
-    result.additionalSubjectFee = result.extraSubjects * ADDITIONAL_SUBJECT_FEE;
-    result.fullMonthlyFee = result.baseFee + result.additionalSubjectFee;
-    result.proratedFee = result.fullMonthlyFee;
-
-    if (startDate) {
-        const start = new Date(startDate);
-        const dayOfMonth = start.getDate();
-        if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
-            result.prorationExplanation = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
-        } else {
-            const year = start.getFullYear();
-            const month = start.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const daysRemaining = daysInMonth - dayOfMonth + 1;
-            result.proratedFee = Math.round((result.fullMonthlyFee / daysInMonth) * daysRemaining);
-            result.prorationDeduction = result.fullMonthlyFee - result.proratedFee;
-            result.prorationExplanation = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+        if (startDate) {
+            const start = new Date(startDate);
+            const dayOfMonth = start.getDate();
+            if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
+                result.prorationExplanation = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+            } else {
+                const year = start.getFullYear();
+                const month = start.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                result.proratedFee = Math.round((result.fullMonthlyFee / daysInMonth) * daysRemaining);
+                result.prorationDeduction = result.fullMonthlyFee - result.proratedFee;
+                result.prorationExplanation = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+            }
         }
     }
 
+    // ── Extracurricular fees ──
+    const extraCards = document.querySelectorAll('.sibling-extra-card.sibling-selected');
+    extraCards.forEach(card => {
+        const activityId = card.dataset.activityId;
+        const isGD = activityId === 'global_discovery';
+        const freqBtn = card.querySelector('.sibling-freq-btn.selected');
+        const freq = freqBtn ? freqBtn.dataset.freq : 'once';
+        const selectedDays = card.querySelectorAll('.sibling-extra-day-btn.selected').length;
+        
+        if (selectedDays === 0) return;
+        
+        const EXTRA_FEES_MAP = {
+            'comic': 35000, 'graphics': 35000, 'ai': 40000, 'youtube': 40000,
+            'animation': 35000, 'videography': 40000, 'music': 45000, 'coding': 45000,
+            'sketch': 45000, 'foreign': 55000, 'global_discovery': 50000,
+            'native': 30000, 'speaking': 35000, 'bible': 35000, 'chess': 40000
+        };
+        const baseFee = EXTRA_FEES_MAP[activityId] || 0;
+        let fee = isGD ? baseFee : (freq === 'twice' ? baseFee * 2 : baseFee);
+        
+        // Prorate extra fees
+        if (startDate) {
+            const start = new Date(startDate);
+            const dayOfMonth = start.getDate();
+            if (dayOfMonth > 6) {
+                const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                fee = Math.round((fee / daysInMonth) * daysRemaining);
+            }
+        }
+        result.extracurricularFee += fee;
+    });
+
+    // ── Test Prep fees ──
+    const TEST_RATES = { 'sat': 20000, 'igcse': 20000, '11plus': 15000 };
+    const tpCards = document.querySelectorAll('.sibling-tp-card');
+    tpCards.forEach(card => {
+        const testId = card.dataset.testId;
+        const hours = parseFloat(card.querySelector('.sibling-tp-hours')?.value) || 0;
+        const selectedDays = card.querySelectorAll('.sibling-tp-day-btn.selected').length;
+        if (hours <= 0 || selectedDays === 0) return;
+        
+        const rate = TEST_RATES[testId] || 0;
+        let fee = hours * rate * selectedDays * WEEKS_PER_MONTH;
+        
+        // Prorate
+        if (startDate) {
+            const start = new Date(startDate);
+            const dayOfMonth = start.getDate();
+            if (dayOfMonth > 6) {
+                const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                fee = Math.round((fee / daysInMonth) * daysRemaining);
+            }
+        }
+        result.testPrepFee += fee;
+    });
+
+    result.totalFee = result.proratedFee + result.extracurricularFee + result.testPrepFee;
     return result;
 }
 
@@ -6501,7 +6981,6 @@ function addStudentPrev() {
 
 /**
  * Update the fee summary in step 3 based on selections.
- * Uses the SAME fee structure as the enrollment portal (enrollment-portal.js CONFIG.ACADEMIC_FEES).
  */
 function _updateFeeSummary() {
     const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
@@ -6510,7 +6989,8 @@ function _updateFeeSummary() {
     const summaryDiv = document.getElementById('addStudentFeeSummary');
     const startDate = document.getElementById('newStudentStartDate')?.value;
 
-    // ── CORRECT FEES — mirrors CONFIG.ACADEMIC_FEES in enrollment-portal.js ──
+    if (!summaryDiv) return;
+
     const ACADEMIC_FEES = {
         'preschool':  { twice: 80000,  three: 95000,  five: 150000 },
         'grade2-4':   { twice: 95000,  three: 110000, five: 170000 },
@@ -6522,79 +7002,75 @@ function _updateFeeSummary() {
     const BASE_SUBJECTS_INCLUDED = 2;
 
     const gradeLabels = {
-        'preschool':  'Preschool – Grade 1',
-        'grade2-4':   'Grade 2 – 4',
-        'grade5-8':   'Grade 5 – 8',
-        'grade9-12':  'Grade 9 – 12'
+        'preschool': 'Preschool – Grade 1', 'grade2-4': 'Grade 2 – 4',
+        'grade5-8': 'Grade 5 – 8', 'grade9-12': 'Grade 9 – 12'
     };
+    const sessionLabels = { twice: 'Twice weekly', three: '3× weekly', five: 'Daily (5×)' };
 
-    const sessionLabels = {
-        twice: 'Twice weekly',
-        three: '3× weekly',
-        five:  'Daily (5×)'
-    };
+    let proratedAcademicFee = 0;
+    let prorationDeduction = 0;
+    let prorationNote = '';
+    let rows = '';
 
     if (gradeTier && sessionType && ACADEMIC_FEES[gradeTier] && ACADEMIC_FEES[gradeTier][sessionType]) {
         const baseFee = ACADEMIC_FEES[gradeTier][sessionType];
-
-        // Count selected subjects
         const selectedSubjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
         const subjectCount = selectedSubjects.length;
         const extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
         const additionalSubjectFee = extraSubjects * ADDITIONAL_SUBJECT_FEE;
-
         const fullMonthlyFee = baseFee + additionalSubjectFee;
-
-        // ── Proration logic (matches enrollment portal) ──
-        let proratedFee = fullMonthlyFee;
-        let prorationNote = '';
-        let prorationDeduction = 0;
+        proratedAcademicFee = fullMonthlyFee;
 
         if (startDate) {
             const start = new Date(startDate);
             const dayOfMonth = start.getDate();
-
             if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
                 prorationNote = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
             } else {
-                // Prorate from 7th onward
-                const year = start.getFullYear();
-                const month = start.getMonth();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
                 const daysRemaining = daysInMonth - dayOfMonth + 1;
-                proratedFee = Math.round((fullMonthlyFee / daysInMonth) * daysRemaining);
-                prorationDeduction = fullMonthlyFee - proratedFee;
+                proratedAcademicFee = Math.round((fullMonthlyFee / daysInMonth) * daysRemaining);
+                prorationDeduction = fullMonthlyFee - proratedAcademicFee;
                 prorationNote = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
             }
         }
 
-        let rows = `
+        rows += `
             <tr><td>Grade Tier:</td><td style="text-align:right;font-weight:600;">${gradeLabels[gradeTier] || gradeTier}</td></tr>
             <tr><td>Session Frequency:</td><td style="text-align:right;font-weight:600;">${sessionLabels[sessionType] || sessionType}</td></tr>
-            <tr><td>Base Tuition:</td><td style="text-align:right;font-weight:600;">₦${baseFee.toLocaleString()}</td></tr>
+            <tr><td>Academic Tuition:</td><td style="text-align:right;font-weight:600;">₦${baseFee.toLocaleString()}</td></tr>
         `;
-
-        if (subjectCount > 0) {
-            rows += `<tr><td>Subjects Selected:</td><td style="text-align:right;font-weight:600;">${subjectCount} (${BASE_SUBJECTS_INCLUDED} included)</td></tr>`;
-        }
         if (extraSubjects > 0) {
-            rows += `<tr><td>Additional Subjects (${extraSubjects} × ₦${ADDITIONAL_SUBJECT_FEE.toLocaleString()}):</td><td style="text-align:right;font-weight:600;color:#D97706;">+₦${additionalSubjectFee.toLocaleString()}</td></tr>`;
+            rows += `<tr><td>Extra Subjects (${extraSubjects}×):</td><td style="text-align:right;font-weight:600;color:#D97706;">+₦${additionalSubjectFee.toLocaleString()}</td></tr>`;
         }
         if (prorationDeduction > 0) {
             rows += `<tr><td>Proration Discount:</td><td style="text-align:right;font-weight:600;color:#10B981;">-₦${prorationDeduction.toLocaleString()}</td></tr>`;
         }
+    }
 
-        rows += `<tr><td style="padding-top:8px;border-top:1px dashed #ccc;">First Month Fee:</td><td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--primary-dark);font-size:1.1rem;">₦${proratedFee.toLocaleString()}</td></tr>`;
+    // Extracurricular from sibling grid
+    const feeCalc = _calculateAddStudentFees();
+    
+    if (feeCalc.extracurricularFee > 0) {
+        rows += `<tr><td>Extracurricular:</td><td style="text-align:right;font-weight:600;color:#3b82f6;">+₦${feeCalc.extracurricularFee.toLocaleString()}</td></tr>`;
+    }
+    if (feeCalc.testPrepFee > 0) {
+        rows += `<tr><td>Test Preparation:</td><td style="text-align:right;font-weight:600;color:#7c3aed;">+₦${feeCalc.testPrepFee.toLocaleString()}</td></tr>`;
+    }
 
+    const grandTotal = feeCalc.totalFee;
+
+    if (rows) {
+        rows += `<tr><td style="padding-top:8px;border-top:1px dashed #ccc;font-weight:700;">Total First Month:</td>
+                 <td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--sage-dark,#2f5240);font-size:1.1rem;">₦${grandTotal.toLocaleString()}</td></tr>`;
         summaryDiv.innerHTML = `
-            <div style="margin-bottom:12px;font-weight:700;font-size:1rem;">Estimated Monthly Tuition</div>
-            <table style="width:100%;border-collapse:collapse;">
-                ${rows}
-            </table>
-            <p style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);">Fees are estimates and subject to confirmation by staff. Proration applies for mid-month starts.</p>
+            <div style="margin-bottom:12px;font-weight:700;font-size:1rem;">Estimated Monthly Fees</div>
+            <table style="width:100%;border-collapse:collapse;">${rows}</table>
+            ${prorationNote ? `<p style="margin-top:8px;font-size:0.75rem;color:#64748b;">${prorationNote}</p>` : ''}
+            <p style="margin-top:12px;font-size:0.75rem;color:#94a3b8;">Fees are estimates and subject to confirmation by staff.</p>
         `;
     } else {
-        summaryDiv.innerHTML = '<p style="color:var(--text-muted);">Select grade tier and session frequency to see estimated fees.</p>';
+        summaryDiv.innerHTML = '<p style="color:#94a3b8;">Select grade tier and session frequency to see estimated fees.</p>';
     }
 }
 
@@ -6763,6 +7239,29 @@ async function submitNewStudent() {
         // ── Calculate fees using the same logic as enrollment portal ──
         const feeCalc = _calculateAddStudentFees();
 
+        // ── Collect extracurricular data ──
+        const extracurriculars = [];
+        document.querySelectorAll('.sibling-extra-card.sibling-selected').forEach(card => {
+            const activityId = card.dataset.activityId;
+            const freqBtn = card.querySelector('.sibling-freq-btn.selected');
+            const freq = freqBtn ? freqBtn.dataset.freq : 'once';
+            const selDays = Array.from(card.querySelectorAll('.sibling-extra-day-btn.selected')).map(b => b.dataset.day);
+            if (selDays.length > 0) {
+                extracurriculars.push({ id: activityId, frequency: freq, days: selDays });
+            }
+        });
+
+        // ── Collect test prep data ──
+        const testPrep = [];
+        document.querySelectorAll('.sibling-tp-card').forEach(card => {
+            const testId = card.dataset.testId;
+            const hours = parseFloat(card.querySelector('.sibling-tp-hours')?.value) || 0;
+            const selDays = Array.from(card.querySelectorAll('.sibling-tp-day-btn.selected')).map(b => b.dataset.day);
+            if (hours > 0 && selDays.length > 0) {
+                testPrep.push({ id: testId, hours, days: selDays });
+            }
+        });
+
         // Build academic schedule string (mirrors enrollment portal format)
         let academicSchedule = '';
         if (days.length > 0 && startHour && endHour) {
@@ -6794,14 +7293,14 @@ async function submitNewStudent() {
             parentUid:        user.uid,
             // ── Fee summary — mirrors enrollment portal's summary structure ──
             summary: {
-                totalFee:              feeCalc.proratedFee,
+                totalFee:              feeCalc.totalFee || feeCalc.proratedFee,
                 academicFee:           feeCalc.baseFee,
                 additionalSubjectFee:  feeCalc.additionalSubjectFee,
                 fullMonthlyFee:        feeCalc.fullMonthlyFee,
                 proratedAmount:        feeCalc.prorationDeduction,
                 prorationExplanation:  feeCalc.prorationExplanation,
-                extracurricularFee:    0,
-                testPrepFee:           0,
+                extracurricularFee:    feeCalc.extracurricularFee || 0,
+                testPrepFee:           feeCalc.testPrepFee || 0,
                 discountAmount:        0
             },
             // ── Wrap student in the students array format used by enrollment portal ──
@@ -6824,8 +7323,8 @@ async function submitNewStudent() {
                 academicDays: days,
                 academicTime: academicTime,
                 academicSchedule: academicSchedule,
-                extracurriculars: [],
-                testPrep: []
+                extracurriculars: extracurriculars,
+                testPrep: testPrep
             }],
             // ── Status / meta ──
             status:           'pending',
@@ -6843,7 +7342,7 @@ async function submitNewStudent() {
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
 
-        showMessage(`${name} has been added! Estimated first month fee: ₦${feeCalc.proratedFee.toLocaleString()}`, 'success');
+        showMessage(`${name} has been added! Estimated first month fee: ₦${(feeCalc.totalFee || feeCalc.proratedFee).toLocaleString()}`, 'success');
         hideAddStudentModal();
 
         // Reload reports and academics to show the new student
