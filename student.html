@@ -300,6 +300,16 @@
                 .replace(/'/g, '&#039;');
         }
 
+        // --- NEW HELPER: Normalize grade to "gradeN" format (e.g., "Grade 3" → "grade3") ---
+        function normalizeGrade(grade) {
+            if (!grade) return grade;
+            const match = grade.match(/\d+/);
+            if (match) {
+                return `grade${match[0]}`;
+            }
+            return grade; // fallback (should not happen)
+        }
+
         // --- KEYBOARD HANDLER: arrow keys scroll normally unless focused on a radio/checkbox ---
         function setupKeyboardHandler() {
             document.addEventListener('keydown', (e) => {
@@ -371,7 +381,8 @@
             const urlParams = new URLSearchParams(window.location.search);
             
             const subject = urlParams.get('subject');
-            const grade = urlParams.get('grade');
+            const rawGrade = urlParams.get('grade');                // original grade (e.g., "Grade 3")
+            const normalizedGrade = normalizeGrade(rawGrade);       // normalized for loading questions (e.g., "grade3")
             const studentName = urlParams.get('studentName');
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
@@ -382,7 +393,7 @@
             const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
 
             // Only require essential fields (country is optional)
-            if (!subject || !grade || !studentName || !parentEmail || !tutorEmail) {
+            if (!subject || !rawGrade || !studentName || !parentEmail || !tutorEmail) {
                 alert("Missing essential student information. Redirecting to login.");
                 window.location.href = "tutor.html";  // Redirect to tutor dashboard
                 return;
@@ -431,7 +442,8 @@
                     console.warn("Could not look up parent referral code:", refErr.message);
                 }
 
-                await loadQuestions(subject, grade, state);
+                // ✅ Use normalized grade for loading questions
+                await loadQuestions(subject, normalizedGrade, state);
                 document.getElementById("submit-button-container").style.display = 'flex';
                 
                 // Initialize keyboard handler after questions are loaded
@@ -450,8 +462,9 @@
                     submitBtn.textContent = 'Submitting...';
 
                     try {
+                        // ✅ Pass the original rawGrade to submission (for display/storage)
                         await submitTestToFirebase(
-                            subject, grade, studentName, parentEmail, 
+                            subject, rawGrade, studentName, parentEmail, 
                             tutorEmail, studentCountry, parentPhone
                         );
                         
