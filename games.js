@@ -70,7 +70,6 @@
             st.textContent = `
                 #bk-game-challenge-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9999px;font-size:.65rem;font-weight:900;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;animation:bkBadgePulse 1.5s ease-in-out infinite;pointer-events:none;}
                 @keyframes bkBadgePulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.6)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
-                #bk-game-floater{position:relative;}
             `;
             document.head.appendChild(st);
         }
