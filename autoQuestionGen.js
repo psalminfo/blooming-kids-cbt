@@ -43,14 +43,6 @@ function generateSessionId(grade, subject, state) {
     const parentEmail = params.get('parentEmail');
     
     const testSessionKey = `test-${grade}-${subject}-${state}-${studentName}-${parentEmail}`;
-    const existingSessionId = sessionStorage.getItem('currentTestSession');
-    
-    if (existingSessionId && existingSessionId === testSessionKey) {
-        return testSessionKey;
-    }
-    
-    clearOtherStateSessions(testSessionKey);
-    sessionStorage.setItem('currentTestSession', testSessionKey);
     return testSessionKey;
 }
 
@@ -92,9 +84,7 @@ function selectELAQuestions(allQuestions, passagesMap) {
     const questionsWithoutPassages = [];
     
     allQuestions.forEach(question => {
-        // STRATEGIC FIX: Force exact string matching
         const qPassageId = question.passageId ? String(question.passageId).trim() : null;
-        
         if (qPassageId && passagesMap[qPassageId]) {
             questionsWithPassages.push(question);
         } else {
@@ -146,61 +136,81 @@ function selectELAQuestions(allQuestions, passagesMap) {
     return selectedQuestions.slice(0, 15);
 }
 
+/**
+ * GOD MODE FIX: Recursive Deep-Scanner
+ * Scans every array inside the 'tests' collection to find the buried data.
+ */
 async function fetchFromTestsCollection(grade, subject) {
     let allQuestions = [];
     let allPassages = [];
     
     try {
-        console.log(`🔍 Scanning 'tests' collection for Grade: ${grade}, Subject: ${subject}`);
+        console.log(`🔍 DEEP SCAN: 'tests' collection for Grade: ${grade}, Subject: ${subject}`);
         const snapshot = await getDocs(collection(db, "tests"));
         
+        if (snapshot.empty) {
+            console.log("⚠️ The 'tests' collection has zero documents in Firebase.");
+            return { questions: [], passages: [] };
+        }
+
         snapshot.forEach(docSnap => {
             const rawData = docSnap.data();
             
-            if (rawData && rawData.tests && Array.isArray(rawData.tests)) {
-                rawData.tests.forEach((test) => {
-                    if (isGradeMatch(test.grade, grade) && isSubjectMatch(test.subject, subject)) {
-                        if (test.passages && Array.isArray(test.passages)) {
-                            test.passages.forEach(passage => {
-                                // STRICT NORMALIZATION
-                                passage.passageId = passage.passageId || passage.id || passage.passage_id;
-                                if (passage.passageId) passage.passageId = String(passage.passageId).trim();
-                                passage.content = passage.content || passage.text || passage.body;
-                                allPassages.push(passage);
-                            });
+            // Check every key in the document to see if it's an array containing tests
+            Object.keys(rawData).forEach(key => {
+                if (Array.isArray(rawData[key])) {
+                    rawData[key].forEach((item) => {
+                        if (item && item.grade && item.subject) {
+                            if (isGradeMatch(item.grade, grade) && isSubjectMatch(item.subject, subject)) {
+                                console.log(`✅ MATCH FOUND in document '${docSnap.id}' inside array '${key}'`);
+                                
+                                if (item.passages && Array.isArray(item.passages)) {
+                                    item.passages.forEach(p => {
+                                        p.passageId = p.passageId || p.id || p.passage_id;
+                                        if (p.passageId) p.passageId = String(p.passageId).trim();
+                                        p.content = p.content || p.text || p.body;
+                                        allPassages.push(p);
+                                    });
+                                }
+                                if (item.questions && Array.isArray(item.questions)) {
+                                    item.questions.forEach(q => {
+                                        q.grade = item.grade;
+                                        q.subject = item.subject;
+                                        q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                                        q.passageId = q.passageId || q.passage_id || null;
+                                        if (q.passageId) q.passageId = String(q.passageId).trim();
+                                        allQuestions.push(q);
+                                    });
+                                }
+                            }
                         }
-                        if (test.questions && Array.isArray(test.questions)) {
-                            test.questions.forEach(q => {
-                                q.grade = test.grade || grade;
-                                q.subject = test.subject || subject;
-                                q.imageUrl = q.imageUrl || q.image_url || q.image || null;
-                                q.passageId = q.passageId || q.passage_id || null;
-                                if (q.passageId) q.passageId = String(q.passageId).trim();
-                            });
-                            allQuestions.push(...test.questions);
-                        }
-                    }
-                });
-            } else if (rawData && isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
-                if (rawData.questions && Array.isArray(rawData.questions)) {
-                    rawData.questions.forEach(q => {
-                        q.imageUrl = q.imageUrl || q.image_url || q.image || null;
-                        q.passageId = q.passageId || q.passage_id || null;
-                        if (q.passageId) q.passageId = String(q.passageId).trim();
                     });
-                    allQuestions.push(...rawData.questions);
                 }
-                if (rawData.passages && Array.isArray(rawData.passages)) {
-                    rawData.passages.forEach(passage => {
-                        passage.passageId = passage.passageId || passage.id || passage.passage_id;
-                        if (passage.passageId) passage.passageId = String(passage.passageId).trim();
-                        passage.content = passage.content || passage.text || passage.body;
-                        allPassages.push(passage);
-                    });
+            });
+            
+            // Fallback for Root Level Tests
+            if (rawData && rawData.grade && rawData.subject) {
+                if (isGradeMatch(rawData.grade, grade) && isSubjectMatch(rawData.subject, subject)) {
+                    if (rawData.questions && Array.isArray(rawData.questions)) {
+                        rawData.questions.forEach(q => {
+                            q.imageUrl = q.imageUrl || q.image_url || q.image || null;
+                            q.passageId = q.passageId || q.passage_id || null;
+                            if (q.passageId) q.passageId = String(q.passageId).trim();
+                            allQuestions.push(q);
+                        });
+                    }
+                    if (rawData.passages && Array.isArray(rawData.passages)) {
+                        rawData.passages.forEach(p => {
+                            p.passageId = p.passageId || p.id || p.passage_id;
+                            if (p.passageId) p.passageId = String(p.passageId).trim();
+                            p.content = p.content || p.text || p.body;
+                            allPassages.push(p);
+                        });
+                    }
                 }
             }
         });
-        console.log(`✅ Extracted from 'tests': ${allQuestions.length} questions, ${allPassages.length} passages`);
+        console.log(`✅ Extracted from Firebase 'tests': ${allQuestions.length} questions, ${allPassages.length} passages`);
     } catch (err) {
         console.error(`Error querying 'tests' collection:`, err);
     }
@@ -341,7 +351,7 @@ function optimizeImageUrl(originalUrl) {
 }
 
 export async function loadQuestions(subject, grade, state) {
-    // FORCE CACHE WIPE ON EVERY RELOAD FOR NOW TO PREVENT GHOST CACHE
+    // FORCE CACHE WIPE ON EVERY RELOAD TO PREVENT GHOST CACHE
     sessionStorage.removeItem('currentTestSession');
     
     if (state === 'creative-writing') {
@@ -387,7 +397,7 @@ export async function loadQuestions(subject, grade, state) {
             }
         }
 
-        // Deep mapping
+        // Deep mapping to ensure passageId links perfectly
         allQuestions = allQuestions.map((q, index) => {
             let pid = q.passageId || q.passage_id || null;
             if (pid) pid = String(pid).trim();
@@ -408,9 +418,8 @@ export async function loadQuestions(subject, grade, state) {
         });
 
         console.log("🔥 DIAGNOSTIC DUMP 🔥");
-        console.log("Found Questions Total:", allQuestions.length);
-        console.log("Found Passages Total:", Object.keys(passagesMap).length);
-        console.log("Passage Map Data:", passagesMap);
+        console.log("Questions Ready to Display:", allQuestions.length);
+        console.log("Passages Ready to Display:", Object.keys(passagesMap).length);
 
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No ${subject} questions found in any source.</p>`;
@@ -615,14 +624,14 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         style.id = 'question-styles';
         style.textContent = `
             .question-container { max-width: 800px; margin: 0 auto; padding: 0 20px; }
-            .question-block { max-width: 100%; }
+            .question-block { max-width: 100%; margin-top: 1rem; }
             .image-container img { max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; }
             .text-answer-input { 
                 width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px; transition: border-color 0.2s;
             }
             .text-answer-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
             .answer-type-label { display: inline-block; padding: 4px 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280; margin-left: 8px; }
-            .passage-content { white-space: pre-wrap; font-family: 'Inter', sans-serif; line-height: 1.6; }
+            .passage-content { white-space: pre-wrap; font-family: 'Inter', sans-serif; line-height: 1.6; font-size: 1.05rem; }
         `;
         document.head.appendChild(style);
     }
@@ -648,13 +657,15 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         const passage = passagesMap[passageId];
         const passageQuestions = questionsByPassage[passageId];
         
+        // STRATEGIC FIX: HIGH VISIBILITY PASSAGE UI
         const passageElement = document.createElement('div');
-        passageElement.className = 'passage-container bg-white p-6 rounded-lg shadow-md mb-6 border-l-4 border-green-500';
+        passageElement.className = 'passage-container bg-blue-50 p-6 rounded-lg shadow-lg mb-8 border-l-8 border-blue-600';
         passageElement.innerHTML = `
-            <h3 class="text-lg font-bold text-green-800 mb-2">${escapeHtml(passage.title || 'Reading Passage')}</h3>
-            ${passage.subtitle ? `<h4 class="text-md text-gray-600 mb-3">${escapeHtml(passage.subtitle)}</h4>` : ''}
-            ${passage.author ? `<p class="text-sm text-gray-500 mb-4">${escapeHtml(passage.author)}</p>` : ''}
-            <div class="passage-content text-gray-700 leading-relaxed bg-gray-50 p-4 rounded border">${escapeHtml(passage.content)}</div>
+            <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide mb-4 inline-block">Reading Passage</span>
+            <h3 class="text-2xl font-black text-gray-900 mb-2">${escapeHtml(passage.title || 'Reading Text')}</h3>
+            ${passage.subtitle ? `<h4 class="text-lg text-gray-700 mb-3 italic">${escapeHtml(passage.subtitle)}</h4>` : ''}
+            ${passage.author ? `<p class="text-md text-gray-500 mb-6 font-semibold">${escapeHtml(passage.author)}</p>` : ''}
+            <div class="passage-content text-gray-800 leading-relaxed bg-white p-5 rounded border border-blue-100 shadow-inner">${escapeHtml(passage.content)}</div>
         `;
         container.appendChild(passageElement);
         
@@ -680,7 +691,7 @@ function createQuestionElement(q, displayIndex) {
     if (!q || typeof q !== 'object') return null;
     
     const questionElement = document.createElement('div');
-    questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4';
+    questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block';
     questionElement.setAttribute('data-question-id', q.id || `question-${displayIndex}`);
     
     const imageUrl = q.imageUrl || q.image_url || null;
@@ -709,7 +720,7 @@ function createQuestionElement(q, displayIndex) {
                 </div>
             ` : ''}
             
-            <p class="font-semibold mb-3 question-text text-gray-800">
+            <p class="font-semibold mb-3 question-text text-gray-800 text-lg">
                 ${displayIndex}. ${safeQuestionText}
                 <span class="answer-type-label">${hasOptions ? 'Multiple Choice' : 'Text Answer'}</span>
             </p>
@@ -728,9 +739,9 @@ function createQuestionElement(q, displayIndex) {
             <div class="mt-3 space-y-2">
                 ${hasOptions ? 
                     safeOptions.map(opt => `
-                        <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
-                            <input type="radio" name="q${q.id || displayIndex}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
-                            <span class="text-gray-700">${opt}</span>
+                        <label class="flex items-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                            <input type="radio" name="q${q.id || displayIndex}" value="${opt}" class="mr-4 h-5 w-5 text-blue-600 focus:ring-blue-500"> 
+                            <span class="text-gray-700 text-md">${opt}</span>
                         </label>
                     `).join('') 
                     : 
