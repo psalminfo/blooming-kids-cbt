@@ -208,31 +208,37 @@ class EnrollmentApp {
             this.submitEnrollment();
         });
 
-        // FIX: Invoice modal close button
-        const closeInvoiceBtn = document.getElementById('close-invoice');
-        if (closeInvoiceBtn) {
-            closeInvoiceBtn.addEventListener('click', () => {
-                const modal = document.getElementById('invoice-modal');
-                if (modal) {
-                    modal.classList.remove('active');
-                    modal.style.display = '';
-                    // Also try hiding with class toggle for different CSS approaches
-                    modal.classList.add('hidden');
-                }
-            });
-        }
+        // Close invoice modal (X button)
+        document.getElementById('close-invoice').addEventListener('click', () => {
+            document.getElementById('invoice-modal').classList.remove('active');
+        });
 
-        // Also close invoice when clicking backdrop (outside invoice-content)
-        const invoiceModal = document.getElementById('invoice-modal');
-        if (invoiceModal) {
-            invoiceModal.addEventListener('click', (e) => {
-                if (e.target === invoiceModal) {
-                    invoiceModal.classList.remove('active');
-                    invoiceModal.style.display = '';
-                    invoiceModal.classList.add('hidden');
-                }
-            });
-        }
+        // Close invoice modal by clicking the backdrop
+        document.getElementById('invoice-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                document.getElementById('invoice-modal').classList.remove('active');
+            }
+        });
+
+        // View Invoice button (shown after save)
+        document.getElementById('view-invoice-btn').addEventListener('click', () => {
+            this.showInvoice();
+        });
+
+        // Copy resume link button
+        document.getElementById('copy-resume-link').addEventListener('click', (e) => {
+            this.copyResumeLink(e.currentTarget);
+        });
+
+        // Print invoice
+        document.getElementById('print-invoice').addEventListener('click', () => {
+            window.print();
+        });
+
+        // Download PDF
+        document.getElementById('download-pdf').addEventListener('click', () => {
+            this.downloadInvoicePDF();
+        });
     }
     
     // ==============================================
@@ -328,7 +334,7 @@ class EnrollmentApp {
             <div class="form-row">
                 <div class="form-group">
                     <label>Preferred Start Date <span class="required">*</span></label>
-                    <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}" onkeydown="return false;" style="cursor:pointer;">
+                    <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
                     <div class="error-message student-start-date-error"></div>
                 </div>
             </div>
@@ -741,15 +747,6 @@ class EnrollmentApp {
             option.addEventListener('click', () => {
                 studentDiv.querySelectorAll('.session-option').forEach(opt => opt.classList.remove('selected'));
                 option.classList.add('selected');
-
-                // Enforce day limit: deselect excess days when session type changes
-                const dayLimits = { twice: 2, three: 3, five: 5 };
-                const maxDays = dayLimits[option.dataset.sessions] || 7;
-                const selectedDays = studentDiv.querySelectorAll('.academic-day-btn.selected');
-                if (selectedDays.length > maxDays) {
-                    Array.from(selectedDays).slice(maxDays).forEach(b => b.classList.remove('selected'));
-                }
-
                 this.updateSessionPrices(studentDiv);
                 this.updateSummary();
                 this.checkCourseSelectionRequirement(id);
@@ -765,36 +762,13 @@ class EnrollmentApp {
             });
         });
 
-        // 5. Academic Days & Time Selection — enforce session-based day limits
+        // 5. Academic Days & Time Selection
         studentDiv.querySelectorAll('.academic-day-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const selectedSession = studentDiv.querySelector('.session-option.selected');
-                const sessionType = selectedSession ? selectedSession.dataset.sessions : null;
-
-                // Map session type to allowed number of days
-                const dayLimits = { twice: 2, three: 3, five: 5 };
-                const maxDays = sessionType ? (dayLimits[sessionType] || 7) : 7;
-
-                if (btn.classList.contains('selected')) {
-                    // Always allow deselection
-                    btn.classList.remove('selected');
-                } else {
-                    const currentlySelected = studentDiv.querySelectorAll('.academic-day-btn.selected').length;
-                    if (currentlySelected >= maxDays) {
-                        const sessionLabel = { twice: '2 days (Twice Weekly)', three: '3 days (3× Weekly)', five: '5 days (Daily)' };
-                        this.showAlert(`Maximum ${sessionLabel[sessionType] || maxDays + ' days'} allowed for this session frequency.`, 'warning');
-                        return;
-                    }
-                    btn.classList.add('selected');
-                }
+                btn.classList.toggle('selected');
                 this.updateSummary();
                 this.checkCourseSelectionRequirement(id);
             });
-        });
-
-        // When session type changes, deselect excess academic days
-        studentDiv.querySelectorAll('.session-option').forEach(option => {
-            option._origClickHandler = option._origClickHandler || null;
         });
 
         // Academic Time selection changes
@@ -808,15 +782,6 @@ class EnrollmentApp {
 
         // 6. Extracurricular Selection
         studentDiv.querySelectorAll('.extracurricular-card').forEach(card => {
-            // ── GLOBAL DISCOVERY: hide non-Saturday days immediately on render ──
-            if (card.dataset.activityId === 'global_discovery') {
-                card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
-                    btn.style.display = btn.dataset.day === 'Saturday' ? 'flex' : 'none';
-                });
-                // Hide the frequency buttons — Global Discovery is always once (Saturday)
-                const freqRow = card.querySelector('.frequency-btns') || card.querySelector('[data-frequency]')?.parentElement;
-                if (freqRow) freqRow.style.display = 'none';
-            }
             card.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('frequency-btn') && 
                     !e.target.classList.contains('day-btn') && 
@@ -826,6 +791,9 @@ class EnrollmentApp {
                     if(card.classList.contains('selected') && !card.querySelector('.frequency-btn.selected')) {
                         const onceBtn = card.querySelector('[data-frequency="once"]');
                         if(onceBtn) onceBtn.classList.add('selected');
+                        // FIX: Apply day visibility rules immediately so Global Discovery
+                        // hides non-Saturday days as soon as the card is first selected
+                        this.handleExtracurricularFrequency(card, 'once');
                     }
                     // Clear buttons if deselected
                     if (!card.classList.contains('selected')) {
@@ -873,20 +841,24 @@ class EnrollmentApp {
                             btn.classList.add('selected');
                         }
                     } else {
-                        // Determine day limit from selected frequency
-                        const selectedFreqBtn = card.querySelector('.frequency-btn.selected');
-                        const freq = selectedFreqBtn ? selectedFreqBtn.dataset.frequency : 'once';
-                        const maxDays = freq === 'twice' ? 2 : 1;
+                        // For regular activities: limit based on selected frequency
+                        const selectedFrequency = card.querySelector('.frequency-btn.selected')?.dataset.frequency || 'once';
+                        const maxDays = selectedFrequency === 'twice' ? 2 : 1;
 
                         if (btn.classList.contains('selected')) {
                             // Deselect if already selected
                             btn.classList.remove('selected');
                         } else if (selectedDays.length < maxDays) {
-                            // Select if under limit
+                            // Select if under the limit
                             btn.classList.add('selected');
                         } else {
-                            const label = freq === 'twice' ? '2 days (Twice Weekly)' : '1 day (Once Weekly)';
-                            this.showAlert(`Maximum ${label} for extracurricular activities`, 'warning');
+                            // Over the limit
+                            this.showAlert(
+                                maxDays === 1
+                                    ? "Once weekly allows only 1 day. Switch to Twice Weekly to select 2 days."
+                                    : "Maximum 2 days per week for extracurricular activities",
+                                "warning"
+                            );
                             return;
                         }
                     }
@@ -1063,7 +1035,6 @@ class EnrollmentApp {
                     btn.style.display = 'flex';
                 } else {
                     btn.style.display = 'none';
-                    btn.classList.remove('selected'); // clear hidden day selections
                 }
             });
         } else {
@@ -1072,12 +1043,16 @@ class EnrollmentApp {
                 btn.style.display = 'flex';
             });
             
-            // Enforce day limit based on new frequency
-            const maxDays = frequency === 'twice' ? 2 : 1;
-            const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected'));
-            if (selectedDays.length > maxDays) {
-                // Keep only the first N selected days, clear the rest
-                selectedDays.slice(maxDays).forEach(btn => btn.classList.remove('selected'));
+            // Clear day selections when changing frequency
+            if (frequency === 'once') {
+                // For once weekly, clear any second day selection
+                const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
+                if (selectedDays.length > 1) {
+                    // Keep only the first selected day
+                    selectedDays.forEach((btn, index) => {
+                        if (index > 0) btn.classList.remove('selected');
+                    });
+                }
             }
         }
     }
@@ -2293,11 +2268,6 @@ class EnrollmentApp {
 
     showInvoice() {
         const modal = document.getElementById('invoice-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            modal.classList.add('active');
-            modal.style.display = '';
-        }
         const total = document.getElementById('total-fee').textContent;
         document.getElementById('invoice-total').textContent = total;
         document.getElementById('invoice-date').textContent = new Date().toLocaleDateString();
@@ -2608,11 +2578,7 @@ class EnrollmentApp {
             if (portalResult && portalResult.isNew) {
                 document.getElementById('temp-password').textContent = portalResult.password;
                 document.getElementById('temp-password-container').style.display = 'block';
-                this.showAlert(
-                    `✅ Portal created! A password-setup email has been sent to your email address. ` +
-                    `Your temporary password is: ${portalResult.password} — use this to log in now, then set a new password via the link in your email.`,
-                    'success'
-                );
+                this.showAlert(`Portal created! Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
 
                 if (portalResult.referralCode) {
                     const referralContainer = document.createElement('div');
@@ -2821,20 +2787,11 @@ class EnrollmentApp {
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         referralCode: newReferralCode,
                         referralEarnings: 0,
-                        uid: user.uid,
-                        requiresPasswordReset: true  // flag: first login must set password
+                        uid: user.uid
                     });
                 } else {
                     // If no DB, still return the password but note that profile may not persist
                     this.showAlert("Parent account created, but profile storage failed. Please contact support.", "warning");
-                }
-
-                // Send password reset email so parent can set their own permanent password
-                try {
-                    await firebase.auth().sendPasswordResetEmail(parentEmail);
-                    console.log('Password reset email sent to:', parentEmail);
-                } catch (resetErr) {
-                    console.warn('Could not send password reset email:', resetErr.message);
                 }
 
                 // Update enrollment - link parent UID
