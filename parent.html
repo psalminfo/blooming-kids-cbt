@@ -809,6 +809,10 @@
         }
         .portal-footer-link:hover { text-decoration-color: var(--sage); }
 
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .auth-split { grid-template-columns: 1fr; }
@@ -960,7 +964,7 @@
         <div class="welcome-actions">
             <button class="btn-add-student" onclick="showAddStudentModal()">
                 <i class="fa-solid fa-user-plus"></i>
-                <span>Add Student</span>
+                <span>Add Sibling</span>
             </button>
             <button id="manualRefreshBtn" class="btn-welcome-action" onclick="manualRefreshReportsV2()">
                 <i class="fa-solid fa-rotate-right"></i>
@@ -1191,7 +1195,7 @@
 <div id="addStudentModal" class="modal-overlay hidden">
     <div class="modal-box modal-box-wide">
         <div class="modal-header">
-            <h3><i class="fa-solid fa-user-plus mr-2" style="color:var(--sage);"></i>Add Another Student</h3>
+            <h3><i class="fa-solid fa-user-plus mr-2" style="color:var(--sage);"></i>Add a Sibling</h3>
             <button class="modal-close" onclick="hideAddStudentModal()">×</button>
         </div>
         <div class="modal-body">
@@ -1264,78 +1268,115 @@
                 </div>
             </div>
 
-            <!-- Step 2: Subjects & Schedule -->
+            <!-- Step 2: Courses & Schedule (3 tabs) -->
             <div class="step-panel" id="add-step-2">
-                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 2 — Subjects &amp; Schedule</h4>
-                <div class="field-group">
-                    <label class="field-label">Academic Subjects (select all that apply)</label>
-                    <div class="picker-grid" id="newStudentSubjects">
-                        <span class="picker-chip" data-subject="Math" onclick="togglePickerChip(this)">Math</span>
-                        <span class="picker-chip" data-subject="Language Arts" onclick="togglePickerChip(this)">Language Arts</span>
-                        <span class="picker-chip" data-subject="Geography" onclick="togglePickerChip(this)">Geography</span>
-                        <span class="picker-chip" data-subject="Science" onclick="togglePickerChip(this)">Science</span>
-                        <span class="picker-chip" data-subject="Biology" onclick="togglePickerChip(this)">Biology</span>
-                        <span class="picker-chip" data-subject="Physics" onclick="togglePickerChip(this)">Physics</span>
-                        <span class="picker-chip" data-subject="Chemistry" onclick="togglePickerChip(this)">Chemistry</span>
-                        <span class="picker-chip" data-subject="Microbiology" onclick="togglePickerChip(this)">Microbiology</span>
-                    </div>
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 2 — Courses &amp; Schedule</h4>
+                
+                <!-- Tab buttons -->
+                <div style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:14px;gap:0;">
+                    <button id="siblingTab_academic" onclick="switchSiblingTab('academic')"
+                        class="active"
+                        style="flex:1;padding:9px 8px;border:none;border-bottom:2px solid var(--sage,#4a7c59);background:none;font-weight:700;font-size:0.8rem;color:var(--sage-dark,#2f5240);cursor:pointer;font-family:inherit;margin-bottom:-2px;">
+                        🎓 Academic
+                    </button>
+                    <button id="siblingTab_extra" onclick="switchSiblingTab('extra')"
+                        style="flex:1;padding:9px 8px;border:none;border-bottom:2px solid transparent;background:none;font-weight:600;font-size:0.8rem;color:#94a3b8;cursor:pointer;font-family:inherit;margin-bottom:-2px;">
+                        🎨 Extracurricular
+                    </button>
+                    <button id="siblingTab_testprep" onclick="switchSiblingTab('testprep')"
+                        style="flex:1;padding:9px 8px;border:none;border-bottom:2px solid transparent;background:none;font-weight:600;font-size:0.8rem;color:#94a3b8;cursor:pointer;font-family:inherit;margin-bottom:-2px;">
+                        📊 Test Prep
+                    </button>
                 </div>
-                <div class="field-group">
-                    <label class="field-label">Session Frequency *</label>
-                    <div class="picker-grid" id="newStudentSessions">
-                        <span class="picker-chip" data-sessions="twice" onclick="toggleSessionChip(this)">Twice weekly</span>
-                        <span class="picker-chip" data-sessions="three" onclick="toggleSessionChip(this)">3× weekly</span>
-                        <span class="picker-chip" data-sessions="five" onclick="toggleSessionChip(this)">Daily (5×)</span>
+                
+                <!-- Academic Tab -->
+                <div id="siblingPanel_academic" style="display:block;">
+                    <div class="field-group">
+                        <label class="field-label">Academic Subjects (select all that apply)</label>
+                        <div class="picker-grid" id="newStudentSubjects">
+                            <span class="picker-chip" data-subject="Math" onclick="togglePickerChip(this)">Math</span>
+                            <span class="picker-chip" data-subject="Language Arts" onclick="togglePickerChip(this)">Language Arts</span>
+                            <span class="picker-chip" data-subject="Geography" onclick="togglePickerChip(this)">Geography</span>
+                            <span class="picker-chip" data-subject="Science" onclick="togglePickerChip(this)">Science</span>
+                            <span class="picker-chip" data-subject="Biology" onclick="togglePickerChip(this)">Biology</span>
+                            <span class="picker-chip" data-subject="Physics" onclick="togglePickerChip(this)">Physics</span>
+                            <span class="picker-chip" data-subject="Chemistry" onclick="togglePickerChip(this)">Chemistry</span>
+                            <span class="picker-chip" data-subject="Microbiology" onclick="togglePickerChip(this)">Microbiology</span>
+                        </div>
                     </div>
-                    <div id="sessionFeesDisplay" style="margin-top:10px;font-size:0.8rem;color:var(--sage-dark);font-weight:600;background:rgba(74,124,89,0.08);padding:8px 12px;border-radius:8px;display:none;"></div>
-                </div>
-                <div class="field-group">
-                    <label class="field-label">Preferred Days (select at least one)</label>
-                    <div class="picker-grid" id="newStudentDays">
-                        <span class="picker-chip" data-day="Monday" onclick="togglePickerChip(this)">Mon</span>
-                        <span class="picker-chip" data-day="Tuesday" onclick="togglePickerChip(this)">Tue</span>
-                        <span class="picker-chip" data-day="Wednesday" onclick="togglePickerChip(this)">Wed</span>
-                        <span class="picker-chip" data-day="Thursday" onclick="togglePickerChip(this)">Thu</span>
-                        <span class="picker-chip" data-day="Friday" onclick="togglePickerChip(this)">Fri</span>
-                        <span class="picker-chip" data-day="Saturday" onclick="togglePickerChip(this)">Sat</span>
-                        <span class="picker-chip" data-day="Sunday" onclick="togglePickerChip(this)">Sun</span>
+                    <div class="field-group">
+                        <label class="field-label">Session Frequency *</label>
+                        <div class="picker-grid" id="newStudentSessions">
+                            <span class="picker-chip" data-sessions="twice" onclick="toggleSessionChip(this)">Twice weekly</span>
+                            <span class="picker-chip" data-sessions="three" onclick="toggleSessionChip(this)">3× weekly</span>
+                            <span class="picker-chip" data-sessions="five" onclick="toggleSessionChip(this)">Daily (5×)</span>
+                        </div>
+                        <div id="sessionFeesDisplay" style="margin-top:10px;font-size:0.8rem;color:var(--sage-dark);font-weight:600;background:rgba(74,124,89,0.08);padding:8px 12px;border-radius:8px;display:none;"></div>
                     </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
-                    <div class="field-group" style="margin:0;">
-                        <label class="field-label" for="newStudentStartHour">Class Start Time</label>
-                        <select id="newStudentStartHour" class="field-input">
-                            <option value="">Select hour</option>
-                            <option value="7">7:00 AM</option><option value="8">8:00 AM</option>
-                            <option value="9">9:00 AM</option><option value="10">10:00 AM</option>
-                            <option value="11">11:00 AM</option><option value="12">12:00 PM</option>
-                            <option value="13">1:00 PM</option><option value="14">2:00 PM</option>
-                            <option value="15">3:00 PM</option><option value="16">4:00 PM</option>
-                            <option value="17">5:00 PM</option><option value="18">6:00 PM</option>
-                            <option value="19">7:00 PM</option><option value="20">8:00 PM</option>
+                    <div class="field-group">
+                        <label class="field-label">Preferred Days (select at least one)</label>
+                        <div class="picker-grid" id="newStudentDays">
+                            <span class="picker-chip" data-day="Monday" onclick="togglePickerChip(this)">Mon</span>
+                            <span class="picker-chip" data-day="Tuesday" onclick="togglePickerChip(this)">Tue</span>
+                            <span class="picker-chip" data-day="Wednesday" onclick="togglePickerChip(this)">Wed</span>
+                            <span class="picker-chip" data-day="Thursday" onclick="togglePickerChip(this)">Thu</span>
+                            <span class="picker-chip" data-day="Friday" onclick="togglePickerChip(this)">Fri</span>
+                            <span class="picker-chip" data-day="Saturday" onclick="togglePickerChip(this)">Sat</span>
+                            <span class="picker-chip" data-day="Sunday" onclick="togglePickerChip(this)">Sun</span>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
+                        <div class="field-group" style="margin:0;">
+                            <label class="field-label" for="newStudentStartHour">Class Start Time</label>
+                            <select id="newStudentStartHour" class="field-input">
+                                <option value="">Select hour</option>
+                                <option value="7">7:00 AM</option><option value="8">8:00 AM</option>
+                                <option value="9">9:00 AM</option><option value="10">10:00 AM</option>
+                                <option value="11">11:00 AM</option><option value="12">12:00 PM</option>
+                                <option value="13">1:00 PM</option><option value="14">2:00 PM</option>
+                                <option value="15">3:00 PM</option><option value="16">4:00 PM</option>
+                                <option value="17">5:00 PM</option><option value="18">6:00 PM</option>
+                                <option value="19">7:00 PM</option><option value="20">8:00 PM</option>
+                            </select>
+                        </div>
+                        <div class="field-group" style="margin:0;">
+                            <label class="field-label" for="newStudentEndHour">Class End Time</label>
+                            <select id="newStudentEndHour" class="field-input">
+                                <option value="">Select hour</option>
+                                <option value="8">8:00 AM</option><option value="9">9:00 AM</option>
+                                <option value="10">10:00 AM</option><option value="11">11:00 AM</option>
+                                <option value="12">12:00 PM</option><option value="13">1:00 PM</option>
+                                <option value="14">2:00 PM</option><option value="15">3:00 PM</option>
+                                <option value="16">4:00 PM</option><option value="17">5:00 PM</option>
+                                <option value="18">6:00 PM</option><option value="19">7:00 PM</option>
+                                <option value="20">8:00 PM</option><option value="21">9:00 PM</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field-group" style="margin-top:13px;">
+                        <label class="field-label" for="newStudentTutor">Tutor Preference</label>
+                        <select id="newStudentTutor" class="field-input">
+                            <option value="">No preference</option>
+                            <option value="male">Male tutor</option>
+                            <option value="female">Female tutor</option>
                         </select>
                     </div>
-                    <div class="field-group" style="margin:0;">
-                        <label class="field-label" for="newStudentEndHour">Class End Time</label>
-                        <select id="newStudentEndHour" class="field-input">
-                            <option value="">Select hour</option>
-                            <option value="8">8:00 AM</option><option value="9">9:00 AM</option>
-                            <option value="10">10:00 AM</option><option value="11">11:00 AM</option>
-                            <option value="12">12:00 PM</option><option value="13">1:00 PM</option>
-                            <option value="14">2:00 PM</option><option value="15">3:00 PM</option>
-                            <option value="16">4:00 PM</option><option value="17">5:00 PM</option>
-                            <option value="18">6:00 PM</option><option value="19">7:00 PM</option>
-                            <option value="20">8:00 PM</option><option value="21">9:00 PM</option>
-                        </select>
-                    </div>
                 </div>
-                <div class="field-group" style="margin-top:13px;">
-                    <label class="field-label" for="newStudentTutor">Tutor Preference</label>
-                    <select id="newStudentTutor" class="field-input">
-                        <option value="">No preference</option>
-                        <option value="male">Male tutor</option>
-                        <option value="female">Female tutor</option>
-                    </select>
+                
+                <!-- Extracurricular Tab -->
+                <div id="siblingPanel_extra" style="display:none;">
+                    <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:12px;">
+                        Select activities. Once Weekly = 1 day max. Twice Weekly = 2 days max. Global Discovery is Saturdays only.
+                    </p>
+                    <div id="siblingExtraGrid"></div>
+                </div>
+                
+                <!-- Test Prep Tab -->
+                <div id="siblingPanel_testprep" style="display:none;">
+                    <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:12px;">
+                        Fee = Hours/session × Rate/hour × Days/week × 4 weeks
+                    </p>
+                    <div id="siblingTestPrepGrid"></div>
                 </div>
             </div>
 
