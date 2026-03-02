@@ -1616,10 +1616,16 @@ function showHomeworkModal(student) {
                                             <p style="font-size:.72rem;color:#f59e0b;margin-top:4px;">⚠️ No subjects found on this student's profile. Please type the subject.</p>`;
                                 }
                                 const options = subs.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-                                return `<select id="hw-subject" class="form-input" required style="appearance:auto;">
+                                return `<select id="hw-subject-select" class="form-input" required style="appearance:auto;" onchange="(function(sel){var c=document.getElementById('hw-custom-subject-wrap');var i=document.getElementById('hw-subject');if(sel.value==='__other__'){c.style.display='block';i.value='';i.setAttribute('placeholder','Type subject name…');i.focus();}else{c.style.display='none';i.value=sel.value;}})(this)">
                                             <option value="">— Select a subject —</option>
                                             ${options}
-                                        </select>`;
+                                            <option value="__other__">✏️ Other (type custom subject)</option>
+                                        </select>
+                                        <input type="hidden" id="hw-subject" value="" required>
+                                        <div id="hw-custom-subject-wrap" style="display:none;margin-top:8px;">
+                                            <input type="text" id="hw-custom-subject-input" class="form-input" placeholder="Type subject name…" style="width:100%;" oninput="document.getElementById('hw-subject').value=this.value.trim()">
+                                            <p style="font-size:.72rem;color:#6b7280;margin-top:4px;">💡 This custom subject will be saved with the homework.</p>
+                                        </div>`;
                             })()}
                         </div>
                     </div>
@@ -1786,7 +1792,15 @@ function showHomeworkModal(student) {
     // SAVE LOGIC
     document.getElementById('save-hw-btn').addEventListener('click', async () => {
         const title = document.getElementById('hw-title').value.trim();
-        const subject = document.getElementById('hw-subject').value.trim();
+        // Support both plain text input and dropdown-with-custom-subject
+        const subjectSelect = document.getElementById('hw-subject-select');
+        const subjectCustom = document.getElementById('hw-custom-subject-input');
+        let subject = document.getElementById('hw-subject').value.trim();
+        if (subjectSelect && subjectSelect.value === '__other__' && subjectCustom) {
+            subject = subjectCustom.value.trim();
+        } else if (subjectSelect && subjectSelect.value && subjectSelect.value !== '__other__') {
+            subject = subjectSelect.value.trim();
+        }
         const desc = document.getElementById('hw-description').value.trim();
         const date = document.getElementById('hw-due-date').value;
         const sendEmail = document.getElementById('hw-reminder').checked;
