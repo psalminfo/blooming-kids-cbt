@@ -881,7 +881,6 @@ async function handleSignInFull(identifier, password, signInBtn, authLoader) {
     
     try {
         await auth.signInWithEmailAndPassword(identifier, password);
-        console.log("✅ Sign in successful");
         // Auth listener will handle the rest
     } catch (error) {
         if (!pendingRequests.has(requestId)) return;
@@ -928,47 +927,6 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         }
         
         const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
-
-        // ── GUARD: Verify this phone/email exists in enrollments before creating account ──
-        // Parents can ONLY get a portal account through the enrollment process.
-        let enrollmentExists = false;
-        try {
-            // Check by phone match (try multiple fields)
-            const phoneSuffix = extractPhoneSuffix(finalPhone);
-            const enrollmentSnap = await db.collection('enrollments').limit(500).get();
-            enrollmentSnap.forEach(doc => {
-                const d = doc.data();
-                const parentFields = [
-                    d.parent?.phone, d.parent?.email,
-                    d.parentPhone, d.parentEmail
-                ];
-                // Check email match
-                if (d.parent?.email === email || d.parentEmail === email) {
-                    enrollmentExists = true;
-                }
-                // Check phone match
-                if (!enrollmentExists) {
-                    for (const p of parentFields) {
-                        if (p && typeof p === 'string' && extractPhoneSuffix(p) === phoneSuffix) {
-                            enrollmentExists = true;
-                            break;
-                        }
-                    }
-                }
-            });
-        } catch (checkErr) {
-            console.warn('Enrollment check failed:', checkErr.message);
-            // If check fails, be conservative and block signup
-            enrollmentExists = false;
-        }
-
-        if (!enrollmentExists) {
-            throw new Error(
-                "No enrollment found for this email or phone number. " +
-                "Please complete the enrollment form first at enrollment.html, or contact support."
-            );
-        }
 
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
@@ -985,8 +943,6 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
             referralEarnings: 0,
             uid: user.uid
         });
-
-        console.log("✅ Account created and profile saved");
         showMessage('Account created successfully!', 'success');
         
     } catch (error) {
@@ -1186,7 +1142,6 @@ async function loadReferralRewards(parentUid) {
 // ============================================================================
 
 async function comprehensiveFindChildren(parentPhone) {
-    console.log("🔍 COMPREHENSIVE SUFFIX SEARCH for children with phone:", parentPhone);
 
     const allChildren = new Map();
     const studentNameIdMap = new Map();
@@ -1242,8 +1197,6 @@ async function comprehensiveFindChildren(parentPhone) {
             }
             
             if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ SUFFIX MATCH: Student ${studentName} linked`);
-                
                 allChildren.set(studentId, {
                     id: studentId,
                     name: studentName,
@@ -1290,8 +1243,6 @@ async function comprehensiveFindChildren(parentPhone) {
             }
             
             if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ PENDING SUFFIX MATCH: Parent ${parentSuffix} = ${matchedField} → Student ${studentName}`);
-                
                 allChildren.set(studentId, {
                     id: studentId,
                     name: studentName,
@@ -1329,8 +1280,6 @@ async function comprehensiveFindChildren(parentPhone) {
                         const studentName = safeText(data.studentName || data.name || 'Unknown');
 
                         if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                            console.log(`✅ EMAIL MATCH: ${userData.email} → Student ${studentName}`);
-                            
                             allChildren.set(studentId, {
                                 id: studentId,
                                 name: studentName,
@@ -1353,9 +1302,6 @@ async function comprehensiveFindChildren(parentPhone) {
         const studentNames = Array.from(studentNameIdMap.keys());
         const studentIds = Array.from(allChildren.keys());
         const allStudentData = Array.from(allChildren.values());
-
-        console.log(`🎯 SUFFIX SEARCH RESULTS: ${studentNames.length} students found`);
-
         return {
             studentIds,
             studentNameIdMap,
@@ -1379,7 +1325,6 @@ async function comprehensiveFindChildren(parentPhone) {
 // ============================================================================
 
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 SUFFIX-MATCHING Search for:", { parentPhone });
     
     let assessmentResults = [];
     let monthlyResults = [];
@@ -1392,9 +1337,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
             console.warn("⚠️ No valid suffix in parent phone");
             return { assessmentResults: [], monthlyResults: [] };
         }
-
-        console.log(`🎯 Searching with suffix: ${parentSuffix}`);
-
         // --- PARALLEL SEARCHES ---
         const searchPromises = [];
         
@@ -1431,9 +1373,7 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                         }
                     }
                 });
-                console.log(`✅ Found ${assessmentResults.length} assessment reports (suffix match)`);
             }).catch(error => {
-                console.log("ℹ️ Assessment search error:", error.message);
             })
         );
         
@@ -1469,9 +1409,7 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                         }
                     }
                 });
-                console.log(`✅ Found ${monthlyResults.length} monthly reports (suffix match)`);
             }).catch(error => {
-                console.log("ℹ️ Monthly search error:", error.message);
             })
         );
         
@@ -1498,7 +1436,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                                     });
                                 }
                             });
-                            console.log(`✅ Found ${snapshot.size} reports by email`);
                         }
                     }).catch(() => {})
             );
@@ -1511,7 +1448,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
         monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
         
-        console.log("🎯 SEARCH SUMMARY:", {
             assessments: assessmentResults.length,
             monthly: monthlyResults.length,
             parentSuffix: parentSuffix
@@ -1959,8 +1895,6 @@ function setupHomeworkRealTimeListener() {
 // ============================================================================
 
 function cleanupRealTimeListeners() {
-    console.log("🧹 Cleaning up real-time listeners...");
-    
     realTimeListeners.forEach(unsubscribe => {
         if (typeof unsubscribe === 'function') {
             unsubscribe();
@@ -1983,8 +1917,6 @@ function cleanupRealTimeListeners() {
 }
 
 function setupRealTimeMonitoring(parentPhone, userId) {
-    console.log("📡 Setting up OPTIMIZED real-time monitoring with onSnapshot...");
-    
     cleanupRealTimeListeners();
     
     if (!window.realTimeIntervals) {
@@ -2047,8 +1979,6 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     } catch (error) {
         // Fallback: no real-time monitoring
     }
-    
-    console.log("✅ Real-time monitoring setup complete (onSnapshot)");
 }
 
 function showNewReportNotification() {
@@ -2659,7 +2589,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     if (!forceRefresh) {
         const cached = dataCache.get(cacheKey);
         if (cached) {
-            console.log("📦 Using cached report data");
             renderReportData(cached.userData, cached.searchResults, parentPhone, userId);
             return;
         }
@@ -2710,9 +2639,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }
 
         const { assessmentResults, monthlyResults } = searchResults;
-
-        console.log("📊 PARALLEL LOAD: Found", assessmentResults.length, "assessments and", monthlyResults.length, "monthly reports");
-
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             reportContent.innerHTML = `
                 <div class="text-center py-16">
@@ -2868,8 +2794,6 @@ class UnifiedAuthManager {
             return;
         }
 
-        console.log("🔐 Initializing Optimized Auth Manager");
-
         this.cleanup();
 
         this.authListener = auth.onAuthStateChanged(
@@ -2878,7 +2802,6 @@ class UnifiedAuthManager {
         );
 
         this.isInitialized = true;
-        console.log("✅ Auth manager initialized");
     }
 
     async handleAuthChange(user) {
@@ -2898,15 +2821,13 @@ class UnifiedAuthManager {
 
         try {
             if (user && user.uid) {
-                console.log(`👤 User authenticated: ${user.uid.substring(0, 8)}...`);
                 await this.loadUserDashboard(user);
             } else {
-                console.log("🚪 User signed out");
                 this.showAuthScreen();
             }
         } catch (error) {
-            console.error("❌ Auth change error:", error);
-            showMessage("Authentication error. Please refresh.", "error");
+            console.error('Auth change error:', error);
+            showMessage('Authentication error. Please refresh.', 'error');
         } finally {
             setTimeout(() => {
                 this.isProcessing = false;
@@ -2920,8 +2841,6 @@ class UnifiedAuthManager {
     }
 
     async loadUserDashboard(user) {
-        console.log("📊 Loading OPTIMIZED dashboard for user");
-
         const authArea = document.getElementById("authArea");
         const reportArea = document.getElementById("reportArea");
         const authLoader = document.getElementById("authLoader");
@@ -2933,51 +2852,19 @@ class UnifiedAuthManager {
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
             
             if (!userDoc.exists) {
-                // Sign out unregistered users — they authenticated but have no portal profile
-                console.warn('⛔ No parent_users profile found for uid:', user.uid);
-                await auth.signOut();
-                showMessage("No parent account found. Please complete enrollment first, or contact support.", 'error');
-                this.showAuthScreen();
-                return;
+                throw new Error("User profile not found");
             }
 
             const userData = userDoc.data();
-            const userPhone = userData.normalizedPhone || userData.phone || '';
-
-            // ── Resolve parentName: prefer students collection match over parent_users ──
-            let resolvedParentName = userData.parentName || 'Parent';
-            if (userPhone) {
-                try {
-                    const phoneSuffix = extractPhoneSuffix(userPhone);
-                    const studentsSnap = await db.collection('students')
-                        .orderBy('createdAt', 'desc')
-                        .limit(200)
-                        .get();
-                    studentsSnap.forEach(doc => {
-                        const d = doc.data();
-                        const phoneFields = [d.normalizedPhone, d.normalizedParentPhone, d.parentPhone];
-                        for (const p of phoneFields) {
-                            if (p && extractPhoneSuffix(p) === phoneSuffix && d.parentName) {
-                                resolvedParentName = d.parentName;
-                                return; // break inner forEach
-                            }
-                        }
-                    });
-                } catch (lookupErr) {
-                    console.warn('Could not resolve parentName from students:', lookupErr.message);
-                }
-            }
-
             this.currentUser = {
                 uid: user.uid,
                 email: userData.email,
-                phone: userPhone,
-                normalizedPhone: userData.normalizedPhone || userPhone,
-                parentName: resolvedParentName,
+                phone: userData.phone,
+                normalizedPhone: userData.normalizedPhone || userData.phone,
+                parentName: userData.parentName || 'Parent',
                 referralCode: userData.referralCode
             };
 
-            console.log("👤 User data loaded:", this.currentUser.parentName);
 
             // Update UI immediately
             this.showDashboardUI();
@@ -2992,9 +2879,6 @@ class UnifiedAuthManager {
             // Setup monitoring and UI
             this.setupRealtimeMonitoring();
             this.setupUIComponents();
-
-            console.log("✅ Dashboard fully loaded");
-
         } catch (error) {
             console.error("❌ Dashboard load error:", error);
             showMessage(error.message || "Failed to load dashboard", "error");
@@ -3073,8 +2957,6 @@ class UnifiedAuthManager {
             console.warn("⚠️ No user to reload dashboard for");
             return;
         }
-
-        console.log("🔄 Force reloading dashboard");
         await loadAllReportsForParent(this.currentUser.normalizedPhone, this.currentUser.uid, true);
     }
 }
@@ -3473,8 +3355,6 @@ class SettingsManager {
     }
 
     async propagateStudentNameChange(studentId, newName) {
-        console.log(`🔄 Propagating name change for ${studentId} to: ${newName}`);
-        
         const collections = ['tutor_submissions', 'student_results'];
         
         for (const col of collections) {
@@ -3494,7 +3374,6 @@ class SettingsManager {
                         });
                     });
                     await batch.commit();
-                    console.log(`✅ Updated ${snapshot.size} documents in ${col}`);
                 }
             } catch (err) {
                 console.warn(`Background update for ${col} failed:`, err);
@@ -3966,8 +3845,6 @@ function updateAcademicsTabBadge(count) {
 // ============================================================================
 
 function initializeParentPortalV2() {
-    console.log("🚀 Initializing Parent Portal V2 (Production Edition)");
-
     setupRememberMe();
     injectCustomCSS();
     createCountryCodeDropdown();
@@ -3980,8 +3857,6 @@ function initializeParentPortalV2() {
         authManager.cleanup();
         cleanupRealTimeListeners();
     });
-
-    console.log("✅ Parent Portal V2 initialized");
 }
 
 function setupRememberMe() {
@@ -4043,6 +3918,8 @@ function handleSignIn() {
 }
 
 function handleSignUp() {
+    // All validation and submission is handled by window.handleSignUpFull which
+    // has a _signupInProgress guard to prevent double-submission.
     const countryCode = document.getElementById('countryCode')?.value;
     const localPhone = document.getElementById('signupPhone')?.value.trim();
     const email = document.getElementById('signupEmail')?.value.trim();
@@ -4067,12 +3944,8 @@ function handleSignUp() {
     const signUpBtn = document.getElementById('signUpBtn');
     const authLoader = document.getElementById('authLoader');
 
-    signUpBtn.disabled = true;
-    document.getElementById('signUpText').textContent = 'Creating Account...';
-    document.getElementById('signUpSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
+    // handleSignUpFull itself checks _signupInProgress and returns early if already running
+    window.handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
 }
 
 function handlePasswordReset() {
@@ -4758,11 +4631,8 @@ function setupGlobalErrorHandler() {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM Content Loaded - Starting V2 initialization");
-    
     initializeParentPortalV2();
     
-    // Initialize Google Classroom scanner (only when academics tab visible)
     setTimeout(scanAndInjectButtons, 500);
     
     const observer = new MutationObserver(() => {
@@ -4774,10 +4644,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const target = document.getElementById('academicsContent');
     if (target) observer.observe(target, { childList: true, subtree: true });
-    
-    // No persistent setInterval — MutationObserver handles it
-    
-    console.log("🎉 Parent Portal V2 fully initialized");
 });
 
 // ============================================================================
@@ -4811,255 +4677,173 @@ window.triggerCloudinaryUpload = triggerCloudinaryUpload;
 window.unsubmitHomework = unsubmitHomework;
 
 // ============================================================================
-// SECTION 21: SIGNUP SUCCESS HANDLER (RACE CONDITION FIX)
+// SECTION 21: SIGNUP HANDLER — NO-RELOAD, SINGLE-WRITE, IDEMPOTENT
 // ============================================================================
 
-// Override the original handleSignUpFull to fix race condition
-const originalHandleSignUpFull = window.handleSignUpFull;
+// Single in-flight guard — prevents two concurrent signup attempts
+// (e.g. from multiple click handlers that were previously stacked on the button)
+let _signupInProgress = false;
 
 window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
-    const requestId = `signup_${Date.now()}`;
-    pendingRequests.add(requestId);
-    
+    // Reject concurrent calls — the first one wins
+    if (_signupInProgress) return;
+    _signupInProgress = true;
+
+    const signUpText    = document.getElementById('signUpText');
+    const signUpSpinner = document.getElementById('signUpSpinner');
+
+    if (signUpBtn)    signUpBtn.disabled = true;
+    if (signUpText)   signUpText.textContent = 'Creating Account…';
+    if (signUpSpinner) signUpSpinner.classList.remove('hidden');
+    if (authLoader)   authLoader.classList.remove('hidden');
+
     try {
         let fullPhoneInput = localPhone;
         if (!localPhone.startsWith('+')) {
             fullPhoneInput = countryCode + localPhone;
         }
-        
-        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
-        
-        if (!normalizedResult.valid) {
-            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-        }
-        
-        const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
 
-        // Step 1: Create user in Firebase Auth
+        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        if (!normalizedResult.valid) {
+            throw new Error('Invalid phone number: ' + normalizedResult.error);
+        }
+        const finalPhone = normalizedResult.normalized;
+
+        // Create Firebase Auth user
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Step 2: Generate referral code
+        // Generate referral code
         const referralCode = await generateReferralCode();
 
-        // Step 3: Create user profile in Firestore
+        // Write Firestore profile — set() is idempotent for the same UID
         await db.collection('parent_users').doc(user.uid).set({
-            email: email,
-            phone: finalPhone,
-            normalizedPhone: finalPhone,
-            parentName: 'Parent',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            referralCode: referralCode,
+            email:            email,
+            phone:            finalPhone,
+            normalizedPhone:  finalPhone,
+            parentName:       'Parent',
+            createdAt:        firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode:     referralCode,
             referralEarnings: 0,
-            uid: user.uid
+            uid:              user.uid
         });
 
-        console.log("✅ Account created and profile saved");
-        
-        // CRITICAL FIX: Wait for Firestore write to propagate
-        console.log("⏳ Waiting for profile to sync...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Step 4: Show success message
-        showMessage('Account created successfully! Loading your dashboard...', 'success');
-        
-        // Step 5: Reset form state
-        if (signUpBtn) signUpBtn.disabled = false;
-        const signUpText = document.getElementById('signUpText');
-        const signUpSpinner = document.getElementById('signUpSpinner');
-        if (signUpText) signUpText.textContent = 'Create Account';
-        if (signUpSpinner) signUpSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
-        
-        // Step 6: Let onAuthStateChanged handle the dashboard transition — NO page reload
-        // Firebase auth state listener will fire and call loadUserDashboard automatically
-        if (window.authManager) {
-            window.authManager.isProcessing = false;
-            window.authManager.lastProcessTime = 0;
-        }
-        console.log("✅ Signup complete — dashboard will load via auth state listener");
-        
+        // Brief pause so Firestore replica catches up before onAuthStateChanged
+        // fetches the document in loadUserDashboard
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        showMessage('Account created! Loading your dashboard…', 'success');
+
+        // DO NOT call window.location.reload() here.
+        // The Firebase onAuthStateChanged listener will fire automatically and
+        // call loadUserDashboard(), which shows the dashboard without a reload.
+
     } catch (error) {
-        if (!pendingRequests.has(requestId)) return;
-        
-        let errorMessage = "Failed to create account.";
+        // Reset in-flight flag so the parent can try again
+        _signupInProgress = false;
+
+        let errorMessage = 'Failed to create account.';
         if (error.code === 'auth/email-already-in-use') {
-            errorMessage = "This email is already registered. Please sign in instead.";
+            errorMessage = 'This email is already registered. Please sign in instead.';
         } else if (error.code === 'auth/weak-password') {
-            errorMessage = "Password should be at least 6 characters.";
+            errorMessage = 'Password must be at least 6 characters.';
         } else if (error.message) {
             errorMessage = error.message;
         }
 
         showMessage(errorMessage, 'error');
 
-        if (signUpBtn) signUpBtn.disabled = false;
-        
-        const signUpText = document.getElementById('signUpText');
-        const signUpSpinner = document.getElementById('signUpSpinner');
-        
-        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpBtn)    signUpBtn.disabled = false;
+        if (signUpText)   signUpText.textContent = 'Create Account';
         if (signUpSpinner) signUpSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
+        if (authLoader)   authLoader.classList.add('hidden');
+    }
+    // Note: do NOT re-enable button on success — the auth observer will
+    // navigate to the dashboard, so the auth area will be hidden.
+};
+
+// ============================================================================
+// SECTION 22: AUTH MANAGER — ROBUST DASHBOARD LOAD (NO AUTO-RELOAD)
+// ============================================================================
+
+UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
+    const authLoader = document.getElementById('authLoader');
+    if (authLoader) authLoader.classList.remove('hidden');
+
+    try {
+        // Retry fetching the profile with exponential backoff.
+        // This handles the brief window between Firebase Auth user creation
+        // and the Firestore .set() completing in handleSignUpFull.
+        let userDoc = null;
+        const maxAttempts = 6;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            userDoc = await db.collection('parent_users').doc(user.uid).get();
+            if (userDoc.exists) break;
+            const delay = 500 * Math.pow(1.5, attempt); // 500ms, 750ms, 1125ms …
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        if (!userDoc || !userDoc.exists) {
+            // Profile still absent — this means signup failed mid-way.
+            // Sign the user out gracefully rather than creating orphan data.
+            await auth.signOut();
+            showMessage('Account setup incomplete. Please sign up again.', 'error');
+            return;
+        }
+
+        const userData = userDoc.data();
+        this.currentUser = {
+            uid:            user.uid,
+            email:          userData.email,
+            phone:          userData.phone,
+            normalizedPhone: userData.normalizedPhone || userData.phone,
+            parentName:     userData.parentName || 'Parent',
+            referralCode:   userData.referralCode
+        };
+
+        // Show dashboard immediately
+        this.showDashboardUI();
+
+        // Load data in parallel — academics loads lazily on tab switch
+        await Promise.all([
+            loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid),
+            loadReferralRewards(user.uid),
+            checkForNewAcademics()
+        ]);
+
+        this.setupRealtimeMonitoring();
+        this.setupUIComponents();
+
+        // Reset in-flight signup flag so next signup (if user logs out) works
+        if (typeof _signupInProgress !== 'undefined') {
+            // eslint-disable-next-line no-undef
+            _signupInProgress = false;
+        }
+
+    } catch (error) {
+        console.error('Dashboard load error:', error.message);
+        showMessage('Failed to load dashboard. Please refresh the page.', 'error');
+        this.showAuthScreen();
     } finally {
-        pendingRequests.delete(requestId);
+        if (authLoader) authLoader.classList.add('hidden');
     }
 };
 
 // ============================================================================
-// SECTION 22: REMOVED — loadUserDashboard is now correctly implemented
-// inside the UnifiedAuthManager class definition above.
+// SECTION 23: (RESERVED — see handleSignUpFull for signup logic)
 // ============================================================================
 
 // ============================================================================
-// SECTION 23: TEMP SIGNUP DATA STORAGE
+// SECTION 24 & 25: (REMOVED — signup logic consolidated in handleSignUpFull)
+// The single source of truth for signup is window.handleSignUpFull (Section 21).
+// setupEventListeners() binds the button; no second handler is needed.
 // ============================================================================
 
-// Store signup data temporarily to use if profile creation fails
-window.tempSignupData = null;
-
-// Override the form submission to store data
-document.addEventListener('DOMContentLoaded', function() {
-    const signUpForm = document.getElementById('signUpForm');
-    if (signUpForm) {
-        signUpForm.addEventListener('submit', function(e) {
-            const countryCode = document.getElementById('countryCode')?.value;
-            const localPhone = document.getElementById('signupPhone')?.value.trim();
-            const email = document.getElementById('signupEmail')?.value.trim();
-            
-            if (countryCode && localPhone && email) {
-                const fullPhone = countryCode + localPhone.replace(/\D/g, '');
-                window.tempSignupData = {
-                    email: email,
-                    phone: fullPhone,
-                    normalizedPhone: fullPhone
-                };
-                
-                // Auto-clear after 5 minutes
-                setTimeout(() => {
-                    window.tempSignupData = null;
-                }, 5 * 60 * 1000);
-            }
-        });
-    }
-});
-
-// ============================================================================
-// SECTION 24: SIGNUP PROGRESS INDICATOR
-// ============================================================================
-
-// Add visual feedback during signup
-function showSignupProgress(step) {
-    const steps = [
-        'Creating your account...',
-        'Setting up your profile...',
-        'Almost done...',
-        'Welcome!'
-    ];
-    
-    const message = steps[step - 1] || 'Processing...';
-    
-    // Create or update progress indicator
-    let progressDiv = document.getElementById('signupProgress');
-    if (!progressDiv) {
-        progressDiv = document.createElement('div');
-        progressDiv.id = 'signupProgress';
-        progressDiv.className = 'fixed top-20 right-4 bg-blue-500 text-white p-4 rounded-lg shadow-lg z-50';
-        document.body.appendChild(progressDiv);
-    }
-    
-    progressDiv.innerHTML = `
-        <div class="flex items-center">
-            <div class="loading-spinner-small mr-3"></div>
-            <div>
-                <div class="font-semibold">${message}</div>
-                <div class="text-xs opacity-80 mt-1">Step ${step} of ${steps.length}</div>
-            </div>
-        </div>
-    `;
-}
-
-function hideSignupProgress() {
-    const progressDiv = document.getElementById('signupProgress');
-    if (progressDiv) {
-        progressDiv.remove();
-    }
-}
-
-// ============================================================================
-// SECTION 25: SIGNUP FLOW ENHANCEMENT
-// ============================================================================
-
-// Override the entire signup button handler for better UX
-const originalSignupHandler = document.querySelector('#signUpBtn')?.onclick;
-if (document.querySelector('#signUpBtn')) {
-    document.querySelector('#signUpBtn').onclick = async function(e) {
-        e.preventDefault();
-        
-        // Show step 1
-        showSignupProgress(1);
-        
-        // Call the enhanced handleSignUpFull
-        const countryCode = document.getElementById('countryCode')?.value;
-        const localPhone = document.getElementById('signupPhone')?.value.trim();
-        const email = document.getElementById('signupEmail')?.value.trim();
-        const password = document.getElementById('signupPassword')?.value;
-        const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
-        const authLoader = document.getElementById('authLoader');
-        
-        if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
-            showMessage('Please fill in all fields', 'error');
-            hideSignupProgress();
-            return;
-        }
-        
-        if (password !== confirmPassword) {
-            showMessage('Passwords do not match', 'error');
-            hideSignupProgress();
-            return;
-        }
-        
-        // Update button state
-        const signUpBtn = this;
-        signUpBtn.disabled = true;
-        document.getElementById('signUpText').textContent = 'Creating...';
-        document.getElementById('signUpSpinner').classList.remove('hidden');
-        if (authLoader) authLoader.classList.remove('hidden');
-        
-        try {
-            // Show step 2
-            setTimeout(() => showSignupProgress(2), 1000);
-            
-            // Call the enhanced signup function
-            await window.handleSignUpFull(
-                countryCode, 
-                localPhone, 
-                email, 
-                password, 
-                confirmPassword, 
-                signUpBtn, 
-                authLoader
-            );
-            
-            // Show step 3
-            setTimeout(() => showSignupProgress(3), 2500);
-            
-        } catch (error) {
-            hideSignupProgress();
-            console.error('Signup error:', error);
-        }
-    };
-}
-
-console.log("✅ Signup race condition fixes installed");
+// Parent Portal ready.
 
 // ============================================================================
 // SILENT UNLIMITED SEARCH FIX (NO PROGRESS MESSAGES)
 // ============================================================================
-
-console.log("🔧 Installing silent unlimited search fix...");
-
 // ============================================================================
 // FIX 1: FAST UNLIMITED SEARCH (SILENT)
 // ============================================================================
@@ -5378,7 +5162,6 @@ if (window.authManager && originalAuthManagerLoad) {
                 if (reportContent && reportContent.textContent.includes('No Reports') && 
                     reportContent.textContent.includes('Waiting for')) {
                     // Silently reload with unlimited search
-                    console.log("Silently switching to unlimited search...");
                     const userPhone = this.currentUser?.normalizedPhone;
                     const userId = this.currentUser?.uid;
                     if (userPhone && userId) {
@@ -5428,15 +5211,9 @@ window.manualRefreshReportsV2 = async function() {
         refreshBtn.disabled = false;
     }
 };
-
-console.log("✅ Search optimization installed");
-
 // ============================================================================
 // SHARED PARENT ACCESS SYSTEM (NO DUPLICATE DECLARATIONS)
 // ============================================================================
-
-console.log("👨‍👩‍👧‍👦 Installing shared parent access system...");
-
 // Check if we already have these variables
 if (typeof window.sharedAccessInstalled === 'undefined') {
     window.sharedAccessInstalled = true;
@@ -5450,8 +5227,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 
     // Create enhanced version
     window.comprehensiveFindChildren = async function(parentPhone) {
-        console.log("🔍 ENHANCED CHILD SEARCH for shared access");
-        
         // First try enhanced search
         const enhancedResult = await enhancedSharedChildSearch(parentPhone);
         
@@ -5513,8 +5288,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 for (const { field, type } of contactFields) {
                     const fieldPhone = data[field];
                     if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
-                        console.log(`✅ SHARED ACCESS: ${type} phone match for ${studentName}`);
-                        
                         allChildren.set(studentId, {
                             id: studentId,
                             name: studentName,
@@ -5537,9 +5310,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
             const studentNames = Array.from(studentNameIdMap.keys());
             const studentIds = Array.from(allChildren.keys());
             const allStudentData = Array.from(allChildren.values());
-
-            console.log(`🎯 ENHANCED SEARCH: ${studentNames.length} students found via shared contacts`);
-
             return {
                 studentIds,
                 studentNameIdMap,
@@ -5567,8 +5337,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 
     // Create wrapper that adds shared contact search
     window.searchAllReportsForParent = async function(parentPhone, parentEmail = '', parentUid = '') {
-        console.log("🔍 SHARED ACCESS REPORT SEARCH");
-        
         // Get results from original function first
         let originalResults = { assessmentResults: [], monthlyResults: [] };
         if (typeof existingSearchFunction === 'function') {
@@ -5597,7 +5365,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         uniqueAssessments.sort((a, b) => b.timestamp - a.timestamp);
         uniqueMonthly.sort((a, b) => b.timestamp - a.timestamp);
         
-        console.log("🎯 COMBINED SEARCH RESULTS:", {
             original: {
                 assessments: originalResults.assessmentResults.length,
                 monthly: originalResults.monthlyResults.length
@@ -5715,9 +5482,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                     });
                 }
             });
-            
-            console.log(`✅ Shared contact search: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly`);
-            
         } catch (error) {
             console.error("Shared contact search error:", error);
         }
@@ -5745,7 +5509,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 
                 // If shared contacts were added, propagate them to reports
                 if (motherPhone || fatherPhone || guardianEmail) {
-                    console.log("🔄 Propagating shared contacts to reports...");
                     await propagateSharedContactsToReports(studentId, motherPhone, fatherPhone, guardianEmail);
                     
                     // Show success message
@@ -5799,7 +5562,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                     
                     if (updateCount > 0) {
                         await batch.commit();
-                        console.log(`✅ Updated ${updateCount} ${collection} with shared contacts`);
                     }
                 }
             } catch (error) {
@@ -5832,7 +5594,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 const finalPhone = normalizedResult.normalized;
                 
                 // Check if this phone/email exists as a shared contact
-                console.log("🔍 Checking for shared contact links...");
                 const linkedStudents = await findLinkedStudentsForContact(finalPhone, email);
                 
                 // Call original signup function
@@ -5901,9 +5662,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                     });
                 }
             });
-            
-            console.log(`✅ Found ${linkedStudents.length} linked students for contact`);
-            
         } catch (error) {
             console.error("Error finding linked students:", error);
         }
@@ -5930,8 +5688,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
             };
             
             await db.collection('parent_users').doc(parentUid).update(updateData);
-            console.log("✅ Updated parent profile with shared access");
-            
             // Also update student records with parent info
             for (const student of linkedStudents) {
                 try {
@@ -6003,11 +5759,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         
         return { isShared, linkedStudents };
     };
-
-    console.log("✅ Shared parent access system initialized");
-    
 } else {
-    console.log("⚠️ Shared access system already installed");
 }
 
 // ============================================================================
@@ -6189,7 +5941,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         }
     `;
     document.head.appendChild(slickStyle);
-    console.log("💎 Premium Slick UI Skin applied successfully.");
 })();
 
 // ============================================================================
@@ -6225,12 +5976,7 @@ function showAddStudentModal() {
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     nextMonth.setDate(1);
     const el = document.getElementById('newStudentStartDate');
-    if (el) {
-        el.min = new Date().toISOString().split('T')[0]; // Cannot go before today
-        el.value = nextMonth.toISOString().split('T')[0];
-        // Force calendar-only: prevent keyboard entry
-        el.addEventListener('keydown', function(e) { e.preventDefault(); });
-    }
+    if (el) el.value = nextMonth.toISOString().split('T')[0];
 
     // Reset all picker chips
     document.querySelectorAll('#newStudentSubjects .picker-chip,#newStudentDays .picker-chip')
@@ -6258,41 +6004,9 @@ function hideAddStudentModal() {
 /**
  * togglePickerChip(el)
  * Toggles the "selected" class on subject/day picker chips.
- * For day chips: enforces session-based day limits (once=1, twice=2, five=5).
- * For Global Discovery activity chips: enforces Saturday-only.
  */
 function togglePickerChip(el) {
-    const container = el.closest('[id]');
-    const containerId = container ? container.id : '';
-
-    // Handle day chip selection with session limit enforcement
-    if (containerId === 'newStudentDays' || el.dataset.day) {
-        const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
-        const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
-        const dayLimits = { twice: 2, three: 3, five: 5 };
-        const maxDays = sessionType ? (dayLimits[sessionType] || 1) : 1;
-
-        if (el.classList.contains('selected')) {
-            // Always allow deselect
-            el.classList.remove('selected');
-        } else {
-            const currentCount = document.querySelectorAll('#newStudentDays .picker-chip.selected').length;
-            if (currentCount >= maxDays) {
-                const sessionLabel = {
-                    twice: '2 days (Twice Weekly)',
-                    three: '3 days (3× Weekly)',
-                    five: '5 days (Daily)'
-                };
-                showMessage(`Maximum ${sessionLabel[sessionType] || maxDays + ' day(s)'} for this session frequency.`, 'error');
-                return;
-            }
-            el.classList.add('selected');
-        }
-    } else {
-        // Default toggle for subjects and other chips
-        el.classList.toggle('selected');
-    }
-
+    el.classList.toggle('selected');
     // Recalculate fees when subjects change (additional subject fee)
     updateAddStudentFees();
 }
@@ -6384,15 +6098,6 @@ function toggleSessionChip(el) {
         chip.classList.remove('selected');
     });
     el.classList.add('selected');
-
-    // Enforce day limit: trim excess selected days when session type changes
-    const dayLimits = { twice: 2, three: 3, five: 5 };
-    const newMax = dayLimits[el.dataset.sessions] || 1;
-    const selectedDays = Array.from(document.querySelectorAll('#newStudentDays .picker-chip.selected'));
-    if (selectedDays.length > newMax) {
-        selectedDays.slice(newMax).forEach(d => d.classList.remove('selected'));
-    }
-
     updateAddStudentFees();
 }
 
@@ -6753,16 +6458,6 @@ async function submitNewStudent() {
 
         if (!name) throw new Error('Student name is required.');
 
-        // Validate start date is not in the past
-        if (start) {
-            const startDateObj = new Date(start + 'T00:00:00');
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (startDateObj < today) {
-                throw new Error('Start date cannot be in the past. Please select a future date.');
-            }
-        }
-
         // ── Calculate fees using the same logic as enrollment portal ──
         const feeCalc = _calculateAddStudentFees();
 
@@ -6841,31 +6536,7 @@ async function submitNewStudent() {
         // Save to enrollments collection — same collection used by enrollment portal
         const docRef = await db.collection('enrollments').add(studentDoc);
 
-        console.log('✅ New student saved to enrollments:', docRef.id);
-
-        // Send email notification — mirrors enrollment portal behavior
-        setTimeout(() => {
-            try {
-                const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKPivWuCyEywMCxgleEoP7MBNxT6ZEvd5WWomDNGYADZmDcBcsO4Eif-JyHSJ5mpXBaw/exec";
-                fetch(APPS_SCRIPT_URL, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        action: "send_enrollment_notification",
-                        applicationId: docRef.id,
-                        parent: studentDoc.parent,
-                        students: 1,
-                        totalFee: studentDoc.summary.totalFee,
-                        studentName: studentDoc.studentName,
-                        startDate: studentDoc.startDate,
-                        addedFromPortal: true
-                    })
-                }).catch(err => console.warn('Email notification failed silently:', err.message));
-            } catch (emailErr) {
-                console.warn('Email setup failed:', emailErr.message);
-            }
-        }, 1500);
+        console.info('Enrolment submitted:', docRef.id);
 
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
@@ -7170,5 +6841,3 @@ window.injectFabHtml        = injectFabHtml;
 window._populateFabStudentDropdown = _populateFabStudentDropdown;
 window._calculateAddStudentFees    = _calculateAddStudentFees;
 window.switchMainTab        = switchMainTab;
-
-console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics, FAB (Feedback/Responses), Payments Tab, Correct Fees');
