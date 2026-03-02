@@ -174,11 +174,7 @@ async function fetchFromGitHub(grade, subject) {
         `${grade}${subject}.json`,             // grade3math.json
         `${gradeNumber}-${subject}.json`,      // 3-math.json
         `${gradeNumber}${subject}.json`,       // 3math.json
-        `${grade}-${subject}`.toLowerCase(),   // already lowercase
-        `${grade}${subject}`.toLowerCase(),
-        `${gradeNumber}-${subject}`.toLowerCase(),
-        `${gradeNumber}${subject}`.toLowerCase(),
-        // Some possible capitalizations
+        // Capitalized variations
         `${grade.charAt(0).toUpperCase() + grade.slice(1)}-${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`, // Grade3-Math.json
         `${grade.charAt(0).toUpperCase() + grade.slice(1)}${subject.charAt(0).toUpperCase() + subject.slice(1)}.json`  // Grade3Math.json
     ];
@@ -201,6 +197,124 @@ async function fetchFromGitHub(grade, subject) {
         }
     }
     throw new Error('No GitHub file found with any pattern');
+}
+
+/**
+ * Try multiple grade formats for tests collection query
+ */
+async function fetchFromTestsCollection(grade, subject) {
+    const subjectPrefix = subject.toLowerCase().slice(0, 3); // "math" → "mat", "ela" → "ela", etc.
+    
+    // Possible grade formats for document ID prefix
+    const gradeFormats = [
+        grade,                          // "grade3"
+        grade.replace('grade', ''),     // "3"
+        `Grade ${grade.replace('grade', '')}`, // "Grade 3"
+        grade.replace('grade', 'Grade '), // "Grade3"? Actually "Grade3" no space
+        grade.charAt(0).toUpperCase() + grade.slice(1), // "Grade3"
+        grade.toLowerCase(),             // already lowercase
+    ];
+    
+    // Also try with and without hyphen after grade
+    const idPrefixes = [];
+    gradeFormats.forEach(g => {
+        idPrefixes.push(`${g}-${subjectPrefix}`);  // "grade3-mat", "3-mat", "Grade 3-mat", etc.
+        idPrefixes.push(`${g}${subjectPrefix}`);   // "grade3mat", "3mat", etc.
+    });
+    
+    // Remove duplicates
+    const uniquePrefixes = [...new Set(idPrefixes)];
+    
+    let allQuestions = [];
+    let allPassages = [];
+    
+    for (const prefix of uniquePrefixes) {
+        try {
+            console.log(`Trying tests collection query with prefix: ${prefix}`);
+            const q = query(
+                collection(db, "tests"),
+                where(documentId(), '>=', prefix),
+                where(documentId(), '<', prefix + '\uf8ff')
+            );
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                console.log(`✅ Found ${snapshot.size} documents in tests collection with prefix: ${prefix}`);
+                const docSnap = snapshot.docs[0];
+                const rawData = docSnap.data();
+                let testArray = [];
+                if (rawData && rawData.tests) {
+                    testArray = rawData.tests;
+                } else if (rawData && rawData.questions) {
+                    testArray = [{ questions: rawData.questions }];
+                }
+                allQuestions = testArray.flatMap(test => test.questions || []);
+                allPassages = testArray.flatMap(test => test.passages || []);
+                break; // Stop at first successful match
+            }
+        } catch (err) {
+            console.warn(`Error querying tests collection with prefix ${prefix}:`, err);
+        }
+    }
+    
+    return { questions: allQuestions, passages: allPassages };
+}
+
+/**
+ * Try multiple grade formats for admin_questions collection
+ */
+async function fetchFromAdminQuestions(grade, subject) {
+    const gradeNumber = grade.replace('grade', ''); // "3"
+    const adminSubject = getAdminQuestionsSubject(subject); // "Mathematics"
+    
+    // Possible grade formats in admin_questions
+    const gradeFormats = [
+        gradeNumber,                    // "3"
+        parseInt(gradeNumber, 10),      // 3 (number)
+        `grade${gradeNumber}`,           // "grade3"
+        `Grade ${gradeNumber}`,          // "Grade 3"
+        grade,                           // "grade3"
+    ];
+    
+    let allQuestions = [];
+    
+    for (const g of gradeFormats) {
+        try {
+            console.log(`Trying admin_questions query with grade:`, g, `subject:`, adminSubject);
+            const q = query(
+                collection(db, "admin_questions"),
+                where("grade", "==", g),
+                where("subject", "==", adminSubject)
+            );
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                console.log(`✅ Found ${snapshot.size} documents in admin_questions with grade:`, g);
+                snapshot.forEach(doc => {
+                    try {
+                        const questionData = doc.data();
+                        if (!questionData || (!questionData.question && !questionData.type)) {
+                            console.warn('Skipping invalid admin question (missing fields):', doc.id);
+                            return;
+                        }
+                        const normalizedQuestion = {
+                            ...questionData,
+                            firebaseId: doc.id,
+                            id: doc.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            subject: subject.toLowerCase(),
+                            grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
+                        };
+                        allQuestions.push(normalizedQuestion);
+                    } catch (err) {
+                        console.error('Error processing admin question:', doc.id, err);
+                    }
+                });
+                break; // Stop after first successful format
+            }
+        } catch (err) {
+            console.warn(`Error querying admin_questions with grade ${g}:`, err);
+        }
+    }
+    
+    return allQuestions;
 }
 
 /**
@@ -264,86 +378,22 @@ export async function loadQuestions(subject, grade, state) {
     try {
         console.log(`🔄 FETCHING QUESTIONS FOR: ${grade} ${subject.toUpperCase()} - STATE: ${state}`);
 
-        // 1. FETCH FROM BOTH FIREBASE COLLECTIONS SIMULTANEOUSLY
-        const [testsSnapshot, adminSnapshot] = await Promise.all([
-            // Fetch from tests collection - BY DOCUMENT ID PATTERN
-            getDocs(query(
-                collection(db, "tests"),
-                where(documentId(), '>=', `${grade}-${subject.toLowerCase().slice(0, 3)}`),
-                where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
-            )),
-            
-            // Fetch from admin_questions collection - BY SUBJECT AND GRADE NUMBER
-            getDocs(query(
-                collection(db, "admin_questions"),
-                where("grade", "==", grade.replace('grade', '')), // e.g., "3"
-                where("subject", "==", getAdminQuestionsSubject(subject))
-            ))
-        ]);
+        // 1. FETCH FROM TESTS COLLECTION with flexible grade formats
+        const testsResult = await fetchFromTestsCollection(grade, subject);
+        allQuestions = testsResult.questions;
+        allPassages = testsResult.passages;
+        console.log(`📊 TESTS Collection: Loaded ${allQuestions.length} questions, ${allPassages.length} passages`);
 
-        console.log(`📊 TESTS Collection: Found ${testsSnapshot.size} documents for ${grade}-${subject}`);
-        console.log(`📊 ADMIN_QUESTIONS Collection: Found ${adminSnapshot.size} documents for grade ${grade.replace('grade', '')} ${getAdminQuestionsSubject(subject)}`);
-
-        // 2. PROCESS TESTS COLLECTION
-        if (!testsSnapshot.empty) {
-            const docSnap = testsSnapshot.docs[0];
-            const rawData = docSnap.data();
-            let testArray = [];
-            if (rawData && rawData.tests) {
-                testArray = rawData.tests;
-            } else if (rawData && rawData.questions) {
-                testArray = [{ questions: rawData.questions }];
-            }
-            
-            allQuestions = testArray.flatMap(test => test.questions || []);
-            allPassages = testArray.flatMap(test => test.passages || []);
-            console.log(`✅ Loaded ${allQuestions.length} questions from TESTS collection for ${subject}`);
-        } else {
-            console.log(`❌ No documents found in TESTS collection for ${grade}-${subject}`);
-        }
-
-        // 3. PROCESS ADMIN_QUESTIONS COLLECTION
-        if (!adminSnapshot.empty) {
-            const adminQuestions = [];
-            adminSnapshot.forEach(doc => {
-                try {
-                    const questionData = doc.data();
-                    
-                    if (!questionData || (!questionData.question && !questionData.type)) {
-                        console.warn('Skipping invalid admin question (missing fields):', doc.id);
-                        return;
-                    }
-                    
-                    const questionSubject = questionData.subject?.toLowerCase();
-                    const expectedSubject = getAdminQuestionsSubject(subject).toLowerCase();
-                    
-                    if (questionSubject !== expectedSubject) {
-                        console.warn(`Skipping admin question - subject mismatch. Expected: ${expectedSubject}, Got: ${questionSubject}`, doc.id);
-                        return;
-                    }
-                    
-                    const normalizedQuestion = {
-                        ...questionData,
-                        firebaseId: doc.id,
-                        id: doc.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        subject: subject.toLowerCase(),
-                        grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
-                    };
-                    
-                    adminQuestions.push(normalizedQuestion);
-                    
-                } catch (err) {
-                    console.error('Error processing admin question:', doc.id, err);
-                }
-            });
+        // 2. FETCH FROM ADMIN_QUESTIONS COLLECTION with flexible grade formats
+        const adminQuestions = await fetchFromAdminQuestions(grade, subject);
+        if (adminQuestions.length > 0) {
             console.log(`✅ Loaded ${adminQuestions.length} valid ${subject} questions from ADMIN_QUESTIONS`);
-            
             allQuestions = [...allQuestions, ...adminQuestions];
         } else {
-            console.log(`❌ No documents found in ADMIN_QUESTIONS for grade ${grade.replace('grade', '')} ${getAdminQuestionsSubject(subject)}`);
+            console.log(`❌ No documents found in ADMIN_QUESTIONS for ${subject} after trying multiple grade formats`);
         }
 
-        // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
+        // 3. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
         if (allQuestions.length === 0) {
             console.log(`📦 No ${subject} questions found in Firebase, trying GitHub...`);
             try {
