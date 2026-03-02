@@ -908,3 +908,28 @@
             el.innerHTML='<div style="color:#d1d5db;font-size:.68rem;text-align:center;padding:6px;">Offline</div>';
         }
     }
+
+    /* ── helpers ─────────────────────────────────────── */
+    function container() { return document.getElementById('bk-game-container'); }
+    function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function stopAll() {
+        state.gameActive=false;
+        if(state.snakeInterval){clearInterval(state.snakeInterval);state.snakeInterval=null;}
+        if(state.tttUnsub){state.tttUnsub();state.tttUnsub=null;}
+        if(state.wordUnsub){state.wordUnsub();state.wordUnsub=null;}
+        document.onkeydown=null;
+    }
+
+    /* ── bridge Firebase from tutor.js ──────────────── */
+    function bridge() {
+        try {
+            if(!window.__fbOnSnapshot && typeof onSnapshot!=='undefined') window.__fbOnSnapshot=onSnapshot;
+            if(!window.__fbDoc        && typeof doc!=='undefined')        window.__fbDoc=doc;
+            if(!window.__fbSetDoc     && typeof setDoc!=='undefined')     window.__fbSetDoc=setDoc;
+            if(!window.__fbUpdateDoc  && typeof updateDoc!=='undefined')  window.__fbUpdateDoc=updateDoc;
+        } catch(e){}
+    }
+
+    window.addEventListener('load', ()=>{ bridge(); setTimeout(bridge,2000); initWidget(); setTimeout(listenForIncomingChallenges, 3000); });
+
+})();
