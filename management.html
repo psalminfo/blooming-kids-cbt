@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <!-- Dark mode flash prevention: must run before first paint -->
+    <script>(function(){try{if(localStorage.getItem('bkh_dark_mode')==='true'){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Management Portal - Blooming Kids House</title>
     <meta name="description" content="Blooming Kids House Management Portal">
@@ -72,20 +74,7 @@
          DASHBOARD CSS
          ============================================ -->
     <style>
-        :root {
-            --sidebar-width: 280px;
-            --sidebar-collapsed: 70px;
-            --header-height: 70px;
-            --primary-color: #10b981;
-            --primary-dark: #059669;
-            --secondary-color: #3b82f6;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --info-color: #8b5cf6;
-            --light-bg: #f9fafb;
-            --card-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-            --elevated-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-        }
+        :root{--sidebar-width:280px;--sidebar-collapsed:70px;--header-height:70px;--primary-color:#10b981;--primary-dark:#059669;--secondary-color:#3b82f6;--danger-color:#ef4444;--warning-color:#f59e0b;--info-color:#8b5cf6;--light-bg:#f9fafb;--bg-page:#f9fafb;--bg-surface:#fff;--bg-surface-2:#f3f4f6;--bg-surface-3:#e5e7eb;--border-color:#e5e7eb;--text-primary:#111827;--text-secondary:#374151;--text-muted:#6b7280;--text-faint:#9ca3af;--input-border:#d1d5db;--input-bg:#fff;--nav-active-bg:#d1fae5;--nav-active-text:#059669;--nav-hover-bg:#f3f4f6;--header-bg:#fff;--sidebar-bg:#fff;--card-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);--elevated-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);}[data-theme=dark]{--bg-page:#0f172a;--bg-surface:#1e293b;--bg-surface-2:#273449;--bg-surface-3:#334155;--border-color:#334155;--text-primary:#f1f5f9;--text-secondary:#cbd5e1;--text-muted:#94a3b8;--text-faint:#64748b;--input-border:#475569;--input-bg:#1e293b;--nav-active-bg:#064e3b;--nav-active-text:#34d399;--nav-hover-bg:#273449;--header-bg:#1e293b;--sidebar-bg:#1e293b;--light-bg:#0f172a;--card-shadow:0 1px 3px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.3);--elevated-shadow:0 4px 6px -1px rgba(0,0,0,.4),0 2px 4px -1px rgba(0,0,0,.3);}
         body { margin:0; padding:0; min-height:100vh; background-color:var(--light-bg); display:grid; grid-template-columns:var(--sidebar-width) 1fr; grid-template-rows:var(--header-height) 1fr; grid-template-areas:"sidebar header" "sidebar main"; transition:grid-template-columns .3s ease; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; }
         body.sidebar-collapsed { grid-template-columns:var(--sidebar-collapsed) 1fr; }
         .sidebar { grid-area:sidebar; background:white; border-right:1px solid #e5e7eb; height:100vh; position:sticky; top:0; display:flex; flex-direction:column; overflow-y:auto; z-index:1000; transition:width .3s ease; }
@@ -173,6 +162,49 @@
         @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
         .bg-primary-50 { background-color:#ecfdf5; }
         .text-primary-600 { color:#059669; }
+        .dark-mode-btn{background:none;border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .2s;color:#4b5563;font-size:1rem;}
+        .dark-mode-btn:hover{background-color:#f3f4f6;}
+        .dark-mode-btn .icon-sun{display:none;}.dark-mode-btn .icon-moon{display:inline;}
+        [data-theme=dark] .dark-mode-btn .icon-sun{display:inline;}[data-theme=dark] .dark-mode-btn .icon-moon{display:none;}
+        [data-theme=dark] .dark-mode-btn{color:#cbd5e1;}[data-theme=dark] .dark-mode-btn:hover{background-color:#273449;}
+        [data-theme=dark] body{background-color:var(--bg-page);color:var(--text-secondary);}
+        [data-theme=dark] .sidebar{background:var(--sidebar-bg);border-right-color:var(--border-color);}
+        [data-theme=dark] .sidebar-header,[data-theme=dark] .user-info,[data-theme=dark] .search-container{border-bottom-color:var(--border-color);}
+        [data-theme=dark] .sidebar-footer{border-top-color:var(--border-color);}
+        [data-theme=dark] .search-box input{background:var(--input-bg);border-color:var(--input-border);color:var(--text-primary);}
+        [data-theme=dark] .nav-item{color:var(--text-secondary);}[data-theme=dark] .nav-item:hover{background-color:var(--nav-hover-bg);}
+        [data-theme=dark] .nav-item.active{background-color:var(--nav-active-bg);color:var(--nav-active-text);}
+        [data-theme=dark] .group-title{color:var(--text-muted);}
+        [data-theme=dark] .logout-btn{color:var(--text-muted);}[data-theme=dark] .logout-btn:hover{background-color:#450a0a;color:#f87171;}
+        [data-theme=dark] .header{background:var(--header-bg);border-bottom-color:var(--border-color);}
+        [data-theme=dark] .page-title{color:var(--text-primary);}[data-theme=dark] .page-subtitle{color:var(--text-muted);}
+        [data-theme=dark] .notification-btn,[data-theme=dark] .user-menu-btn,[data-theme=dark] .toggle-sidebar-btn{color:var(--text-secondary);}
+        [data-theme=dark] .notification-btn:hover,[data-theme=dark] .user-menu-btn:hover,[data-theme=dark] .toggle-sidebar-btn:hover{background-color:var(--bg-surface-2);}
+        [data-theme=dark] .notification-badge{border-color:var(--header-bg);}
+        [data-theme=dark] .main-content{background-color:var(--bg-page);}
+        [data-theme=dark] .loading-spinner{border-color:var(--bg-surface-3);border-top-color:var(--primary-color);}
+        [data-theme=dark] .bg-white{background-color:var(--bg-surface)!important;}
+        [data-theme=dark] .bg-gray-50{background-color:var(--bg-surface-2)!important;}
+        [data-theme=dark] .bg-gray-100{background-color:var(--bg-surface-3)!important;}
+        [data-theme=dark] .text-gray-800,[data-theme=dark] .text-gray-900{color:var(--text-primary)!important;}
+        [data-theme=dark] .text-gray-700{color:var(--text-secondary)!important;}
+        [data-theme=dark] .text-gray-600,[data-theme=dark] .text-gray-500{color:var(--text-muted)!important;}
+        [data-theme=dark] .text-gray-400{color:var(--text-faint)!important;}
+        [data-theme=dark] .border-gray-200,[data-theme=dark] .border-gray-300{border-color:var(--border-color)!important;}
+        [data-theme=dark] .divide-gray-200>*+*{border-color:var(--border-color)!important;}
+        [data-theme=dark] input:not([type=checkbox]):not([type=radio]):not([type=range]),[data-theme=dark] select,[data-theme=dark] textarea{background-color:var(--input-bg)!important;border-color:var(--input-border)!important;color:var(--text-primary)!important;}
+        [data-theme=dark] input::placeholder,[data-theme=dark] textarea::placeholder{color:var(--text-faint)!important;}
+        [data-theme=dark] table{background-color:var(--bg-surface)!important;}
+        [data-theme=dark] thead{background-color:var(--bg-surface-2)!important;}
+        [data-theme=dark] tbody tr:hover{background-color:var(--bg-surface-2)!important;}
+        [data-theme=dark] th,[data-theme=dark] td{border-color:var(--border-color)!important;color:var(--text-secondary)!important;}
+        [data-theme=dark] .sticky.top-0.bg-white{background-color:var(--bg-surface)!important;}
+        [data-theme=dark] .shadow-md,[data-theme=dark] .shadow-xl,[data-theme=dark] .shadow-sm{box-shadow:var(--card-shadow)!important;}
+        [data-theme=dark] .badge-primary{background-color:#064e3b;color:#34d399;}
+        [data-theme=dark] .badge-secondary{background-color:#1e3a5f;color:#60a5fa;}
+        [data-theme=dark] .badge-warning{background-color:#451a03;color:#fbbf24;}
+        [data-theme=dark] .badge-danger{background-color:#450a0a;color:#f87171;}
+        [data-theme=dark] .badge-info{background-color:#2e1065;color:#a78bfa;}
     </style>
 </head>
 <body>
@@ -219,6 +251,7 @@
             </div>
         </div>
         <div class="header-actions">
+            <button class="dark-mode-btn" id="darkModeToggle" title="Toggle dark/light mode" aria-label="Toggle dark mode"><i class="fas fa-moon icon-moon"></i><i class="fas fa-sun icon-sun"></i></button>
             <button class="notification-btn" id="notificationBell" title="Notifications" style="position:relative;"><i class="fas fa-bell"></i></button>
             <button class="user-menu-btn" id="activityLogBtn" title="Activity Log &amp; Profile"><i class="fas fa-user-circle"></i></button>
         </div>
@@ -229,6 +262,7 @@
             <p class="text-emerald-600 font-semibold mt-4">Loading dashboard...</p>
         </div>
     </main>
+    <script>(function(){var b=document.getElementById("darkModeToggle"),r=document.documentElement,K="bkh_dark_mode";function a(d){d?r.setAttribute("data-theme","dark"):r.removeAttribute("data-theme");try{localStorage.setItem(K,d?"true":"false");}catch(e){}}a(localStorage.getItem(K)==="true");b.addEventListener("click",function(){a(r.getAttribute("data-theme")!=="dark");});})();</script>
     <script type="module" src="management.js"></script>
 </body>
 </html>
