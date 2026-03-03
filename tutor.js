@@ -1235,7 +1235,7 @@ class ScheduleManager {
 
         } catch (error) {
             console.error(error);
-            this.showAlert('Save failed. Check console.', 'error');
+            this.showAlert('Save failed. Please try again.', 'error');
         }
     }
 
@@ -1903,7 +1903,6 @@ function showHomeworkModal(student) {
                         parentEmail: finalParentEmail,
                         parentName: finalParentName
                     });
-                    console.log("Student record updated with new parent info.");
                 } catch (updateError) {
                     console.error("Failed to sync student data (non-fatal):", updateError);
                 }
@@ -1922,7 +1921,6 @@ function showHomeworkModal(student) {
                         });
                         // Update local object so re-opens of the modal reflect the new subject immediately
                         student.subjects = [...currentSubjects, subject];
-                        console.log(`Custom subject "${subject}" added to student profile.`);
                     } catch (subjectUpdateError) {
                         // Non-fatal — homework is still saved, subject just won't persist
                         console.warn('Could not persist custom subject to student profile:', subjectUpdateError.message);
@@ -5495,8 +5493,6 @@ async function renderStudentDatabase(container, tutor) {
         if (r.studentId)   studentsWithResults.add(r.studentId);
         if (r.studentName) studentsWithResultNames.add(r.studentName.trim().toLowerCase());
     });
-    console.log(`[Placement] student_results fetched: ${allResultsSnapshot.size} docs | ids: ${studentsWithResults.size} | names: ${studentsWithResultNames.size}`);
-
     // Process Students - ONLY APPROVED STUDENTS
     let approvedStudents = allStudentDocs
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
@@ -5656,14 +5652,6 @@ async function renderStudentDatabase(container, tutor) {
                 // ── DEBUG — logs every grade 3–12 student so you can see exactly why
                 //            the button is/isn't showing. Check browser console.
                 if (_gradeOk) {
-                    console.log(
-                        `[Placement] ${student.studentName}` +
-                        ` | grade="${student.grade}" gradeOk=${_gradeOk}` +
-                        ` | createdAt=${studentCreatedAt ? studentCreatedAt.toISOString() : 'MISSING ⚠️'} newEnough=${_isNewEnough}` +
-                        ` | hasResult=${_hasResult} (byId:${studentsWithResults.has(student.id)} byName:${studentsWithResultNames.has((student.studentName||'').trim().toLowerCase())})` +
-                        ` | placementTestStatus="${student.placementTestStatus||''}" notDone=${_notDone}` +
-                        ` | ➡ SHOW BUTTON: ${_showPlacementBtn}`
-                    );
                 }
 
                 if (_showPlacementBtn) {
@@ -6353,7 +6341,6 @@ async function renderStudentDatabase(container, tutor) {
                     placementTestCompletedAt: new Date(),
                     placementTestSubject:     subject || ''
                 });
-                console.log('Placement test marked complete for student:', studentId);
             } catch (e) {
                 // Non-fatal — button is already removed from the UI
                 console.warn('Could not persist placementTestStatus:', e.message);
@@ -6942,7 +6929,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
             renderStudentDatabase(mainContent, window.tutorData);
         }
     } else {
-        console.warn('⚠️ global_settings document does not exist yet. Using defaults.');
+        /* global_settings not found, using defaults */
     }
 }, (error) => {
     console.error('❌ Settings listener error:', error);
@@ -7800,10 +7787,9 @@ async function autoSyncStudentSchedules(tutor) {
                     updatedAt: new Date()
                 }, { merge: true });
             } catch (err) {
-                console.warn(`Auto-sync schedule failed for ${student.studentName}:`, err.message);
+                console.warn('Auto-sync schedule failed:', err.message);
             }
         }
-        console.log(`✅ Auto-schedule sync complete for ${tutor.email}`);
     } catch (err) {
         console.warn('autoSyncStudentSchedules error:', err);
     }
