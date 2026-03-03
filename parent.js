@@ -192,7 +192,7 @@ async function submitFeedback() {
 
         await db.collection('parent_feedback').add({
             parentUid: user.uid,
-            parentEmail: user.email || '',
+            parentEmail: (user.email || '').toLowerCase(),
             parentName: currentUserData?.parentName || 'Parent',
             category: sanitizeInput(category),
             priority: sanitizeInput(priority),
@@ -881,7 +881,6 @@ async function handleSignInFull(identifier, password, signInBtn, authLoader) {
     
     try {
         await auth.signInWithEmailAndPassword(identifier, password);
-        console.log("✅ Sign in successful");
         // Auth listener will handle the rest
     } catch (error) {
         if (!pendingRequests.has(requestId)) return;
@@ -914,6 +913,9 @@ async function handleSignInFull(identifier, password, signInBtn, authLoader) {
 async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
     const requestId = `signup_${Date.now()}`;
     pendingRequests.add(requestId);
+
+    // Issue 2: Ensure email is always stored lowercase
+    email = email.toLowerCase().trim();
     
     try {
         let fullPhoneInput = localPhone;
@@ -928,7 +930,6 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         }
         
         const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
 
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
@@ -946,7 +947,6 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
             uid: user.uid
         });
 
-        console.log("✅ Account created and profile saved");
 
         // Back-fill parent email onto any existing student records matching this phone.
         // Fire-and-forget — won't block login if it fails.
@@ -1015,6 +1015,9 @@ async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
 // ============================================================================
 async function attachEmailToMatchingStudentRecords(parentPhone, parentEmail) {
     if (!parentPhone || !parentEmail) return 0;
+
+    // Issue 2: Normalise email to lowercase before any matching or writing
+    parentEmail = parentEmail.toLowerCase().trim();
 
     const normalizedPhone = parentPhone; // already normalized before being passed in
     const phoneSuffix     = extractPhoneSuffix(parentPhone); // last 10 digits
@@ -1085,9 +1088,7 @@ async function attachEmailToMatchingStudentRecords(parentPhone, parentEmail) {
     }
 
     if (updateCount > 0) {
-        console.log('attachEmail: linked parent email to ' + updateCount + ' student record(s)');
     } else {
-        console.log('attachEmail: no unlinked records found');
     }
     return updateCount;
 }
@@ -1236,7 +1237,6 @@ async function loadReferralRewards(parentUid) {
 // ============================================================================
 
 async function comprehensiveFindChildren(parentPhone, parentEmail = '') {
-    console.log("🔍 COMPREHENSIVE SUFFIX SEARCH for children with phone:", parentPhone);
 
     const allChildren = new Map();
     const studentNameIdMap = new Map();
@@ -1283,14 +1283,12 @@ async function comprehensiveFindChildren(parentPhone, parentEmail = '') {
 
             processSnap(studentsSnap, false);
             processSnap(pendingSnap, true);
-            console.log('✅ comprehensiveFindChildren email query:', allChildren.size, 'student(s) found');
         }
 
         // ── STEP 2: Phone scan fallback — only when email found nothing ─────
         // Picks up students added by a tutor before the parent registered
         // (their email won't be on those records yet).
         if (allChildren.size === 0) {
-            console.log('📱 No email results — running phone scan fallback');
 
             const [studentsSnapshot, pendingSnapshot] = await Promise.all([
                 db.collection('students').get().catch(() => ({ forEach: () => {} })),
@@ -1323,14 +1321,12 @@ async function comprehensiveFindChildren(parentPhone, parentEmail = '') {
 
             scanSnap(studentsSnapshot, false);
             scanSnap(pendingSnapshot, true);
-            console.log('✅ Phone scan fallback:', allChildren.size, 'student(s) found');
         }
 
         const studentNames = Array.from(studentNameIdMap.keys());
         const studentIds = Array.from(allChildren.keys());
         const allStudentData = Array.from(allChildren.values());
 
-        console.log(`🎯 SUFFIX SEARCH RESULTS: ${studentNames.length} students found`);
 
         return {
             studentIds,
@@ -1355,7 +1351,6 @@ async function comprehensiveFindChildren(parentPhone, parentEmail = '') {
 // ============================================================================
 
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 Search for reports | email:", parentEmail, "phone:", parentPhone);
 
     let assessmentResults = [];
     let monthlyResults = [];
@@ -1391,7 +1386,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                 });
             });
 
-            console.log('✅ Email query:', assessmentResults.length, 'assessments,', monthlyResults.length, 'monthly reports');
         }
 
         // ── STEP 2: Phone fallback — only runs when email found nothing ─────
@@ -1406,7 +1400,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                 return { assessmentResults, monthlyResults };
             }
 
-            console.log('📱 No email results — running phone fallback with suffix:', parentSuffix);
 
             const noPlus = parentPhone.replace(/^\+/, '');
             const phoneVariants = [...new Set([
@@ -1456,7 +1449,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                     .catch(e => console.warn('Non-critical: post-login backfill failed:', e.message));
             }
 
-            console.log('✅ Phone fallback:', assessmentResults.length, 'assessments,', monthlyResults.length, 'monthly');
         }
 
     } catch (error) {
@@ -1901,7 +1893,6 @@ function setupHomeworkRealTimeListener() {
 // ============================================================================
 
 function cleanupRealTimeListeners() {
-    console.log("🧹 Cleaning up real-time listeners...");
     
     realTimeListeners.forEach(unsubscribe => {
         if (typeof unsubscribe === 'function') {
@@ -1925,7 +1916,6 @@ function cleanupRealTimeListeners() {
 }
 
 function setupRealTimeMonitoring(parentPhone, userId) {
-    console.log("📡 Setting up OPTIMIZED real-time monitoring with onSnapshot...");
     
     cleanupRealTimeListeners();
     
@@ -1990,7 +1980,6 @@ function setupRealTimeMonitoring(parentPhone, userId) {
         // Fallback: no real-time monitoring
     }
     
-    console.log("✅ Real-time monitoring setup complete (onSnapshot)");
 }
 
 function showNewReportNotification() {
@@ -2601,7 +2590,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     if (!forceRefresh) {
         const cached = dataCache.get(cacheKey);
         if (cached) {
-            console.log("📦 Using cached report data");
             renderReportData(cached.userData, cached.searchResults, parentPhone, userId);
             return;
         }
@@ -2653,7 +2641,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         const { assessmentResults, monthlyResults } = searchResults;
 
-        console.log("📊 PARALLEL LOAD: Found", assessmentResults.length, "assessments and", monthlyResults.length, "monthly reports");
 
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             reportContent.innerHTML = `
@@ -2810,7 +2797,6 @@ class UnifiedAuthManager {
             return;
         }
 
-        console.log("🔐 Initializing Optimized Auth Manager");
 
         this.cleanup();
 
@@ -2820,7 +2806,6 @@ class UnifiedAuthManager {
         );
 
         this.isInitialized = true;
-        console.log("✅ Auth manager initialized");
     }
 
     async handleAuthChange(user) {
@@ -2840,10 +2825,8 @@ class UnifiedAuthManager {
 
         try {
             if (user && user.uid) {
-                console.log(`👤 User authenticated: ${user.uid.substring(0, 8)}...`);
                 await this.loadUserDashboard(user);
             } else {
-                console.log("🚪 User signed out");
                 this.showAuthScreen();
             }
         } catch (error) {
@@ -2862,7 +2845,6 @@ class UnifiedAuthManager {
     }
 
     async loadUserDashboard(user) {
-        console.log("📊 Loading OPTIMIZED dashboard for user");
 
         const authArea = document.getElementById("authArea");
         const reportArea = document.getElementById("reportArea");
@@ -2888,7 +2870,6 @@ class UnifiedAuthManager {
                 referralCode: userData.referralCode
             };
 
-            console.log("👤 User data loaded:", this.currentUser.parentName);
 
             // ONE-TIME backfill for existing parents: attach email to student records
             // that were created before they signed up. Runs only once per account,
@@ -2920,7 +2901,6 @@ class UnifiedAuthManager {
             this.setupRealtimeMonitoring();
             this.setupUIComponents();
 
-            console.log("✅ Dashboard fully loaded");
 
         } catch (error) {
             console.error("❌ Dashboard load error:", error);
@@ -3001,7 +2981,6 @@ class UnifiedAuthManager {
             return;
         }
 
-        console.log("🔄 Force reloading dashboard");
         await loadAllReportsForParent(this.currentUser.normalizedPhone, this.currentUser.uid, true);
     }
 }
@@ -3400,7 +3379,6 @@ class SettingsManager {
     }
 
     async propagateStudentNameChange(studentId, newName) {
-        console.log(`🔄 Propagating name change for ${studentId} to: ${newName}`);
         
         const collections = ['tutor_submissions', 'student_results'];
         
@@ -3421,7 +3399,6 @@ class SettingsManager {
                         });
                     });
                     await batch.commit();
-                    console.log(`✅ Updated ${snapshot.size} documents in ${col}`);
                 }
             } catch (err) {
                 console.warn(`Background update for ${col} failed:`, err);
@@ -3893,7 +3870,6 @@ function updateAcademicsTabBadge(count) {
 // ============================================================================
 
 function initializeParentPortalV2() {
-    console.log("🚀 Initializing Parent Portal V2 (Production Edition)");
 
     setupRememberMe();
     injectCustomCSS();
@@ -3908,7 +3884,6 @@ function initializeParentPortalV2() {
         cleanupRealTimeListeners();
     });
 
-    console.log("✅ Parent Portal V2 initialized");
 }
 
 function setupRememberMe() {
@@ -3972,12 +3947,19 @@ function handleSignIn() {
 function handleSignUp() {
     const countryCode = document.getElementById('countryCode')?.value;
     const localPhone = document.getElementById('signupPhone')?.value.trim();
-    const email = document.getElementById('signupEmail')?.value.trim();
+    const email = document.getElementById('signupEmail')?.value.trim().toLowerCase();
     const password = document.getElementById('signupPassword')?.value;
     const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
 
     if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
         showMessage('Please fill in all fields including country code', 'error');
+        return;
+    }
+
+    // Issue 4: Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+        showMessage('Please enter a valid email address.', 'error');
         return;
     }
 
@@ -4685,7 +4667,6 @@ function setupGlobalErrorHandler() {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM Content Loaded - Starting V2 initialization");
     
     initializeParentPortalV2();
     
@@ -4704,7 +4685,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // No persistent setInterval — MutationObserver handles it
     
-    console.log("🎉 Parent Portal V2 fully initialized");
 });
 
 // ============================================================================
@@ -4750,7 +4730,6 @@ const originalLoadUserDashboard = UnifiedAuthManager.prototype.loadUserDashboard
 
 // Override with enhanced version
 UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
-    console.log("📊 Loading ENHANCED dashboard for user");
     
     const authArea = document.getElementById("authArea");
     const reportArea = document.getElementById("reportArea");
@@ -4759,7 +4738,6 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
     if (authLoader) authLoader.classList.remove("hidden");
     
     try {
-        console.log("🔍 Checking user profile...");
         
         let userDoc;
         let retryCount = 0;
@@ -4769,7 +4747,6 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
             try {
                 userDoc = await db.collection('parent_users').doc(user.uid).get();
                 if (userDoc.exists) {
-                    console.log(`✅ User profile found on attempt ${retryCount + 1}`);
                     break;
                 }
                 retryCount++;
@@ -4784,7 +4761,6 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
         
         if (!userDoc || !userDoc.exists) {
             // BLOCK: No profile = not enrolled through enrollment portal
-            console.log("🚫 No parent profile found - unauthorized access");
             if (authLoader) authLoader.classList.add("hidden");
             await auth.signOut();
             if (authArea) authArea.classList.remove("hidden");
@@ -4804,14 +4780,12 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
             passwordResetComplete: userData.passwordResetComplete
         };
 
-        console.log("👤 User data loaded:", this.currentUser.parentName);
 
         // Update UI immediately
         this.showDashboardUI();
 
         // CHECK: First-time login - show non-dismissible password reset modal
         if (userData.passwordResetComplete === false) {
-            console.log("🔐 First-time login - showing password reset modal");
             showFirstTimePasswordModal(user.uid);
         }
 
@@ -4825,7 +4799,6 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
         this.setupRealtimeMonitoring();
         this.setupUIComponents();
 
-        console.log("✅ Dashboard fully loaded");
 
     } catch (error) {
         console.error("❌ Enhanced dashboard load error:", error);
@@ -5025,7 +4998,7 @@ document.addEventListener('DOMContentLoaded', function() {
         signUpForm.addEventListener('submit', function(e) {
             const countryCode = document.getElementById('countryCode')?.value;
             const localPhone = document.getElementById('signupPhone')?.value.trim();
-            const email = document.getElementById('signupEmail')?.value.trim();
+            const email = document.getElementById('signupEmail')?.value.trim().toLowerCase();
             
             if (countryCode && localPhone && email) {
                 const fullPhone = countryCode + localPhone.replace(/\D/g, '');
@@ -5086,13 +5059,11 @@ function hideSignupProgress() {
     }
 }
 
-console.log("✅ Signup handlers ready");
 
 // ============================================================================
 // SILENT UNLIMITED SEARCH FIX (NO PROGRESS MESSAGES)
 // ============================================================================
 
-console.log("🔧 Installing silent unlimited search fix...");
 
 // ============================================================================
 // FIX 1: FAST UNLIMITED SEARCH (SILENT)
@@ -5412,7 +5383,6 @@ if (window.authManager && originalAuthManagerLoad) {
                 if (reportContent && reportContent.textContent.includes('No Reports') && 
                     reportContent.textContent.includes('Waiting for')) {
                     // Silently reload with unlimited search
-                    console.log("Silently switching to unlimited search...");
                     const userPhone = this.currentUser?.normalizedPhone;
                     const userId = this.currentUser?.uid;
                     if (userPhone && userId) {
@@ -5463,13 +5433,11 @@ window.manualRefreshReportsV2 = async function() {
     }
 };
 
-console.log("✅ Search optimization installed");
 
 // ============================================================================
 // SHARED PARENT ACCESS SYSTEM (NO DUPLICATE DECLARATIONS)
 // ============================================================================
 
-console.log("👨‍👩‍👧‍👦 Installing shared parent access system...");
 
 // Check if we already have these variables
 if (typeof window.sharedAccessInstalled === 'undefined') {
@@ -5484,7 +5452,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 
     // Create enhanced version
     window.comprehensiveFindChildren = async function(parentPhone) {
-        console.log("🔍 ENHANCED CHILD SEARCH for shared access");
         
         // First try enhanced search
         const enhancedResult = await enhancedSharedChildSearch(parentPhone);
@@ -5547,7 +5514,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 for (const { field, type } of contactFields) {
                     const fieldPhone = data[field];
                     if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
-                        console.log(`✅ SHARED ACCESS: ${type} phone match for ${studentName}`);
                         
                         allChildren.set(studentId, {
                             id: studentId,
@@ -5572,7 +5538,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
             const studentIds = Array.from(allChildren.keys());
             const allStudentData = Array.from(allChildren.values());
 
-            console.log(`🎯 ENHANCED SEARCH: ${studentNames.length} students found via shared contacts`);
 
             return {
                 studentIds,
@@ -5601,7 +5566,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 
     // Create wrapper that adds shared contact search
     window.searchAllReportsForParent = async function(parentPhone, parentEmail = '', parentUid = '') {
-        console.log("🔍 SHARED ACCESS REPORT SEARCH");
         
         // Get results from original function first
         let originalResults = { assessmentResults: [], monthlyResults: [] };
@@ -5631,20 +5595,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         uniqueAssessments.sort((a, b) => b.timestamp - a.timestamp);
         uniqueMonthly.sort((a, b) => b.timestamp - a.timestamp);
         
-        console.log("🎯 COMBINED SEARCH RESULTS:", {
-            original: {
-                assessments: originalResults.assessmentResults.length,
-                monthly: originalResults.monthlyResults.length
-            },
-            shared: {
-                assessments: sharedResults.assessmentResults.length,
-                monthly: sharedResults.monthlyResults.length
-            },
-            combined: {
-                assessments: uniqueAssessments.length,
-                monthly: uniqueMonthly.length
-            }
-        });
         
         return {
             assessmentResults: uniqueAssessments,
@@ -5750,7 +5700,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 }
             });
             
-            console.log(`✅ Shared contact search: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly`);
             
         } catch (error) {
             console.error("Shared contact search error:", error);
@@ -5779,7 +5728,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 
                 // If shared contacts were added, propagate them to reports
                 if (motherPhone || fatherPhone || guardianEmail) {
-                    console.log("🔄 Propagating shared contacts to reports...");
                     await propagateSharedContactsToReports(studentId, motherPhone, fatherPhone, guardianEmail);
                     
                     // Show success message
@@ -5833,7 +5781,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                     
                     if (updateCount > 0) {
                         await batch.commit();
-                        console.log(`✅ Updated ${updateCount} ${collection} with shared contacts`);
                     }
                 }
             } catch (error) {
@@ -5881,7 +5828,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 }
                 
                 // Check email matches
-                if (email && data.guardianEmail === email) {
+                if (email && data.guardianEmail?.toLowerCase() === email.toLowerCase()) {
                     linkedStudents.push({
                         studentId: doc.id,
                         studentName: studentName,
@@ -5891,7 +5838,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 }
             });
             
-            console.log(`✅ Found ${linkedStudents.length} linked students for contact`);
             
         } catch (error) {
             console.error("Error finding linked students:", error);
@@ -5902,6 +5848,8 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 
     // Update parent profile with shared access info
     async function updateParentWithSharedAccess(parentUid, phone, email, linkedStudents) {
+        // Issue 2: Normalise email
+        email = email ? email.toLowerCase().trim() : '';
         try {
             const updateData = {
                 isSharedContact: true,
@@ -5919,7 +5867,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
             };
             
             await db.collection('parent_users').doc(parentUid).update(updateData);
-            console.log("✅ Updated parent profile with shared access");
             
             // Also update student records with parent info
             for (const student of linkedStudents) {
@@ -5976,7 +5923,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 }
                 
                 // Check email
-                if (email && data.guardianEmail === email) {
+                if (email && data.guardianEmail?.toLowerCase() === email.toLowerCase()) {
                     isShared = true;
                     linkedStudents.push({
                         studentId: doc.id,
@@ -5993,10 +5940,8 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         return { isShared, linkedStudents };
     };
 
-    console.log("✅ Shared parent access system initialized");
     
 } else {
-    console.log("⚠️ Shared access system already installed");
 }
 
 // ============================================================================
@@ -6178,7 +6123,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         }
     `;
     document.head.appendChild(slickStyle);
-    console.log("💎 Premium Slick UI Skin applied successfully.");
 })();
 
 // ============================================================================
@@ -6996,7 +6940,7 @@ async function submitNewStudent() {
         if (!userDoc.exists) throw new Error('Parent profile not found.');
         const parentData = userDoc.data();
         const parentPhone   = parentData.normalizedPhone || parentData.phone || '';
-        const parentEmail   = parentData.email || '';
+        const parentEmail   = (parentData.email || '').toLowerCase();
         const parentName    = parentData.parentName || 'Parent';
 
         // Collect form data
@@ -7129,7 +7073,6 @@ async function submitNewStudent() {
         // Save to enrollments collection — same collection used by enrollment portal
         const docRef = await db.collection('enrollments').add(studentDoc);
 
-        console.log('✅ New student saved to enrollments:', docRef.id);
 
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
@@ -7434,5 +7377,3 @@ window.injectFabHtml        = injectFabHtml;
 window._populateFabStudentDropdown = _populateFabStudentDropdown;
 window._calculateAddStudentFees    = _calculateAddStudentFees;
 window.switchMainTab        = switchMainTab;
-
-console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics, FAB (Feedback/Responses), Payments Tab, Correct Fees');
