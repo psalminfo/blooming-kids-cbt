@@ -1041,7 +1041,7 @@ async function attachEmailToMatchingStudentRecords(parentPhone, parentEmail) {
         'contactPhone', 'normalizedParentPhone'
     ];
 
-    const collections = ['student_results', 'tutor_submissions'];
+    const collections = ['student_results', 'tutor_submissions', 'students', 'pending_students'];
     let updateCount = 0;
 
     for (const colName of collections) {
