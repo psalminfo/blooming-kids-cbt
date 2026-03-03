@@ -2085,7 +2085,7 @@ async function performTransition(student, newTutor, startDate, endDate, reason, 
         
     } catch (error) {
         console.error("Transition error:", error);
-        alert(`Error: ${error.message}`);
+        alert("An error occurred. Please try again.");
         btn.textContent = "Start Transition";
         btn.disabled = false;
     }
@@ -2408,7 +2408,7 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
         
     } catch (error) {
         console.error("Group creation error:", error);
-        alert(`Error: ${error.message}`);
+        alert("An error occurred. Please try again.");
         btn.textContent = "Create Group Class";
         btn.disabled = false;
     }
@@ -3171,7 +3171,7 @@ function showManageTransitionModal(studentId) {
                 
             } catch (error) {
                 console.error("Manage transition error:", error);
-                alert(`Error: ${error.message}`);
+                alert("An error occurred. Please try again.");
                 btn.textContent = "Apply Changes";
                 btn.disabled = false;
             }
@@ -4825,7 +4825,7 @@ function showArchiveStudentModal(mode = 'single') {
             submitSpinner.classList.add('hidden');
             
             setTimeout(() => {
-                alert(`Failed to archive student(s). Error: ${error.message}`);
+                alert("Failed to archive student(s). Please try again.");
             }, 500);
         }
     });
@@ -5817,7 +5817,7 @@ async function applyTenureBonus(tutorEmail) {
 
     } catch (err) {
         console.error('Error applying tenure bonus:', err);
-        alert(`Failed to apply tenure bonus: ${err.message}`);
+        alert("Failed to apply tenure bonus. Please try again.");
     }
 }
 
@@ -5926,7 +5926,7 @@ function showManualFeeAdjustModal(tutorEmail, tutorName) {
             await loadTenureBonusData();
         } catch (err) {
             console.error('Error saving manual fee adjustment:', err);
-            alert(`Failed to save: ${err.message}`);
+            alert("Failed to save. Please try again.");
         }
     });
 }
@@ -6186,7 +6186,7 @@ async function renderReferralsAdminPanel(container) {
         window.showReferralDetailsModal = showReferralDetailsModal;
     } catch (error) {
         console.error("Error loading referral data: ", error);
-        container.innerHTML = `<p class="text-center mt-12 text-red-600">Error loading referral data: ${error.message}</p>`;
+        container.innerHTML = `<p class="text-center mt-12 text-red-600">Error loading referral data. Please refresh and try again.</p>`;
     }
 }
 
@@ -7374,7 +7374,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
         renderEnrollmentsFromCache();
     } catch (error) {
         console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="12" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        enrollmentsList.innerHTML = `<tr><td colspan="12" class="px-6 py-4 text-center text-red-500">Failed to load enrollments. Please refresh and try again.</td></tr>`;
     }
 }
 
@@ -8133,14 +8133,14 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                     extracurricularHTML = extracurricularActivities.map((activity, ecIndex) => `
                         <div class="mb-3 p-3 border rounded bg-blue-50">
                             <div class="flex justify-between items-center mb-2">
-                                <p class="font-medium">${activity.name}</p>
-                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">${activity.frequency}</span>
+                                <p class="font-medium text-blue-800"><i class="fas fa-futbol mr-1"></i>${escapeHtml(activity.name || activity)}</p>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">${escapeHtml(activity.frequency || 'Extracurricular')}</span>
                             </div>
                             <div class="relative">
-                                <input type="text" 
-                                       id="ec-tutor-search-${studentIndex}-${ecIndex}" 
+                                <input type="text"
+                                       id="ec-tutor-search-${studentIndex}-${ecIndex}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
-                                       placeholder="Search tutor for ${activity.name}..."
+                                       placeholder="Search tutor for ${escapeHtml(activity.name || activity)}..."
                                        autocomplete="off">
                                 <div id="ec-tutor-results-${studentIndex}-${ecIndex}" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden"></div>
                                 <input type="hidden" name="ec-tutor-assignment-${studentIndex}-${ecIndex}" id="selected-ec-tutor-${studentIndex}-${ecIndex}" value="">
@@ -8154,17 +8154,40 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                     subjectsHTML = subjects.map((subject, subIndex) => `
                         <div class="mb-3 p-3 border rounded bg-purple-50">
                             <div class="flex justify-between items-center mb-2">
-                                <p class="font-medium">${subject}</p>
-                                <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Subject</span>
+                                <p class="font-medium text-purple-800"><i class="fas fa-book mr-1"></i>${escapeHtml(subject)}</p>
+                                <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Academic Subject</span>
                             </div>
                             <div class="relative">
-                                <input type="text" 
-                                       id="sub-tutor-search-${studentIndex}-${subIndex}" 
+                                <input type="text"
+                                       id="sub-tutor-search-${studentIndex}-${subIndex}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
-                                       placeholder="Search tutor for ${subject}..."
+                                       placeholder="Search tutor for ${escapeHtml(subject)}..."
                                        autocomplete="off">
                                 <div id="sub-tutor-results-${studentIndex}-${subIndex}" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden"></div>
                                 <input type="hidden" name="sub-tutor-assignment-${studentIndex}-${subIndex}" id="selected-sub-tutor-${studentIndex}-${subIndex}" value="">
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // Test Prep section
+                const testPrepCourses = student.testPrep || [];
+                let testPrepHTML = '';
+                if (testPrepCourses.length > 0) {
+                    testPrepHTML = testPrepCourses.map((course, tpIndex) => `
+                        <div class="mb-3 p-3 border rounded bg-orange-50">
+                            <div class="flex justify-between items-center mb-2">
+                                <p class="font-medium text-orange-800"><i class="fas fa-graduation-cap mr-1"></i>${escapeHtml(course.name || course)}</p>
+                                <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">${escapeHtml(course.hours ? course.hours + ' hrs' : 'Test Prep')}</span>
+                            </div>
+                            <div class="relative">
+                                <input type="text"
+                                       id="tp-tutor-search-${studentIndex}-${tpIndex}"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
+                                       placeholder="Search tutor for ${escapeHtml(course.name || course)}..."
+                                       autocomplete="off">
+                                <div id="tp-tutor-results-${studentIndex}-${tpIndex}" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden"></div>
+                                <input type="hidden" name="tp-tutor-assignment-${studentIndex}-${tpIndex}" id="selected-tp-tutor-${studentIndex}-${tpIndex}" value="">
                             </div>
                         </div>
                     `).join('');
@@ -8200,8 +8223,14 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                         
                         ${subjects.length > 0 ? `
                             <div class="mb-4">
-                                <p class="font-medium mb-2 text-purple-700">Subject-Specific Tutors</p>
+                                <p class="font-medium mb-2 text-purple-700"><i class="fas fa-book mr-1"></i>Subject-Specific Tutors</p>
                                 ${subjectsHTML}
+                            </div>
+                        ` : ''}
+                        ${testPrepCourses.length > 0 ? `
+                            <div class="mb-4">
+                                <p class="font-medium mb-2 text-orange-700"><i class="fas fa-graduation-cap mr-1"></i>Test Prep Tutors</p>
+                                ${testPrepHTML}
                             </div>
                         ` : ''}
                     </div>
@@ -8309,6 +8338,11 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                 if (student.selectedSubjects) {
                     student.selectedSubjects.forEach((_, subIndex) => {
                         initializeTutorSearch(`sub-tutor-search-${studentIndex}-${subIndex}`, `sub-tutor-results-${studentIndex}-${subIndex}`, `selected-sub-tutor-${studentIndex}-${subIndex}`, tutors);
+                    });
+                }
+                if (student.testPrep) {
+                    student.testPrep.forEach((_, tpIndex) => {
+                        initializeTutorSearch(`tp-tutor-search-${studentIndex}-${tpIndex}`, `tp-tutor-results-${studentIndex}-${tpIndex}`, `selected-tp-tutor-${studentIndex}-${tpIndex}`, tutors);
                     });
                 }
             });
@@ -8552,6 +8586,37 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                     }
                 });
             }
+
+            // --- Test Prep Tutors (each course separately) ---
+            if (student.testPrep && student.testPrep.length > 0) {
+                student.testPrep.forEach((course, tpIndex) => {
+                    const tpTutorId = document.getElementById(`selected-tp-tutor-${studentIndex}-${tpIndex}`)?.value;
+                    if (tpTutorId) {
+                        const tpTutor = tutors.find(t => t.id === tpTutorId || t.email === tpTutorId);
+                        if (tpTutor) {
+                            const pendingTpRef = doc(collection(db, "pending_students"));
+                            batch.set(pendingTpRef, {
+                                studentName: student.name,
+                                tutorId: tpTutor.id,
+                                tutorName: tpTutor.name,
+                                tutorEmail: tpTutor.email,
+                                course: course.name || course,
+                                courseHours: course.hours || null,
+                                grade: student.grade,
+                                parentName: enrollmentData.parent?.name,
+                                parentPhone: enrollmentData.parent?.phone,
+                                parentEmail: enrollmentData.parent?.email,
+                                enrollmentId: enrollmentId,
+                                type: 'test_prep',
+                                status: 'pending',
+                                createdAt: Timestamp.now(),
+                                source: 'enrollment_approval',
+                                note: 'Test preparation assignment awaiting your acceptance'
+                            });
+                        }
+                    }
+                });
+            }
         });
 
         await batch.commit();
@@ -8563,9 +8628,8 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         // Clear relevant caches
         delete sessionCache.enrollments;
         delete sessionCache.pendingStudents;
-        // No need to delete students cache because we didn't create any students
 
-        // Refresh the view (invalidate cache since data changed)
+        // Refresh the view
         const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
         const mainContent = document.getElementById('main-content');
         if (currentNavId) invalidateTabCache(currentNavId);
@@ -8578,7 +8642,11 @@ async function approveEnrollmentWithDetails(enrollmentId) {
 
     } catch (error) {
         console.error("Error approving enrollment:", error);
-        alert("Failed to approve enrollment: " + error.message);
+        // Show user-friendly message — do not expose internal error details
+        const userMsg = error.message && error.message.startsWith('Please select')
+            ? error.message
+            : 'Failed to approve enrollment. Please check all fields and try again.';
+        alert(userMsg);
     }
 }
 
@@ -8975,7 +9043,6 @@ async function fetchRecallRequests(forceRefresh = false) {
         
     } catch (error) {
         console.error("❌ Error fetching recall requests:", error);
-        console.error("Error details:", error.message, error.stack);
         
         const container = document.getElementById('recall-requests-list');
         if (container) {
@@ -11019,7 +11086,7 @@ window.previewReport = async function(reportId) {
         }
     } catch (error) {
         console.error("Error previewing report:", error);
-        alert(`Error: ${error.message}`);
+        alert("An error occurred. Please try again.");
     }
 };
 
@@ -11071,7 +11138,7 @@ window.downloadSingleReport = async function(reportId, event) {
 
     } catch (error) {
         console.error("Error downloading report:", error);
-        alert(`Error downloading report: ${error.message}`);
+        alert("Failed to download report. Please try again.");
         document.getElementById('pdf-progress-modal')?.classList.add('hidden');
     } finally {
         if (button && originalText) {
@@ -12009,7 +12076,7 @@ async function renderAcademicFollowUpPanel(container) {
 
     } catch (err) {
         console.error('Academic Follow-Up error:', err);
-        document.getElementById('afu-loading').innerHTML = `<p class="text-red-500">❌ Error: ${err.message}</p>`;
+        document.getElementById('afu-loading').innerHTML = '<p class="text-red-500">Error loading follow-up data. Please refresh and try again.</p>';
     }
 }
 
@@ -12463,7 +12530,7 @@ async function renderUserDirectoryPanel(container) {
         } catch(err) {
             console.error('User Directory load error:', err);
             const loadingEl = document.getElementById('ud-loading');
-            if (loadingEl) loadingEl.innerHTML = `<p class="text-red-500">Error loading data: ${err.message}</p>`;
+            if (loadingEl) loadingEl.innerHTML = "<p class="text-red-500">Error loading data. Please refresh and try again.</p>";
         }
     }
 
@@ -12956,7 +13023,7 @@ async function renderManagementMessagingPanel(container) {
                     <div class="text-center py-10 text-red-400">
                         <i class="fas fa-exclamation-triangle text-3xl mb-3 block"></i>
                         <p class="font-medium">Failed to load inbox</p>
-                        <p class="text-sm mt-1">${escapeHtml(err.message)}</p>
+                        <p class="text-sm mt-1">Please refresh and try again.</p>
                         <button onclick="startInboxListener()" class="mt-3 text-sm text-blue-600 hover:underline">Try again</button>
                     </div>`;
             }
@@ -13434,6 +13501,12 @@ window.createManagementNotification = createManagementNotification;
 // ======================================================
 
 async function initManagementNotifications(staffData) {
+    // Tear down any existing listeners before rebuilding (prevents duplicate stacking)
+    if (window._bellUnsubs && window._bellUnsubs.length) {
+        window._bellUnsubs.forEach(u => { try { u(); } catch(e) {} });
+        window._bellUnsubs = [];
+    }
+
     const bellBtn = document.getElementById('notificationBell') || document.querySelector('[data-notification-bell]');
     if (!bellBtn) return;
 
