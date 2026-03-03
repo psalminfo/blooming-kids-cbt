@@ -2689,37 +2689,210 @@ function renderReportData(userData, assessmentResults, monthlyResults, parentPho
 }
 
 // Pre-loads all tabs silently in background so every tab click is instant
-async function preloadAllTabs(userId) {
+// Pure data fetch — writes straight to cache with zero DOM involvement.
+// userData is passed in from loadUserDashboard so no extra Firestore read needed.
+async function preloadAllTabs(userId, userData) {
+    const user = auth.currentUser;
+    if (!user || user.uid !== userId) return;
+
+    // Small delay so the reports tab renders fully first
+    await new Promise(r => setTimeout(r, 1500));
+
     try {
-        const user = auth.currentUser;
-        if (!user || user.uid !== userId) return;
+        // If userData not passed, fetch it (cold path fallback)
+        if (!userData) {
+            const userDoc = await db.collection('parent_users').doc(userId).get();
+            if (!userDoc.exists) return;
+            userData = userDoc.data();
+        }
 
-        // Stagger the preloads so they don't all fire at once
-        setTimeout(async () => {
-            if (!persistentCache.getTab(userId, 'academics', 30 * 60 * 1000)) {
-                // Only pre-cache if academics DOM element isn't already showing
-                const el = document.getElementById('academicsContent');
-                if (!el || !el.innerHTML.trim()) loadAcademicsData().catch(() => {});
+        const parentPhone = userData.normalizedPhone || userData.phone;
+        const email       = userData.email || '';
+
+        // Run all three preloads in parallel — none touch the DOM
+        await Promise.allSettled([
+            _preloadAcademicsCache(userId, parentPhone, email),
+            _preloadRewardsCache(userId, userData),
+            _preloadSettingsCache(userId, userData, parentPhone, email)
+        ]);
+    } catch (e) { /* silent — preload is best-effort */ }
+}
+
+// Fetch academics data and build HTML, save to cache — no DOM touched
+async function _preloadAcademicsCache(userId, parentPhone, email) {
+    if (persistentCache.getTab(userId, 'academics', 30 * 60 * 1000)) return; // already cached
+
+    const childrenResult = await comprehensiveFindChildren(parentPhone, email);
+    if (childrenResult.studentNames.length === 0) return;
+
+    const studentIdMapLocal   = childrenResult.studentNameIdMap;
+    const allStudentDataLocal = childrenResult.allStudentData;
+    let academicsHtml = '';
+
+    if (studentIdMapLocal.size > 1) {
+        academicsHtml += `<div class="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Select Student:</label>
+            <select id="studentSelector" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="onStudentSelected(this.value)">
+                <option value="">All Students</option>`;
+        childrenResult.studentNames.forEach(name => {
+            const info = allStudentDataLocal.find(s => s.name === name);
+            academicsHtml += `<option value="${safeText(name)}">${capitalize(name)}${info?.isPending ? ' (Pending Registration)' : ''}</option>`;
+        });
+        academicsHtml += `</select></div>`;
+    }
+
+    const studentPromises = childrenResult.studentNames.map(async (studentName) => {
+        const studentId   = studentIdMapLocal.get(studentName);
+        const studentInfo = allStudentDataLocal.find(s => s.name === studentName);
+        let sessionTopicsHtml = '', homeworkHtml = '';
+
+        if (studentId) {
+            const [topicsSnap, hwSnap] = await Promise.all([
+                db.collection('daily_topics').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
+                db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true }))
+            ]);
+
+            sessionTopicsHtml = topicsSnap.empty
+                ? `<div class="bg-gray-50 border rounded-lg p-6 text-center"><p class="text-gray-500">No session topics recorded yet.</p></div>`
+                : `<div class="bg-gray-50 border rounded-lg p-6 text-center"><p class="text-gray-500">Session topics loaded.</p></div>`;
+
+            if (hwSnap.empty) {
+                homeworkHtml = `<div class="bg-gray-50 border rounded-lg p-6 text-center"><p class="text-gray-500">No homework assignments yet.</p></div>`;
+            } else {
+                const now = Date.now();
+                hwSnap.forEach(doc => {
+                    const hw           = doc.data();
+                    const homeworkId   = doc.id;
+                    const dueTimestamp = getTimestamp(hw.dueDate);
+                    const isOverdue    = dueTimestamp && dueTimestamp < now && !['submitted','completed','graded'].includes(hw.status);
+                    const isSubmitted  = ['submitted','completed'].includes(hw.status);
+                    const isGraded     = hw.status === 'graded';
+                    const gradeValue   = hw.grade || hw.score || hw.overallGrade || hw.percentage || hw.marks;
+                    let gradeDisplay   = 'N/A';
+                    if (gradeValue != null) { const p = parseFloat(gradeValue); gradeDisplay = !isNaN(p) ? `${p}%` : gradeValue; }
+                    let statusColor, statusText, statusIcon, buttonText, buttonColor;
+                    if (isGraded)         { statusColor='bg-green-100 text-green-800';  statusText='Graded';    statusIcon='✅'; buttonText='View Grade & Feedback'; buttonColor='bg-green-600 hover:bg-green-700'; }
+                    else if (isSubmitted) { statusColor='bg-blue-100 text-blue-800';   statusText='Submitted'; statusIcon='📤'; buttonText='View Submission';       buttonColor='bg-blue-600 hover:bg-blue-700'; }
+                    else if (isOverdue)   { statusColor='bg-red-100 text-red-800';     statusText='Overdue';   statusIcon='⚠️'; buttonText='Upload Assignment';     buttonColor='bg-red-600 hover:bg-red-700'; }
+                    else { statusColor=hw.submissionUrl?'bg-yellow-100 text-yellow-800':'bg-gray-100 text-gray-800'; statusText=hw.submissionUrl?'Uploaded - Not Submitted':'Not Started'; statusIcon=hw.submissionUrl?'📎':'📝'; buttonText=hw.submissionUrl?'Review & Submit':'Download Assignment'; buttonColor=hw.submissionUrl?'bg-yellow-600 hover:bg-yellow-700':'bg-blue-600 hover:bg-blue-700'; }
+                    const safeTitle = safeText(hw.title||hw.subject||'Untitled Assignment');
+                    const safeDesc  = safeText(hw.description||hw.instructions||'No description provided.');
+                    const tutor     = safeText(hw.tutorName||hw.assignedBy||'Tutor');
+                    homeworkHtml += `<div class="bg-white border ${isOverdue?'border-red-200':'border-gray-200'} rounded-lg p-4 shadow-sm mb-4" data-homework-id="${homeworkId}" data-student-id="${studentId}">
+                        <div class="flex justify-between items-start mb-3">
+                            <div><h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
+                            <div class="mt-1 flex flex-wrap items-center gap-2"><span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusIcon} ${statusText}</span><span class="text-xs text-gray-600">Assigned by: ${tutor}</span></div></div>
+                            <span class="text-sm font-medium text-gray-700">Due: ${formatDetailedDate(new Date(dueTimestamp),true)}</span>
+                        </div>
+                        <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md text-gray-700 mb-4">${safeDesc}</p>
+                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                            <div>${hw.fileUrl?`<button onclick="forceDownload('${sanitizeUrl(hw.fileUrl)}','${safeText(hw.title||'assignment')}.pdf')" class="text-green-600 hover:text-green-800 font-medium text-sm">📥 Download Assignment</button>`:''}</div>
+                            ${gradeValue!=null?`<span class="font-bold ${typeof gradeValue==='number'?(gradeValue>=70?'text-green-600':gradeValue>=50?'text-yellow-600':'text-red-600'):'text-gray-600'}">Grade: ${gradeDisplay}</span>`:''}
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-gray-100">
+                            <button onclick="handleHomeworkAction('${homeworkId}','${studentId}','${isGraded?'graded':isSubmitted?'submitted':hw.submissionUrl?'uploaded':'pending'}')" class="w-full ${buttonColor} text-white px-4 py-2 rounded-lg font-semibold">${buttonText}</button>
+                        </div></div>`;
+                });
             }
-        }, 3000);
+        }
+        return { studentName, studentInfo, sessionTopicsHtml, homeworkHtml };
+    });
 
-        setTimeout(async () => {
-            if (!persistentCache.getTab(userId, 'rewards', 4 * 60 * 60 * 1000)) {
-                const el = document.getElementById('rewardsContent');
-                if (!el || !el.innerHTML.trim()) loadReferralRewards(userId).catch(() => {});
-            }
-        }, 5000);
+    const results = await Promise.all(studentPromises);
+    results.forEach(({ studentName, studentInfo, sessionTopicsHtml, homeworkHtml }) => {
+        academicsHtml += `
+            <div class="bg-gradient-to-r from-green-100 to-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6">
+                <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}${studentInfo?.isPending?'<span class="text-yellow-600 text-sm"> (Pending Registration)</span>':''}</h2>
+                <p class="text-green-600">Academic progress and assignments</p>
+            </div>
+            <div class="mb-8">
+                <button onclick="toggleAcademicsAccordion('session-topics-${safeText(studentName)}')" class="w-full flex justify-between items-center p-4 bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 mb-4">
+                    <div class="flex items-center"><span class="text-xl mr-3">📝</span><h3 class="font-bold text-blue-800 text-lg">Session Topics</h3></div>
+                    <span id="session-topics-${safeText(studentName)}-arrow" class="text-blue-600 text-xl">▼</span>
+                </button>
+                <div id="session-topics-${safeText(studentName)}-content" class="hidden">${sessionTopicsHtml}</div>
+            </div>
+            <div class="mb-8">
+                <button onclick="toggleAcademicsAccordion('homework-${safeText(studentName)}')" class="w-full flex justify-between items-center p-4 bg-purple-100 border border-purple-300 rounded-lg hover:bg-purple-200 mb-4">
+                    <div class="flex items-center"><span class="text-xl mr-3">📚</span><h3 class="font-bold text-purple-800 text-lg">Homework Assignments</h3></div>
+                    <span id="homework-${safeText(studentName)}-arrow" class="text-purple-600 text-xl">▼</span>
+                </button>
+                <div id="homework-${safeText(studentName)}-content" class="hidden">${homeworkHtml}</div>
+            </div>`;
+    });
 
-        setTimeout(async () => {
-            if (!persistentCache.getTab(userId, 'settings', 4 * 60 * 60 * 1000)) {
-                const el = document.getElementById('settingsDynamicContent');
-                if (!el || !el.innerHTML.trim()) {
-                    if (window.settingsManager) window.settingsManager.loadSettingsData().catch(() => {});
-                }
-            }
-        }, 7000);
+    persistentCache.setTab(userId, 'academics', {
+        html:               academicsHtml,
+        studentNames:       childrenResult.studentNames,
+        studentNameIdPairs: [...studentIdMapLocal.entries()],
+        minStudentData:     allStudentDataLocal.map(s => ({ id: s.id, name: s.name, isPending: s.isPending, collection: s.collection }))
+    });
+}
 
-    } catch (e) { /* silent */ }
+// Fetch rewards data and build HTML, save to cache — no DOM touched
+async function _preloadRewardsCache(userId, userData) {
+    if (persistentCache.getTab(userId, 'rewards', 4 * 60 * 60 * 1000)) return;
+
+    const referralCode  = safeText(userData.referralCode || 'N/A');
+    const totalEarnings = userData.referralEarnings || 0;
+    const snap          = await db.collection('referral_transactions').where('ownerUid', '==', userId).get();
+
+    let referralsHtml = '', pendingCount = 0, approvedCount = 0, paidCount = 0;
+
+    if (snap.empty) {
+        referralsHtml = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>`;
+    } else {
+        const txns = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        txns.sort((a,b) => (b.timestamp?.toDate?.() || new Date(0)) - (a.timestamp?.toDate?.() || new Date(0)));
+        txns.forEach(data => {
+            const status = safeText(data.status || 'pending');
+            const sc     = status==='paid'?'bg-green-100 text-green-800':status==='approved'?'bg-blue-100 text-blue-800':'bg-yellow-100 text-yellow-800';
+            if (status==='pending') pendingCount++; if (status==='approved') approvedCount++; if (status==='paid') paidCount++;
+            const name   = capitalize(data.referredStudentName || data.referredStudentPhone);
+            const amount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
+            const date   = data.timestamp?.toDate?.().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) || 'N/A';
+            referralsHtml += `<tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm font-medium text-gray-900">${name}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${safeText(date)}</td>
+                <td class="px-4 py-3 text-sm"><span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${sc}">${capitalize(status)}</span></td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-bold">${safeText(amount)}</td></tr>`;
+        });
+    }
+
+    const html = `
+        <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
+            <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
+            <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
+            <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600"><p class="text-sm font-medium text-green-700">Total Earnings</p><p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p></div>
+            <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600"><p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p><p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p></div>
+            <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600"><p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p><p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p></div>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
+        <div class="overflow-x-auto bg-white rounded-lg shadow">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Referred Parent/Student</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Used</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reward</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-200">${referralsHtml}</tbody>
+            </table>
+        </div>`;
+
+    persistentCache.setTab(userId, 'rewards', { html });
+}
+
+// Fetch settings data and build HTML, save to cache — no DOM touched
+async function _preloadSettingsCache(userId, userData, parentPhone, email) {
+    if (persistentCache.getTab(userId, 'settings', 4 * 60 * 60 * 1000)) return;
+
+    const childrenResult = await comprehensiveFindChildren(parentPhone, email);
+    const html = _buildSettingsHtml(userData, childrenResult.allStudentData);
+    if (html) persistentCache.setTab(userId, 'settings', { html });
 }
 
 // Silently fetches fresh data in the background after showing cached data.
@@ -2799,7 +2972,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }, 1500); // small delay so the render completes first
 
             // Pre-load all other tabs so they're instant on first click
-            preloadAllTabs(userId);
+            preloadAllTabs(userId, cached.userData);
 
             return;
         }
@@ -2831,7 +3004,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         renderReportData(userData, assessmentResults, monthlyResults, parentPhone, userId);
 
         // Pre-load all other tabs in background so they're instant on first click
-        preloadAllTabs(userId);
+        preloadAllTabs(userId, userData);
 
         setTimeout(() => {
             setupRealTimeMonitoring(parentPhone, userId);
@@ -3168,6 +3341,96 @@ function addLogoutButton() {
     buttonContainer.appendChild(logoutBtn);
 }
 
+// Pure HTML builder for settings — no DOM reads or writes.
+// Used by both renderSettingsForm (live render) and _preloadSettingsCache (background).
+function _buildSettingsHtml(userData, students) {
+    let html = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="md:col-span-1 space-y-6">
+                <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Parent Profile</h3>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                    <input type="text" id="settingParentName" value="${safeText(userData.parentName || 'Parent')}"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Primary Phone (Login)</label>
+                    <input type="text" value="${safeText(userData.phone)}" disabled
+                        class="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed">
+                    <p class="text-xs text-gray-500 mt-1">To change login phone, please contact support.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" id="settingParentEmail" value="${safeText(userData.email || '')}"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button onclick="window.settingsManager.saveParentProfile()"
+                    class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Update My Profile
+                </button>
+            </div>
+            <div class="md:col-span-2 space-y-6">
+                <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Children & Linked Contacts</h3>
+                ${students.length === 0 ? '<p class="text-gray-500 italic">No students linked yet.</p>' : ''}
+                <div class="space-y-6">`;
+
+    students.forEach((student) => {
+        const data         = student.data;
+        const gender       = data.gender       || '';
+        const motherPhone  = data.motherPhone  || '';
+        const fatherPhone  = data.fatherPhone  || '';
+        const guardianEmail = data.guardianEmail || '';
+        html += `
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Student Name</label>
+                        <input type="text" id="studentName_${student.id}" value="${safeText(student.name)}"
+                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-500 font-semibold text-gray-800">
+                    </div>
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Gender</label>
+                        <select id="studentGender_${student.id}" class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white">
+                            <option value="" ${gender===''?'selected':''}>Select Gender...</option>
+                            <option value="Male" ${gender==='Male'?'selected':''}>Male</option>
+                            <option value="Female" ${gender==='Female'?'selected':''}>Female</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2 border-t border-gray-200 pt-3 mt-1">
+                        <p class="text-sm font-semibold text-blue-800 mb-2">📞 Additional Contacts (For Access)</p>
+                        <p class="text-xs text-gray-500 mb-3">Add Father/Mother numbers here. Anyone with these numbers can log in or view reports.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-500">Mother's Phone</label>
+                                <input type="tel" id="motherPhone_${student.id}" value="${safeText(motherPhone)}" placeholder="+1..."
+                                    class="w-full px-3 py-1.5 border rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500">Father's Phone</label>
+                                <input type="tel" id="fatherPhone_${student.id}" value="${safeText(fatherPhone)}" placeholder="+1..."
+                                    class="w-full px-3 py-1.5 border rounded text-sm">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-xs text-gray-500">Secondary Email (CC for Reports)</label>
+                                <input type="email" id="guardianEmail_${student.id}" value="${safeText(guardianEmail)}"
+                                    class="w-full px-3 py-1.5 border rounded text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-2 mt-2 flex justify-end">
+                        <button onclick="window.settingsManager.updateStudent('${student.id}', '${student.collection}')"
+                            class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center">
+                            <span>💾 Save ${safeText(student.name)}'s Details</span>
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+    });
+
+    html += `</div></div></div>`;
+    return html;
+}
+
 // ============================================================================
 // SECTION 17: SETTINGS MANAGER
 // ============================================================================
@@ -3293,112 +3556,7 @@ class SettingsManager {
 
     renderSettingsForm(userData, students) {
         const content = document.getElementById('settingsDynamicContent');
-        
-        let html = `
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="md:col-span-1 space-y-6">
-                    <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Parent Profile</h3>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-                        <input type="text" id="settingParentName" value="${safeText(userData.parentName || 'Parent')}" 
-                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Primary Phone (Login)</label>
-                        <input type="text" value="${safeText(userData.phone)}" disabled 
-                            class="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed">
-                        <p class="text-xs text-gray-500 mt-1">To change login phone, please contact support.</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                        <input type="email" id="settingParentEmail" value="${safeText(userData.email || '')}" 
-                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <button onclick="window.settingsManager.saveParentProfile()" 
-                        class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                        Update My Profile
-                    </button>
-                </div>
-
-                <div class="md:col-span-2 space-y-6">
-                    <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Children & Linked Contacts</h3>
-                    
-                    ${students.length === 0 ? '<p class="text-gray-500 italic">No students linked yet.</p>' : ''}
-                    
-                    <div class="space-y-6">
-        `;
-
-        students.forEach((student, index) => {
-            const data = student.data;
-            const gender = data.gender || '';
-            const motherPhone = data.motherPhone || '';
-            const fatherPhone = data.fatherPhone || '';
-            const guardianEmail = data.guardianEmail || '';
-
-            html += `
-                <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Student Name</label>
-                            <input type="text" id="studentName_${student.id}" value="${safeText(student.name)}" 
-                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-500 font-semibold text-gray-800">
-                        </div>
-
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Gender</label>
-                            <select id="studentGender_${student.id}" class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white">
-                                <option value="" ${gender === '' ? 'selected' : ''}>Select Gender...</option>
-                                <option value="Male" ${gender === 'Male' ? 'selected' : ''}>Male</option>
-                                <option value="Female" ${gender === 'Female' ? 'selected' : ''}>Female</option>
-                            </select>
-                        </div>
-
-                        <div class="col-span-2 border-t border-gray-200 pt-3 mt-1">
-                            <p class="text-sm font-semibold text-blue-800 mb-2">📞 Additional Contacts (For Access)</p>
-                            <p class="text-xs text-gray-500 mb-3">Add Father/Mother numbers here. Anyone with these numbers can log in or view reports.</p>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs text-gray-500">Mother's Phone</label>
-                                    <input type="tel" id="motherPhone_${student.id}" value="${safeText(motherPhone)}" placeholder="+1..."
-                                        class="w-full px-3 py-1.5 border rounded text-sm">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-500">Father's Phone</label>
-                                    <input type="tel" id="fatherPhone_${student.id}" value="${safeText(fatherPhone)}" placeholder="+1..."
-                                        class="w-full px-3 py-1.5 border rounded text-sm">
-                                </div>
-                                <div class="col-span-2">
-                                    <label class="block text-xs text-gray-500">Secondary Email (CC for Reports)</label>
-                                    <input type="email" id="guardianEmail_${student.id}" value="${safeText(guardianEmail)}" 
-                                        class="w-full px-3 py-1.5 border rounded text-sm">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-span-2 mt-2 flex justify-end">
-                            <button onclick="window.settingsManager.updateStudent('${student.id}', '${student.collection}')" 
-                                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center">
-                                <span>💾 Save ${safeText(student.name)}'s Details</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-
-        html += `
-                    </div>
-                </div>
-            </div>
-        `;
-
-        content.innerHTML = html;
+        if (content) content.innerHTML = _buildSettingsHtml(userData, students);
     }
 
     async saveParentProfile() {
