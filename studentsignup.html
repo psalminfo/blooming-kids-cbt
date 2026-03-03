@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Production Tailwind CSS via CDN (still) but with CSP fix -->
+    <!-- Production Tailwind CSS via CDN -->
     <!-- In true production, you should build Tailwind locally -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -16,7 +16,6 @@
     
     <title>BKH Student Portal | Intelligent LMS</title>
     
-    <!-- Inline styles to avoid CSP issues -->
     <style>
         * {
             box-sizing: border-box;
@@ -42,20 +41,6 @@
         .glass { 
             background: rgba(255, 255, 255, 0.8); 
             backdrop-filter: blur(10px); 
-        }
-        
-        .google-btn {
-            background: white;
-            color: #757575;
-            border: 1px solid #ddd;
-            transition: all 0.3s ease;
-        }
-        
-        .google-btn:hover {
-            background: #f8f8f8;
-            border-color: #ccc;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transform: translateY(-1px);
         }
         
         .tab-btn {
@@ -244,17 +229,14 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Custom checkbox */
         input[type="checkbox"] {
             accent-color: #059669;
         }
         
-        /* Smooth transitions */
         .transition-all-custom {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        /* Security badge */
         .security-badge {
             display: inline-flex;
             align-items: center;
@@ -267,19 +249,16 @@
             font-weight: 600;
         }
         
-        /* Custom rounded corners */
         .rounded-5xl {
             border-radius: 2.5rem;
         }
         
-        /* Focus styles */
         .focus-ring:focus {
             outline: none;
             ring: 4px;
             ring-color: rgba(5, 150, 105, 0.2);
         }
         
-        /* Brand colors */
         .brand-light { color: #f0fdf4; }
         .brand-primary { color: #059669; }
         .brand-dark { color: #064e3b; }
@@ -292,7 +271,6 @@
         .bg-brand-accent { background-color: #fbbf24; }
         .bg-brand-danger { background-color: #dc2626; }
         
-        /* Gradient backgrounds */
         .bg-gradient-brand {
             background: linear-gradient(135deg, #059669 0%, #064e3b 100%);
         }
@@ -311,6 +289,7 @@
     <div id="toast-container"></div>
 
     <div class="flex flex-col lg:flex-row w-full max-w-5xl bg-white rounded-5xl shadow-2xl overflow-hidden min-h-[700px] border border-gray-100">
+        
         <!-- Left Side - Hero Section -->
         <div class="hidden lg:flex lg:w-2/5 hero-gradient p-12 flex-col justify-between text-white relative overflow-hidden">
             <!-- Background patterns -->
@@ -325,8 +304,9 @@
                 <h1 class="text-5xl font-black leading-tight tracking-tight">
                     BKH <br>Student <br><span class="text-yellow-400">Portal.</span>
                 </h1>
+                <!-- FIX: Removed "military-grade encryption" false claim -->
                 <p class="text-emerald-100/90 text-lg font-medium leading-relaxed">
-                    Enterprise-grade security with military-grade encryption. Your data is protected 24/7 with automated threat detection.
+                    Enterprise-grade security powered by Firebase Authentication. Your data is protected with industry-standard encryption, in transit and at rest.
                 </p>
                 
                 <!-- Security Features List -->
@@ -357,17 +337,18 @@
                         </div>
                         <div>
                             <h4 class="font-bold">Regular security audits</h4>
-                            <p class="text-emerald-100/70 text-sm">Continuous monitoring and penetration testing</p>
+                            <p class="text-emerald-100/70 text-sm">Continuous monitoring and threat detection</p>
                         </div>
                     </div>
                 </div>
             </div>
             
+            <!-- FIX: Removed false ISO 27001 badge — replaced with accurate statement -->
             <div class="relative z-10">
                 <div class="flex items-center justify-between text-xs opacity-70">
                     <div class="security-badge">
                         <i class="fas fa-shield-check"></i>
-                        ISO 27001 Certified
+                        Secured by Firebase
                     </div>
                     <span>Powered by Blooming Kids House</span>
                 </div>
@@ -383,7 +364,7 @@
                     <i class="fas fa-shield-alt text-4xl text-white"></i>
                 </div>
                 <h2 class="text-3xl font-black text-gray-900 mb-2">Secure Student Portal</h2>
-                <p class="text-gray-600">Enterprise-grade security for your education</p>
+                <p class="text-gray-600">Powered by Firebase Authentication</p>
             </div>
             
             <!-- Tabs for Activation vs Login -->
@@ -398,6 +379,7 @@
 
             <!-- Activation Flow -->
             <div id="activation-flow" class="space-y-6">
+                
                 <!-- Step 1: Parent Verification -->
                 <div id="step-1" class="space-y-6 fade-in">
                     <div class="mb-10">
@@ -441,22 +423,6 @@
                         <span id="find-profile-loading" class="hidden items-center justify-center">
                             <i class="fas fa-spinner spinner mr-3"></i>Verifying...
                         </span>
-                    </button>
-                    
-                    <!-- Divider with Google Sign-in option -->
-                    <div class="relative py-6">
-                        <div class="absolute inset-0 flex items-center">
-                            <div class="w-full border-t-2 border-gray-200"></div>
-                        </div>
-                        <div class="relative flex justify-center text-sm">
-                            <span class="px-5 bg-white text-gray-500 font-medium">Or activate with</span>
-                        </div>
-                    </div>
-                    
-                    <button id="google-activate-btn" 
-                            class="w-full google-btn font-bold py-5 rounded-3xl flex items-center justify-center gap-4 hover:shadow-lg text-lg">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIyLjU2IDEyLjI1QzIyLjU2IDExLjQ3IDIyLjQ5IDEwLjcyIDIyLjM2IDEwSDEyVjE0LjI1SDE4LjA5QzE3LjkzIDE1LjMgMTcuMjIgMTYuMTUgMTYuMDIgMTYuNzJWMjAuMDJIMTkuNjRDMjEuNTUgMTguMjQgMjIuNTYgMTUuNSAyMi41NiAxMi4yNVoiIGZpbGw9IiM0Mjg1RjQiLz4KPHBhdGggZD0iTTEyIDIzQzE1LjMgMjMgMTcuOTYgMjEuOTIgMTkuNjQgMjAuMDJMMTYuMDIgMTYuNzJDMTQuOTcgMTcuMjcgMTMuNjUgMTcuNjUgMTIgMTcuNjVDOC44NyAxNy42NSA2LjIxIDE1LjYgNS40NiAxMi44MUgxLjY0VjE2LjE5QzMuMzQgMTkuNDcgNi43IDIyIDEyIDIyWiIgZmlsbD0iIzM0QTg1MyIvPgo8cGF0aCBkPSJNNS40NiAxMi44MUM1LjIgMTEuODEgNS4wOSAxMC43NiA1LjA5IDkuNzVDNS4wOSA4LjczOSA1LjIgNy42OSA1LjQ2IDYuNjlWMy4zMUgxLjY0QzAuNTYgNS4zOSAwIDcuNzggMCA5Ljc1QzAgMTEuNzIgMC41NiAxNC4xMSAxLjY0IDE2LjE5TDUuNDYgMTIuODFaIiBmaWxsPSIiIGlkPSJhIi8+CjxwYXRoIGQ9Ik0xMiA1LjM4QzEzLjYyIDUuMzggMTUuMDYgNS45NCAxNi4xMiA3LjA4TDE5Ljc4IDMuNDJDMTcuOTYgMS43MyAxNS4zIDAgMTIgMEM2LjcgMCAzLjM0IDIuNTMgMS42NCA1LjgxTDUuNDYgOS4xOUM2LjIxIDYuNCA4Ljg3IDQuMzggMTIgNC4zOFoiIGZpbGw9IiNGRjcxMDAiLz4KPC9zdmc+'">
-                        Google Account
                     </button>
                     
                     <div class="pt-4 border-t border-gray-100">
@@ -546,7 +512,7 @@
                             </ul>
                         </div>
                         
-                        <!-- Remember Me -->
+                        <!-- FIX: Remember Me is unchecked by default — protects students on shared devices -->
                         <div class="flex items-center space-x-3 pt-4">
                             <input type="checkbox" id="remember-me-activation" 
                                    class="w-6 h-6 rounded-lg text-green-600 focus:ring-4 focus:ring-green-100 focus-ring">
@@ -556,15 +522,15 @@
                         </div>
                     </div>
 
-
                     <!-- Privacy Consent -->
                     <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;margin-bottom:8px;">
                         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.82rem;color:#0c4a6e;line-height:1.5;">
-                            <input type="checkbox" id="student-privacy-consent" style="margin-top:2px;flex-shrink:0;accent-color:#0ea5e9;">
+                            <input type="checkbox" id="student-privacy-consent" style="margin-top:2px;flex-shrink:0;accent-color:#0ea5e9;" required>
                             <span>I agree to the <a href="#" onclick="showPrivacyPolicy();return false;" style="color:#0369a1;font-weight:700;text-decoration:underline;">Privacy Policy</a> and consent to BrightKids Hub collecting and processing my data in accordance with NDPA, GDPR, and COPPA. Parents/guardians confirm they have reviewed this on behalf of minors under 13.</span>
                         </label>
                     </div>
-                    <button id="activate-portal-btn" 
+
+                    <button id="activate-portal-btn" disabled
                             class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-green-900 font-black py-6 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 active:scale-[0.98] transition-all-custom disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
                         <span id="activate-text" class="flex items-center justify-center">
                             <i class="fas fa-rocket mr-3"></i>Activate My Portal
@@ -636,10 +602,10 @@
                         </div>
                     </div>
                     
-                    <!-- Remember Me -->
+                    <!-- FIX: Remember Me unchecked by default to protect students on shared devices -->
                     <div class="flex items-center space-x-3 pt-2">
                         <input type="checkbox" id="remember-me-login" 
-                               class="w-6 h-6 rounded-lg text-green-600 focus:ring-4 focus:ring-green-100 focus-ring" checked>
+                               class="w-6 h-6 rounded-lg text-green-600 focus:ring-4 focus:ring-green-100 focus-ring">
                         <label for="remember-me-login" class="text-gray-700 font-medium cursor-pointer">
                             <i class="fas fa-history mr-2"></i>Remember me for 30 days
                         </label>
@@ -654,12 +620,6 @@
                     <span id="login-loading" class="hidden items-center justify-center">
                         <i class="fas fa-spinner spinner mr-3"></i>Verifying...
                     </span>
-                </button>
-                
-                <button id="google-login-btn" 
-                        class="w-full google-btn font-bold py-5 rounded-3xl flex items-center justify-center gap-4 hover:shadow-lg text-lg">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6" onerror="this.onerror=null;this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIyLjU2IDEyLjI1QzIyLjU2IDExLjQ3IDIyLjQ5IDEwLjcyIDIyLjM2IDEwSDEyVjE0LjI1SDE4LjA5QzE3LjkzIDE1LjMgMTcuMjIgMTYuMTUgMTYuMDIgMTYuNzJWMjAuMDJIMTkuNjRDMjEuNTUgMTguMjQgMjIuNTYgMTUuNSAyMi41NiAxMi4yNVoiIGZpbGw9IiM0Mjg1RjQiLz4KPHBhdGggZD0iTTEyIDIzQzE1LjMgMjMgMTcuOTYgMjEuOTIgMTkuNjQgMjAuMDJMMTYuMDIgMTYuNzJDMTQuOTcgMTcuMjcgMTMuNjUgMTcuNjUgMTIgMTcuNjVDOC44NyAxNy42NSA2LjIxIDE1LjYgNS40NiAxMi44MUgxLjY0VjE2LjE5QzMuMzQgMTkuNDcgNi43IDIyIDEyIDIyWiIgZmlsbD0iIzM0QTg1MyIvPgo8cGF0aCBkPSJNNS40NiAxMi44MUM1LjIgMTEuODEgNS4wOSAxMC43NiA1LjA5IDkuNzVDNS4wOSA4LjczOSA1LjIgNy42OSA1LjQ2IDYuNjlWMy4zMUgxLjY0QzAuNTYgNS4zOSAwIDcuNzggMCA5Ljc1QzAgMTEuNzIgMC41NiAxNC4xMSAxLjY0IDE2LjE5TDUuNDYgMTIuODFaIiBmaWxsPSIiIGlkPSJhIi8+CjxwYXRoIGQ9Ik0xMiA1LjM4QzEzLjYyIDUuMzggMTUuMDYgNS45NCAxNi4xMiA3LjA4TDE5Ljc4IDMuNDJjLTEuODItMS42OS00LjQ4LTMuMTUtOC4xLTMuMTVDNi43IDAgMy4zNCAyLjUzIDEuNjQgNS44MUw1LjQ2IDkuMTlDNi4yMSA2LjQgOC44NyA0LjM4IDEyIDQuMzhaIiBmaWxsPSIjRkY3MTAwIi8+Cjwvc3ZnPgo='">
-                        Continue with Google
                 </button>
                 
                 <p class="text-center text-gray-600 mt-6">
@@ -736,9 +696,8 @@
     <!-- External JavaScript Module -->
     <script type="module" src="./studentsignup-app.js"></script>
     
-    <!-- Inline initialization script (small, event listeners only) -->
+    <!-- Inline initialization script (event listeners only) -->
     <script>
-        // DOM event listeners - this is minimal and necessary
         document.addEventListener('DOMContentLoaded', function() {
             // Tab switching
             document.getElementById('tab-activate').addEventListener('click', function() {
@@ -806,19 +765,11 @@
                 window.loginStudent();
             });
             
-            document.getElementById('google-activate-btn').addEventListener('click', function() {
-                window.signInWithGoogleForActivation();
-            });
-            
-            document.getElementById('google-login-btn').addEventListener('click', function() {
-                window.signInWithGoogle();
-            });
-            
             document.getElementById('send-reset-btn').addEventListener('click', function() {
                 window.sendPasswordReset();
             });
             
-            // Auto-fill remembered email
+            // Auto-fill remembered email on login tab
             const rememberedEmail = localStorage.getItem('student_email');
             const rememberMe = localStorage.getItem('student_remember_me') === 'true';
             
@@ -829,39 +780,27 @@
             
             // Enter key support
             document.getElementById('parent-email').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    window.findStudents();
-                }
+                if (e.key === 'Enter') { window.findStudents(); }
             });
             
             document.getElementById('student-email-input').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    document.getElementById('student-pass').focus();
-                }
+                if (e.key === 'Enter') { document.getElementById('student-pass').focus(); }
             });
             
             document.getElementById('student-pass').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    window.completeRegistration();
-                }
+                if (e.key === 'Enter') { window.completeRegistration(); }
             });
             
             document.getElementById('login-email').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    document.getElementById('login-password').focus();
-                }
+                if (e.key === 'Enter') { document.getElementById('login-password').focus(); }
             });
             
             document.getElementById('login-password').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    window.loginStudent();
-                }
+                if (e.key === 'Enter') { window.loginStudent(); }
             });
             
             document.getElementById('reset-email').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    window.sendPasswordReset();
-                }
+                if (e.key === 'Enter') { window.sendPasswordReset(); }
             });
             
             // Initial focus
@@ -914,7 +853,7 @@
             <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">Children Privacy (COPPA)</h3>
             <p style="font-size:0.875rem;color:#475569;margin-bottom:16px;line-height:1.6;">We never knowingly collect personal data from children under 13 without verifiable parental consent. Parents may review, update, or delete their child's information by contacting us.</p>
             <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">Contact Us</h3>
-            <p style="font-size:0.875rem;color:#475569;line-height:1.6;">For data requests or privacy concerns, contact: <strong>privacy@brightkidshub.com</strong></p>
+            <p style="font-size:0.875rem;color:#475569;line-height:1.6;">For data requests or privacy concerns, contact: <strong>admin@brightkidshub.com</strong></p>
         </div>
         <div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;">
             <button onclick="closePrivacyPolicy()" style="background:#1e40af;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:700;cursor:pointer;">Close</button>
@@ -925,15 +864,14 @@
 <script>
 (function() {
     var CONSENT_KEY = "bkh_cookie_consent";
-    function showBanner() { var b=document.getElementById("privacyCookieBanner"); if(b) b.style.display="block"; }
-    function hideBanner() { var b=document.getElementById("privacyCookieBanner"); if(b) b.style.display="none"; }
-    window.acceptPrivacyCookies = function() { localStorage.setItem(CONSENT_KEY,"all"); hideBanner(); };
-    window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY,"essential"); hideBanner(); };
-    window.showPrivacyPolicy = function() { var m=document.getElementById("privacyPolicyModal"); if(m){m.style.display="flex";} };
-    window.closePrivacyPolicy = function() { var m=document.getElementById("privacyPolicyModal"); if(m){m.style.display="none";} };
-    document.addEventListener("DOMContentLoaded", function() {
-        if (!localStorage.getItem(CONSENT_KEY)) showBanner();
-    });
+    function showBanner() { var b = document.getElementById("privacyCookieBanner"); if (b) b.style.display = "block"; }
+    function hideBanner() { var b = document.getElementById("privacyCookieBanner"); if (b) b.style.display = "none"; }
+    window.acceptPrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "all"); hideBanner(); };
+    window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "essential"); hideBanner(); };
+    window.showPrivacyPolicy = function() { var m = document.getElementById("privacyPolicyModal"); if (m) { m.style.display = "flex"; } };
+    window.closePrivacyPolicy = function() { var m = document.getElementById("privacyPolicyModal"); if (m) { m.style.display = "none"; } };
+    // Show banner if consent not yet given
+    if (!localStorage.getItem(CONSENT_KEY)) { showBanner(); }
 })();
 </script>
 
