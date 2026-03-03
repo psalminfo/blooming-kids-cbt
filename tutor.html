@@ -3,15 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- SECURITY: Content Security Policy -->
+    <!-- SECURITY: Content Security Policy
+         Note: frame-ancestors only works as an HTTP header, not a meta tag.
+         Set it at your hosting/server level instead.
+    -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-        connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.cloudinary.com;
-        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-        font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
+        script-src 'self' 'unsafe-inline'
+            https://www.gstatic.com
+            https://cdn.jsdelivr.net
+            https://cdnjs.cloudflare.com
+            https://html2canvas.hertzen.com;
+        connect-src 'self'
+            https://*.googleapis.com
+            https://*.firebaseio.com
+            https://*.firebasestorage.googleapis.com
+            https://identitytoolkit.googleapis.com
+            https://securetoken.googleapis.com
+            https://firestore.googleapis.com
+            https://firebase.googleapis.com
+            wss://*.firebaseio.com
+            https://api.cloudinary.com
+            https://res.cloudinary.com;
+        style-src 'self' 'unsafe-inline'
+            https://fonts.googleapis.com
+            https://cdn.jsdelivr.net
+            https://cdnjs.cloudflare.com;
+        font-src 'self'
+            https://fonts.gstatic.com
+            https://cdnjs.cloudflare.com;
         img-src 'self' data: https: blob:;
-        frame-ancestors 'none';
+        media-src 'self' blob: https://res.cloudinary.com;
     ">
     <title>Blooming · Tutor Portal</title>
 
@@ -954,6 +976,288 @@
             background-color: var(--danger);
             border-radius: 50%; width: 8px; height: 8px;
             display: inline-block; margin-left: 0.4rem;
+        }
+
+        /* ══════════════════════════════════════════════════
+           DARK MODE — COMPREHENSIVE OVERRIDES
+           All components that were hardcoded to light colours
+           now respond correctly when body.dark is active.
+           ══════════════════════════════════════════════════ */
+
+        /* ── Cards ────────────────────────────────────── */
+        body.dark .card {
+            background: #0f1e2e;
+            border-color: rgba(255,255,255,0.08);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        body.dark .card:hover {
+            box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+        }
+        body.dark .card-header {
+            border-bottom-color: rgba(255,255,255,0.08);
+            color: #e2e8f0;
+        }
+        body.dark .card-footer {
+            background-color: #0a1520;
+            border-top-color: rgba(255,255,255,0.08);
+            color: #94a3b8;
+        }
+
+        /* ── Forms ────────────────────────────────────── */
+        body.dark .form-input,
+        body.dark .form-textarea,
+        body.dark textarea,
+        body.dark input[type="text"],
+        body.dark input[type="number"],
+        body.dark input[type="email"],
+        body.dark input[type="password"],
+        body.dark select {
+            background: #0f1e2e;
+            border-color: rgba(255,255,255,0.12);
+            color: #e2e8f0;
+        }
+        body.dark .form-input:focus,
+        body.dark textarea:focus,
+        body.dark input:focus,
+        body.dark select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(34,197,94,0.15);
+        }
+        body.dark .form-label { color: #cbd5e1; }
+        body.dark .form-input::placeholder,
+        body.dark textarea::placeholder { color: #475569; }
+
+        /* ── Modals ───────────────────────────────────── */
+        body.dark .modal-content {
+            background: #0f1e2e;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+        }
+        body.dark .modal-header {
+            border-bottom-color: rgba(255,255,255,0.08);
+            color: #e2e8f0;
+        }
+        body.dark .modal-title { color: #e2e8f0; }
+        body.dark .modal-body  { color: #cbd5e1; }
+        body.dark .modal-footer {
+            background: #0a1520;
+            border-top-color: rgba(255,255,255,0.08);
+        }
+
+        /* ── Buttons ──────────────────────────────────── */
+        body.dark .btn-secondary {
+            background-color: #1e3a5f;
+            color: #e2e8f0;
+            border-color: rgba(255,255,255,0.12);
+        }
+        body.dark .btn-secondary:hover {
+            background-color: #243f66;
+            border-color: rgba(255,255,255,0.20);
+        }
+
+        /* ── Tables ───────────────────────────────────── */
+        body.dark .table-container {
+            border-color: rgba(255,255,255,0.08);
+        }
+        body.dark .table th {
+            background-color: #0a1520;
+            color: #94a3b8;
+            border-bottom-color: rgba(255,255,255,0.08);
+        }
+        body.dark .table td {
+            border-bottom-color: rgba(255,255,255,0.05);
+            color: #cbd5e1;
+        }
+        body.dark .table tbody tr:hover {
+            background-color: rgba(255,255,255,0.04);
+        }
+
+        /* ── Badges ───────────────────────────────────── */
+        body.dark .badge-success  { background-color: #052e16; color: #4ade80; }
+        body.dark .badge-warning  { background-color: #1c1400; color: #fbbf24; }
+        body.dark .badge-danger   { background-color: #1f0a0a; color: #f87171; }
+        body.dark .badge-info     { background-color: #0c1a3a; color: #60a5fa; }
+        body.dark .badge-secondary{ background-color: #1e293b; color: #94a3b8; }
+
+        /* ── Student / Action Cards ───────────────────── */
+        body.dark .student-action-card,
+        body.dark .recipient-option {
+            background: #0f1e2e;
+            border-color: rgba(255,255,255,0.10);
+            color: #e2e8f0;
+        }
+        body.dark .student-action-card:hover,
+        body.dark .recipient-option:hover {
+            border-color: var(--primary);
+            background: #0a2010;
+        }
+        body.dark .recipient-option.selected {
+            border-color: var(--primary);
+            background: #052e16;
+        }
+
+        /* ── Skeleton loader ──────────────────────────── */
+        body.dark .skeleton-loader {
+            background: rgba(15,30,46,0.6);
+            border-color: rgba(255,255,255,0.08);
+        }
+
+        /* ── File upload ──────────────────────────────── */
+        body.dark .file-upload-container {
+            background: #0f1e2e;
+            border-color: rgba(255,255,255,0.12);
+        }
+        body.dark .file-upload-container:hover {
+            background: #0a2010;
+            border-color: var(--primary);
+        }
+        body.dark .file-preview {
+            background-color: #0a1520;
+            color: #cbd5e1;
+        }
+
+        /* ── Email ────────────────────────────────────── */
+        body.dark .email-settings {
+            background-color: #0a1520;
+            border-color: rgba(255,255,255,0.08);
+            color: #cbd5e1;
+        }
+        body.dark .email-preview {
+            background-color: #0f1e2e;
+            border-color: rgba(255,255,255,0.08);
+            color: #cbd5e1;
+        }
+        body.dark .email-preview-header {
+            border-bottom-color: rgba(255,255,255,0.08);
+        }
+
+        /* ── Calendar ─────────────────────────────────── */
+        body.dark .calendar-day {
+            background: #0f1e2e;
+            border-color: rgba(255,255,255,0.08);
+        }
+        body.dark .calendar-day-header {
+            color: #94a3b8;
+            border-bottom-color: rgba(255,255,255,0.08);
+        }
+        body.dark .calendar-event {
+            background: #0a1520;
+            color: #cbd5e1;
+        }
+        body.dark .calendar-event-time { color: #94a3b8; }
+
+        /* ── Conversations sidebar / inbox ────────────── */
+        body.dark .conversations-sidebar {
+            background: #0a1520;
+            border-right-color: rgba(255,255,255,0.08);
+        }
+        body.dark .conversations-header {
+            border-bottom-color: rgba(255,255,255,0.08);
+            color: #e2e8f0;
+        }
+        body.dark .conversation-item {
+            border-bottom-color: rgba(255,255,255,0.05);
+        }
+        body.dark .conversation-item:hover { background-color: rgba(255,255,255,0.04); }
+        body.dark .conversation-item.active {
+            background-color: #052e16;
+            border-left-color: var(--primary);
+        }
+        body.dark .conversation-preview { color: #64748b; }
+        body.dark .chat-main { background: #0f1e2e; }
+
+        /* ── Chat messages ────────────────────────────── */
+        body.dark .chat-input-area { background-color: #0a1520; }
+        body.dark .chat-input {
+            background: #0f1e2e;
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.10);
+        }
+        body.dark .message-bubble.received {
+            background: #1e3a5f;
+            color: #e2e8f0;
+        }
+        body.dark .message-sender { color: #94a3b8; }
+        body.dark .message-time   { color: #475569; }
+
+        /* ── Nav tab (legacy) ─────────────────────────── */
+        body.dark .nav-tab {
+            color: #cbd5e1;
+        }
+        body.dark .nav-tab:hover { background-color: rgba(255,255,255,0.06); }
+
+        /* ── General text helpers ─────────────────────── */
+        body.dark h1,
+        body.dark h2,
+        body.dark h3,
+        body.dark h4,
+        body.dark h5,
+        body.dark h6 { color: #e2e8f0; }
+        body.dark p   { color: #cbd5e1; }
+        body.dark label { color: #cbd5e1; }
+        body.dark span.text-gray-500,
+        body.dark span.text-gray-600,
+        body.dark span.text-gray-700 { color: #94a3b8 !important; }
+        body.dark .text-gray-800 { color: #e2e8f0 !important; }
+        body.dark .text-gray-400 { color: #64748b !important; }
+
+        /* ── Tailwind bg-white overrides ──────────────── */
+        body.dark .bg-white { background-color: #0f1e2e !important; }
+        body.dark .bg-gray-50,
+        body.dark .bg-gray-100 { background-color: #0a1520 !important; }
+        body.dark .bg-blue-50  { background-color: #0c1a3a !important; }
+        body.dark .bg-green-50 { background-color: #052e16 !important; }
+        body.dark .bg-red-50   { background-color: #1f0a0a !important; }
+        body.dark .bg-yellow-50,
+        body.dark .bg-amber-50 { background-color: #1c1400 !important; }
+
+        /* ── Tailwind border overrides ────────────────── */
+        body.dark .border-gray-100,
+        body.dark .border-gray-200 { border-color: rgba(255,255,255,0.08) !important; }
+        body.dark .border-gray-300 { border-color: rgba(255,255,255,0.12) !important; }
+
+        /* ── Spinner ──────────────────────────────────── */
+        body.dark .spinner {
+            border-color: rgba(255,255,255,0.10);
+            border-top-color: var(--primary);
+        }
+
+        /* ── Rounded panels injected by tutor.js ──────── */
+        body.dark [style*="background:#fff"],
+        body.dark [style*="background: #fff"],
+        body.dark [style*="background:white"],
+        body.dark [style*="background: white"] {
+            background: #0f1e2e !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark [style*="background:#f8fafc"],
+        body.dark [style*="background: #f8fafc"],
+        body.dark [style*="background:#f1f5f9"],
+        body.dark [style*="background: #f1f5f9"],
+        body.dark [style*="background:#fafafa"],
+        body.dark [style*="background: #fafafa"] {
+            background: #0a1520 !important;
+        }
+        body.dark [style*="color:#1e293b"],
+        body.dark [style*="color: #1e293b"],
+        body.dark [style*="color:#1f2937"],
+        body.dark [style*="color: #1f2937"],
+        body.dark [style*="color:#374151"],
+        body.dark [style*="color: #374151"] {
+            color: #e2e8f0 !important;
+        }
+        body.dark [style*="color:#64748b"],
+        body.dark [style*="color: #64748b"],
+        body.dark [style*="color:#6b7280"],
+        body.dark [style*="color: #6b7280"] {
+            color: #94a3b8 !important;
+        }
+        body.dark [style*="border:1px solid #e2e8f0"],
+        body.dark [style*="border: 1px solid #e2e8f0"],
+        body.dark [style*="border:1px solid #e5e7eb"],
+        body.dark [style*="border: 1px solid #e5e7eb"],
+        body.dark [style*="border:1.5px solid #e2e8f0"] {
+            border-color: rgba(255,255,255,0.08) !important;
         }
     </style>
 </head>
