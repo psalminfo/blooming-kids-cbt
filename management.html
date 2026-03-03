@@ -109,25 +109,161 @@
             --card-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
             --elevated-shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -1px rgba(0,0,0,0.4);
         }
-        /* Dark mode — override Tailwind inline classes that can't use variables */
-        body.dark-mode .bg-white { background-color: var(--bg-surface) !important; }
-        body.dark-mode .bg-gray-50 { background-color: var(--bg-surface2) !important; }
-        body.dark-mode .bg-gray-100 { background-color: var(--bg-surface3) !important; }
-        body.dark-mode .text-gray-800, body.dark-mode .text-gray-900 { color: var(--text-primary) !important; }
-        body.dark-mode .text-gray-600, body.dark-mode .text-gray-700 { color: var(--text-secondary) !important; }
-        body.dark-mode .text-gray-400, body.dark-mode .text-gray-500 { color: var(--text-muted) !important; }
-        body.dark-mode .border-gray-200, body.dark-mode .border-gray-300 { border-color: var(--border-color) !important; }
+        /* ─────────────────────────────────────────────
+           DARK MODE — comprehensive Tailwind overrides
+           Covers all classes used in dynamic innerHTML
+           ───────────────────────────────────────────── */
+
+        /* Backgrounds — neutrals */
+        body.dark-mode .bg-white       { background-color: var(--bg-surface)  !important; }
+        body.dark-mode .bg-gray-50     { background-color: var(--bg-surface2) !important; }
+        body.dark-mode .bg-gray-100    { background-color: var(--bg-surface3) !important; }
+        body.dark-mode .bg-gray-200    { background-color: #374151            !important; }
+        body.dark-mode .bg-gray-300    { background-color: #4b5563            !important; }
+        body.dark-mode .bg-gray-800    { background-color: #0f172a            !important; }
+        body.dark-mode .bg-gray-900    { background-color: #020617            !important; }
+
+        /* Backgrounds — brand / status tints (tone down in dark mode) */
+        body.dark-mode .bg-blue-50     { background-color: #1e3a5f !important; }
+        body.dark-mode .bg-blue-100    { background-color: #1e3a5f !important; }
+        body.dark-mode .bg-green-50    { background-color: #064e3b !important; }
+        body.dark-mode .bg-green-100   { background-color: #064e3b !important; }
+        body.dark-mode .bg-emerald-50  { background-color: #064e3b !important; }
+        body.dark-mode .bg-emerald-100 { background-color: #064e3b !important; }
+        body.dark-mode .bg-purple-50   { background-color: #3b0764 !important; }
+        body.dark-mode .bg-purple-100  { background-color: #3b0764 !important; }
+        body.dark-mode .bg-indigo-50   { background-color: #1e1b4b !important; }
+        body.dark-mode .bg-indigo-100  { background-color: #1e1b4b !important; }
+        body.dark-mode .bg-yellow-50   { background-color: #422006 !important; }
+        body.dark-mode .bg-yellow-100  { background-color: #422006 !important; }
+        body.dark-mode .bg-orange-50   { background-color: #431407 !important; }
+        body.dark-mode .bg-orange-100  { background-color: #431407 !important; }
+        body.dark-mode .bg-red-50      { background-color: #450a0a !important; }
+        body.dark-mode .bg-red-100     { background-color: #450a0a !important; }
+        body.dark-mode .bg-teal-50     { background-color: #042f2e !important; }
+        body.dark-mode .bg-teal-100    { background-color: #042f2e !important; }
+        body.dark-mode .bg-pink-50     { background-color: #500724 !important; }
+        body.dark-mode .bg-pink-100    { background-color: #500724 !important; }
+
+        /* Text — neutrals */
+        body.dark-mode .text-gray-900  { color: var(--text-primary)   !important; }
+        body.dark-mode .text-gray-800  { color: var(--text-primary)   !important; }
+        body.dark-mode .text-gray-700  { color: var(--text-secondary) !important; }
+        body.dark-mode .text-gray-600  { color: var(--text-secondary) !important; }
+        body.dark-mode .text-gray-500  { color: var(--text-muted)     !important; }
+        body.dark-mode .text-gray-400  { color: var(--text-muted)     !important; }
+
+        /* Text — brand / status (keep vivid enough to read) */
+        body.dark-mode .text-blue-700  { color: #93c5fd !important; }
+        body.dark-mode .text-blue-800  { color: #93c5fd !important; }
+        body.dark-mode .text-blue-600  { color: #60a5fa !important; }
+        body.dark-mode .text-green-700 { color: #6ee7b7 !important; }
+        body.dark-mode .text-green-800 { color: #6ee7b7 !important; }
+        body.dark-mode .text-green-600 { color: #34d399 !important; }
+        body.dark-mode .text-emerald-600{ color: #34d399 !important; }
+        body.dark-mode .text-emerald-700{ color: #6ee7b7 !important; }
+        body.dark-mode .text-purple-700 { color: #d8b4fe !important; }
+        body.dark-mode .text-purple-800 { color: #d8b4fe !important; }
+        body.dark-mode .text-indigo-700 { color: #a5b4fc !important; }
+        body.dark-mode .text-indigo-800 { color: #a5b4fc !important; }
+        body.dark-mode .text-yellow-700 { color: #fcd34d !important; }
+        body.dark-mode .text-yellow-800 { color: #fcd34d !important; }
+        body.dark-mode .text-orange-700 { color: #fb923c !important; }
+        body.dark-mode .text-orange-800 { color: #fb923c !important; }
+        body.dark-mode .text-red-700    { color: #fca5a5 !important; }
+        body.dark-mode .text-red-800    { color: #fca5a5 !important; }
+        body.dark-mode .text-red-600    { color: #f87171 !important; }
+        body.dark-mode .text-teal-700   { color: #5eead4 !important; }
+        body.dark-mode .text-pink-700   { color: #f9a8d4 !important; }
+
+        /* Borders */
+        body.dark-mode .border-gray-100 { border-color: #1f2937 !important; }
+        body.dark-mode .border-gray-200 { border-color: var(--border-color) !important; }
+        body.dark-mode .border-gray-300 { border-color: var(--border-input) !important; }
+        body.dark-mode .border-blue-200 { border-color: #1e3a5f !important; }
+        body.dark-mode .border-green-200{ border-color: #064e3b !important; }
+        body.dark-mode .border-red-200  { border-color: #450a0a !important; }
+
+        /* Forms */
         body.dark-mode input, body.dark-mode textarea, body.dark-mode select {
             background-color: var(--bg-surface2) !important;
             color: var(--text-primary) !important;
             border-color: var(--border-input) !important;
         }
         body.dark-mode input::placeholder, body.dark-mode textarea::placeholder { color: var(--text-muted) !important; }
-        body.dark-mode .shadow-md, body.dark-mode .shadow-sm, body.dark-mode .shadow-xl, body.dark-mode .shadow-2xl { box-shadow: var(--elevated-shadow) !important; }
-        body.dark-mode table th { background-color: var(--bg-surface3) !important; color: var(--text-secondary) !important; }
-        body.dark-mode table td { color: var(--text-primary) !important; border-color: var(--border-color) !important; }
-        body.dark-mode tr:hover { background-color: var(--bg-surface2) !important; }
-        body.dark-mode .divide-y > * { border-color: var(--border-color) !important; }
+        body.dark-mode input:focus, body.dark-mode textarea:focus, body.dark-mode select:focus {
+            border-color: var(--primary-color) !important;
+            outline-color: var(--primary-color) !important;
+        }
+
+        /* Shadows */
+        body.dark-mode .shadow, body.dark-mode .shadow-sm, body.dark-mode .shadow-md,
+        body.dark-mode .shadow-lg, body.dark-mode .shadow-xl, body.dark-mode .shadow-2xl {
+            box-shadow: var(--elevated-shadow) !important;
+        }
+
+        /* Tables */
+        body.dark-mode table              { background-color: var(--bg-surface) !important; }
+        body.dark-mode table th           { background-color: var(--bg-surface3) !important; color: var(--text-secondary) !important; border-color: var(--border-color) !important; }
+        body.dark-mode table td           { color: var(--text-primary) !important; border-color: var(--border-color) !important; }
+        body.dark-mode thead              { background-color: var(--bg-surface3) !important; }
+        body.dark-mode tbody tr:hover     { background-color: var(--bg-surface2) !important; }
+        body.dark-mode .divide-y > *      { border-color: var(--border-color) !important; }
+
+        /* Modals — the fixed overlay wrappers injected by JS */
+        body.dark-mode .fixed.inset-0 > div,
+        body.dark-mode .fixed.inset-0 .bg-white,
+        body.dark-mode .fixed.inset-0 .bg-gray-50 {
+            background-color: var(--bg-surface) !important;
+        }
+        /* Keep modal overlays dark */
+        body.dark-mode .bg-gray-600.bg-opacity-50,
+        body.dark-mode .bg-black.bg-opacity-50,
+        body.dark-mode .bg-black.bg-opacity-60 {
+            background-color: rgba(0,0,0,0.75) !important;
+        }
+
+        /* Rounded cards generated by JS panels */
+        body.dark-mode .rounded-lg.border,
+        body.dark-mode .rounded-xl.border,
+        body.dark-mode .rounded-lg.shadow,
+        body.dark-mode .rounded-xl.shadow {
+            background-color: var(--bg-surface) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        /* Badges / pill spans — keep readable */
+        body.dark-mode .bg-blue-100.text-blue-800   { background-color: #1e3a5f !important; color: #93c5fd !important; }
+        body.dark-mode .bg-green-100.text-green-800  { background-color: #064e3b !important; color: #6ee7b7 !important; }
+        body.dark-mode .bg-purple-100.text-purple-800{ background-color: #3b0764 !important; color: #d8b4fe !important; }
+        body.dark-mode .bg-yellow-100.text-yellow-800{ background-color: #422006 !important; color: #fcd34d !important; }
+        body.dark-mode .bg-red-100.text-red-800      { background-color: #450a0a !important; color: #fca5a5 !important; }
+        body.dark-mode .bg-indigo-100.text-indigo-800{ background-color: #1e1b4b !important; color: #a5b4fc !important; }
+        body.dark-mode .bg-orange-100.text-orange-800{ background-color: #431407 !important; color: #fb923c !important; }
+        body.dark-mode .bg-teal-100.text-teal-800    { background-color: #042f2e !important; color: #5eead4 !important; }
+        body.dark-mode .bg-emerald-100.text-emerald-800{ background-color: #064e3b !important; color: #6ee7b7 !important; }
+
+        /* Hover states for buttons in dark mode */
+        body.dark-mode .hover\:bg-gray-100:hover { background-color: var(--bg-surface3) !important; }
+        body.dark-mode .hover\:bg-gray-200:hover { background-color: #374151 !important; }
+        body.dark-mode .hover\:bg-gray-50:hover  { background-color: var(--bg-surface2) !important; }
+
+        /* Specific structural elements rendered by JS panels */
+        body.dark-mode .border-t          { border-color: var(--border-color) !important; }
+        body.dark-mode .border-b          { border-color: var(--border-color) !important; }
+        body.dark-mode .border-l          { border-color: var(--border-color) !important; }
+        body.dark-mode .border-r          { border-color: var(--border-color) !important; }
+        body.dark-mode .border            { border-color: var(--border-color) !important; }
+
+        /* Notification panel */
+        body.dark-mode #notif-panel       { background-color: var(--bg-surface) !important; border-color: var(--border-color) !important; }
+        body.dark-mode .border-l-4        { /* keep accent colors, only reset bg */ }
+
+        /* Scrollbars in dark mode */
+        body.dark-mode ::-webkit-scrollbar       { width: 6px; height: 6px; }
+        body.dark-mode ::-webkit-scrollbar-track { background: var(--bg-surface2); }
+        body.dark-mode ::-webkit-scrollbar-thumb { background: var(--bg-surface3); border-radius: 3px; }
+        body.dark-mode ::-webkit-scrollbar-thumb:hover { background: #475569; }
         /* Dark mode toggle button */
         .dark-mode-btn { background:none; border:none; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; transition:background-color .2s; color:#4b5563; font-size:1.1rem; }
         .dark-mode-btn:hover { background-color:#f3f4f6; }
