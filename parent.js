@@ -1235,7 +1235,7 @@ async function loadReferralRewards(parentUid) {
 // SECTION 9: COMPREHENSIVE CHILDREN FINDER (WITH SUFFIX MATCHING)
 // ============================================================================
 
-async function comprehensiveFindChildren(parentPhone) {
+async function comprehensiveFindChildren(parentPhone, parentEmail = '') {
     console.log("🔍 COMPREHENSIVE SUFFIX SEARCH for children with phone:", parentPhone);
 
     const allChildren = new Map();
@@ -1257,7 +1257,7 @@ async function comprehensiveFindChildren(parentPhone) {
         // ── STEP 1: Fast email query — reads only this parent's students ────
         // Pass parentEmail as second arg when calling comprehensiveFindChildren.
         // Falls back to phone scan only when nothing is found (new parent / not yet backfilled).
-        const parentEmail = arguments[1] || '';
+        // parentEmail passed as second argument — used for fast targeted query
 
         if (parentEmail) {
             const [studentsSnap, pendingSnap] = await Promise.all([
@@ -1629,7 +1629,7 @@ async function loadAcademicsData(selectedStudent = null) {
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
-        const childrenResult = await comprehensiveFindChildren(parentPhone);
+        const childrenResult = await comprehensiveFindChildren(parentPhone, userData.email || '');
         
         userChildren = childrenResult.studentNames;
         studentIdMap = childrenResult.studentNameIdMap;
@@ -3185,7 +3185,7 @@ class SettingsManager {
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
             const userData = userDoc.data();
             
-            const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone);
+            const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone, userData.email || '');
             const students = childrenResult.allStudentData;
 
             this.renderSettingsForm(userData, students);
@@ -3821,7 +3821,7 @@ async function checkForNewAcademics() {
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
-        const childrenResult = await comprehensiveFindChildren(parentPhone);
+        const childrenResult = await comprehensiveFindChildren(parentPhone, userData.email || '');
         
         let totalUnread = 0;
 
