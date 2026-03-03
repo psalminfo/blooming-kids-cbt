@@ -178,10 +178,47 @@ const persistentCache = {
             if (userId) {
                 localStorage.removeItem(this._key(userId));
             } else {
-                // Clear all bkh report caches
                 Object.keys(localStorage)
                     .filter(k => k.startsWith('bkh_reports_'))
                     .forEach(k => localStorage.removeItem(k));
+            }
+        } catch (e) {}
+    },
+
+    // ── Generic tab cache (academics, rewards, settings) ─────────────────────
+    _tabKey(userId, tab) { return `bkh_tab_${tab}_${userId}`; },
+
+    getTab(userId, tab, ttlMs) {
+        try {
+            const raw = localStorage.getItem(this._tabKey(userId, tab));
+            if (!raw) return null;
+            const entry = JSON.parse(raw);
+            const age = ttlMs || (30 * 60 * 1000); // default 30 min
+            if (Date.now() - entry.savedAt > age) {
+                localStorage.removeItem(this._tabKey(userId, tab));
+                return null;
+            }
+            return entry;
+        } catch (e) { return null; }
+    },
+
+    setTab(userId, tab, data) {
+        try {
+            const serialized = JSON.stringify({ savedAt: Date.now(), ...data });
+            if (serialized.length > this._MAX_BYTES) return;
+            localStorage.setItem(this._tabKey(userId, tab), serialized);
+        } catch (e) {}
+    },
+
+    invalidateTab(userId, tab) {
+        try {
+            if (tab) {
+                localStorage.removeItem(this._tabKey(userId, tab));
+            } else {
+                // Invalidate all tabs for this user
+                ['academics', 'rewards', 'settings'].forEach(t =>
+                    localStorage.removeItem(this._tabKey(userId, t))
+                );
             }
         } catch (e) {}
     }
@@ -1164,115 +1201,102 @@ async function generateReferralCode() {
 async function loadReferralRewards(parentUid) {
     const rewardsContent = document.getElementById('rewardsContent');
     if (!rewardsContent) return;
-    
+
+    // ── STEP 1: Show cache instantly (4h TTL — referral data rarely changes) ──
+    const cached = persistentCache.getTab(parentUid, 'rewards', 4 * 60 * 60 * 1000);
+    if (cached) {
+        rewardsContent.innerHTML = cached.html;
+        // Silent background refresh
+        setTimeout(() => _silentRefreshRewards(parentUid), 3000);
+        return;
+    }
+
+    // ── STEP 2: No cache — full load ─────────────────────────────────────────
     showSkeletonLoader('rewardsContent', 'reports');
 
     try {
         const userDoc = await db.collection('parent_users').doc(parentUid).get();
-        if (!userDoc.exists) {
-            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found.</p>';
-            return;
-        }
-        
-        const userData = userDoc.data();
-        const referralCode = safeText(userData.referralCode || 'N/A');
-        const totalEarnings = userData.referralEarnings || 0;
-        
-        const transactionsSnapshot = await db.collection('referral_transactions')
-            .where('ownerUid', '==', parentUid)
-            .get();
+        if (!userDoc.exists) { rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found.</p>'; return; }
+
+        const userData         = userDoc.data();
+        const referralCode     = safeText(userData.referralCode || 'N/A');
+        const totalEarnings    = userData.referralEarnings || 0;
+        const transactionsSnap = await db.collection('referral_transactions').where('ownerUid', '==', parentUid).get();
 
         let referralsHtml = '';
-        let pendingCount = 0;
-        let approvedCount = 0;
-        let paidCount = 0;
+        let pendingCount = 0, approvedCount = 0, paidCount = 0;
 
-        if (transactionsSnapshot.empty) {
-            referralsHtml = `
-                <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
-            `;
+        if (transactionsSnap.empty) {
+            referralsHtml = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>`;
         } else {
-            const transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            transactions.sort((a, b) => {
-                const aTime = a.timestamp?.toDate?.() || new Date(0);
-                const bTime = b.timestamp?.toDate?.() || new Date(0);
-                return bTime - aTime;
-            });
-            
+            const transactions = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            transactions.sort((a, b) => (b.timestamp?.toDate?.() || new Date(0)) - (a.timestamp?.toDate?.() || new Date(0)));
             transactions.forEach(data => {
-                const status = safeText(data.status || 'pending');
-                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
-                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 
-                                    'bg-yellow-100 text-yellow-800';
-                
-                if (status === 'pending') pendingCount++;
+                const status      = safeText(data.status || 'pending');
+                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : status === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800';
+                if (status === 'pending')  pendingCount++;
                 if (status === 'approved') approvedCount++;
-                if (status === 'paid') paidCount++;
-
-                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
-                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
-                const referralDate = data.timestamp?.toDate?.().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
-
+                if (status === 'paid')     paidCount++;
+                const referredName  = capitalize(data.referredStudentName || data.referredStudentPhone);
+                const rewardAmount  = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
+                const referralDate  = data.timestamp?.toDate?.().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
                 referralsHtml += `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
                         <td class="px-4 py-3 text-sm text-gray-500">${safeText(referralDate)}</td>
-                        <td class="px-4 py-3 text-sm">
-                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
-                                ${capitalize(status)}
-                            </span>
-                        </td>
+                        <td class="px-4 py-3 text-sm"><span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">${capitalize(status)}</span></td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-bold">${safeText(rewardAmount)}</td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
-        
-        rewardsContent.innerHTML = `
+
+        const html = `
             <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md slide-down">
                 <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
                 <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
                 <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
             </div>
-
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600 fade-in">
-                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
-                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
-                </div>
-                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600 fade-in">
-                    <p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p>
-                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
-                </div>
-                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600 fade-in">
-                    <p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p>
-                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
-                </div>
+                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600 fade-in"><p class="text-sm font-medium text-green-700">Total Earnings</p><p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p></div>
+                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600 fade-in"><p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p><p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p></div>
+                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600 fade-in"><p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p><p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p></div>
             </div>
-
             <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
             <div class="overflow-x-auto bg-white rounded-lg shadow">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        ${referralsHtml}
-                    </tbody>
+                    <thead class="bg-gray-50"><tr>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-gray-200">${referralsHtml}</tbody>
                 </table>
-            </div>
-        `;
-        
+            </div>`;
+
+        rewardsContent.innerHTML = html;
+        persistentCache.setTab(parentUid, 'rewards', { html });
+
     } catch (error) {
         console.error('Error loading referral rewards:', error);
         rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">Error loading rewards.</p>';
     }
+}
+
+// Silent background refresh for rewards
+async function _silentRefreshRewards(parentUid) {
+    try {
+        const user = auth.currentUser;
+        if (!user || user.uid !== parentUid) return;
+        const snap = await db.collection('referral_transactions').where('ownerUid', '==', parentUid).get();
+        const cached = persistentCache.getTab(parentUid, 'rewards', 4 * 60 * 60 * 1000);
+        // Simple check: if transaction count changed, invalidate and reload
+        const cachedCount = (cached?.html?.match(/<tr class="hover:bg-gray-50">/g) || []).length;
+        if (snap.size !== cachedCount) {
+            persistentCache.invalidateTab(parentUid, 'rewards');
+            loadReferralRewards(parentUid);
+        }
+    } catch (e) { /* silent */ }
 }
 
 // ============================================================================
@@ -1653,21 +1677,40 @@ function showGradeFeedbackModal(grade, feedback, homeworkData) {
 async function loadAcademicsData(selectedStudent = null) {
     const academicsContent = document.getElementById('academicsContent');
     if (!academicsContent) return;
-    
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // ── STEP 1: Show cache instantly if available (30 min TTL) ───────────────
+    if (!selectedStudent && !window._academicsForceRefresh) {
+        const cached = persistentCache.getTab(user.uid, 'academics', 30 * 60 * 1000);
+        if (cached) {
+            // Restore globals so homework interactions work
+            userChildren   = cached.studentNames || [];
+            studentIdMap   = new Map(cached.studentNameIdPairs || []);
+            allStudentData = cached.minStudentData || [];
+
+            academicsContent.innerHTML = cached.html;
+
+            // Silent background refresh
+            setTimeout(() => _silentRefreshAcademics(user.uid), 2000);
+            return;
+        }
+    }
+    window._academicsForceRefresh = false;
+
+    // ── STEP 2: No cache — full load with skeleton ────────────────────────────
     showSkeletonLoader('academicsContent', 'reports');
 
     try {
-        const user = auth.currentUser;
-        if (!user) throw new Error('Please sign in');
-
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
         const childrenResult = await comprehensiveFindChildren(parentPhone, userData.email || '');
-        
-        userChildren = childrenResult.studentNames;
-        studentIdMap = childrenResult.studentNameIdMap;
+
+        userChildren   = childrenResult.studentNames;
+        studentIdMap   = childrenResult.studentNameIdMap;
         allStudentData = childrenResult.allStudentData;
 
         if (userChildren.length === 0) {
@@ -1676,121 +1719,74 @@ async function loadAcademicsData(selectedStudent = null) {
                     <div class="text-6xl mb-4">📚</div>
                     <h3 class="text-xl font-bold text-gray-700 mb-2">No Students Found</h3>
                     <p class="text-gray-500">No students are currently assigned to your account.</p>
-                </div>
-            `;
+                </div>`;
             return;
         }
 
-        let studentsToShow = selectedStudent && studentIdMap.has(selectedStudent) 
-            ? [selectedStudent] 
+        let studentsToShow = selectedStudent && studentIdMap.has(selectedStudent)
+            ? [selectedStudent]
             : userChildren;
 
         let academicsHtml = '';
 
-        // Student selector
         if (studentIdMap.size > 1) {
             academicsHtml += `
                 <div class="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Select Student:</label>
                     <select id="studentSelector" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" onchange="onStudentSelected(this.value)">
-                        <option value="">All Students</option>
-            `;
-            
+                        <option value="">All Students</option>`;
             userChildren.forEach(studentName => {
                 const studentInfo = allStudentData.find(s => s.name === studentName);
-                const isSelected = selectedStudent === studentName ? 'selected' : '';
-                const studentStatus = studentInfo?.isPending ? ' (Pending Registration)' : '';
-                
-                academicsHtml += `<option value="${safeText(studentName)}" ${isSelected}>${capitalize(studentName)}${safeText(studentStatus)}</option>`;
+                const isSelected  = selectedStudent === studentName ? 'selected' : '';
+                const status      = studentInfo?.isPending ? ' (Pending Registration)' : '';
+                academicsHtml += `<option value="${safeText(studentName)}" ${isSelected}>${capitalize(studentName)}${safeText(status)}</option>`;
             });
-            
-            academicsHtml += `
-                    </select>
-                </div>
-            `;
+            academicsHtml += `</select></div>`;
         }
 
-        // Load data for each student
         const studentPromises = studentsToShow.map(async (studentName) => {
-            const studentId = studentIdMap.get(studentName);
+            const studentId   = studentIdMap.get(studentName);
             const studentInfo = allStudentData.find(s => s.name === studentName);
-            
             let sessionTopicsHtml = '';
-            let homeworkHtml = '';
-            
+            let homeworkHtml      = '';
+
             if (studentId) {
                 const [sessionTopicsSnapshot, homeworkSnapshot] = await Promise.all([
                     db.collection('daily_topics').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
                     db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true }))
                 ]);
-                
-                // Process session topics (simplified for brevity)
-                if (sessionTopicsSnapshot.empty) {
-                    sessionTopicsHtml = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">No session topics recorded yet.</p></div>`;
-                } else {
-                    // Your existing session topics code here
-                    sessionTopicsHtml = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">Session topics loaded.</p></div>`;
-                }
-                
-                // Process homework - SIMPLIFIED without Work Here
+
+                sessionTopicsHtml = sessionTopicsSnapshot.empty
+                    ? `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">No session topics recorded yet.</p></div>`
+                    : `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">Session topics loaded.</p></div>`;
+
                 if (homeworkSnapshot.empty) {
                     homeworkHtml = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">No homework assignments yet.</p></div>`;
                 } else {
-                    const homeworkList = [];
                     const now = new Date().getTime();
-                    
                     homeworkSnapshot.forEach(doc => {
-                        const homework = doc.data();
-                        const homeworkId = doc.id;
+                        const homework    = doc.data();
+                        const homeworkId  = doc.id;
                         const dueTimestamp = getTimestamp(homework.dueDate);
-                        const isOverdue = dueTimestamp && dueTimestamp < now && !['submitted', 'completed', 'graded'].includes(homework.status);
+                        const isOverdue   = dueTimestamp && dueTimestamp < now && !['submitted', 'completed', 'graded'].includes(homework.status);
                         const isSubmitted = ['submitted', 'completed'].includes(homework.status);
-                        const isGraded = homework.status === 'graded';
-                        
-                        const gradeValue = homework.grade || homework.score || homework.overallGrade || homework.percentage || homework.marks;
-                        let gradeDisplay = 'N/A';
+                        const isGraded    = homework.status === 'graded';
+                        const gradeValue  = homework.grade || homework.score || homework.overallGrade || homework.percentage || homework.marks;
+                        let gradeDisplay  = 'N/A';
                         if (gradeValue !== undefined && gradeValue !== null) {
-                            if (typeof gradeValue === 'number') {
-                                gradeDisplay = `${gradeValue}%`;
-                            } else {
-                                const parsedGrade = parseFloat(gradeValue);
-                                gradeDisplay = !isNaN(parsedGrade) ? `${parsedGrade}%` : gradeValue;
-                            }
+                            const parsed = parseFloat(gradeValue);
+                            gradeDisplay = !isNaN(parsed) ? `${parsed}%` : gradeValue;
                         }
-                        
                         let statusColor, statusText, statusIcon, buttonText, buttonColor;
-                        
-                        if (isGraded) {
-                            statusColor = 'bg-green-100 text-green-800';
-                            statusText = 'Graded';
-                            statusIcon = '✅';
-                            buttonText = 'View Grade & Feedback';
-                            buttonColor = 'bg-green-600 hover:bg-green-700';
-                        } else if (isSubmitted) {
-                            statusColor = 'bg-blue-100 text-blue-800';
-                            statusText = 'Submitted';
-                            statusIcon = '📤';
-                            buttonText = 'View Submission';
-                            buttonColor = 'bg-blue-600 hover:bg-blue-700';
-                        } else if (isOverdue) {
-                            statusColor = 'bg-red-100 text-red-800';
-                            statusText = 'Overdue';
-                            statusIcon = '⚠️';
-                            buttonText = 'Upload Assignment';
-                            buttonColor = 'bg-red-600 hover:bg-red-700';
-                        } else {
-                            statusColor = homework.submissionUrl ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800';
-                            statusText = homework.submissionUrl ? 'Uploaded - Not Submitted' : 'Not Started';
-                            statusIcon = homework.submissionUrl ? '📎' : '📝';
-                            buttonText = homework.submissionUrl ? 'Review & Submit' : 'Download Assignment';
-                            buttonColor = homework.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700';
-                        }
-                        
-                        const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
+                        if (isGraded)         { statusColor = 'bg-green-100 text-green-800';  statusText = 'Graded';    statusIcon = '✅'; buttonText = 'View Grade & Feedback'; buttonColor = 'bg-green-600 hover:bg-green-700'; }
+                        else if (isSubmitted) { statusColor = 'bg-blue-100 text-blue-800';   statusText = 'Submitted'; statusIcon = '📤'; buttonText = 'View Submission';       buttonColor = 'bg-blue-600 hover:bg-blue-700'; }
+                        else if (isOverdue)   { statusColor = 'bg-red-100 text-red-800';     statusText = 'Overdue';   statusIcon = '⚠️'; buttonText = 'Upload Assignment';     buttonColor = 'bg-red-600 hover:bg-red-700'; }
+                        else { statusColor = homework.submissionUrl ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'; statusText = homework.submissionUrl ? 'Uploaded - Not Submitted' : 'Not Started'; statusIcon = homework.submissionUrl ? '📎' : '📝'; buttonText = homework.submissionUrl ? 'Review & Submit' : 'Download Assignment'; buttonColor = homework.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'; }
+
+                        const safeTitle       = safeText(homework.title || homework.subject || 'Untitled Assignment');
                         const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
-                        const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
-                        
-                        // Build homework HTML - SIMPLIFIED
+                        const tutorName       = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
+
                         homeworkHtml += `
                             <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm mb-4" data-homework-id="${homeworkId}" data-student-id="${studentId}">
                                 <div class="flex justify-between items-start mb-3">
@@ -1805,87 +1801,58 @@ async function loadAcademicsData(selectedStudent = null) {
                                         <span class="text-sm font-medium text-gray-700">Due: ${formatDetailedDate(new Date(dueTimestamp), true)}</span>
                                     </div>
                                 </div>
-                                
                                 <div class="text-gray-700 mb-4">
                                     <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
                                 </div>
-                                
                                 <div class="flex justify-between items-center pt-3 border-t border-gray-100">
                                     <div class="flex items-center space-x-3">
-                                        ${homework.fileUrl ? `
-                                            <button onclick="forceDownload('${sanitizeUrl(homework.fileUrl)}', '${safeText(homework.title || 'assignment')}.pdf')" 
-                                                    class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                                                <span class="mr-1">📥</span> Download Assignment
-                                            </button>
-                                        ` : ''}
+                                        ${homework.fileUrl ? `<button onclick="forceDownload('${sanitizeUrl(homework.fileUrl)}', '${safeText(homework.title || 'assignment')}.pdf')" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm"><span class="mr-1">📥</span> Download Assignment</button>` : ''}
                                     </div>
-                                    
-                                    ${gradeValue !== undefined && gradeValue !== null ? `
-                                        <div class="text-right">
-                                            <span class="font-medium text-gray-700">Grade: </span>
-                                            <span class="font-bold ${typeof gradeValue === 'number' ? (gradeValue >= 70 ? 'text-green-600' : gradeValue >= 50 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-600'}">
-                                                ${gradeDisplay}
-                                            </span>
-                                        </div>
-                                    ` : ''}
+                                    ${gradeValue !== undefined && gradeValue !== null ? `<div class="text-right"><span class="font-medium text-gray-700">Grade: </span><span class="font-bold ${typeof gradeValue === 'number' ? (gradeValue >= 70 ? 'text-green-600' : gradeValue >= 50 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-600'}">${gradeDisplay}</span></div>` : ''}
                                 </div>
-                                
                                 <div class="mt-4 pt-3 border-t border-gray-100">
-                                    <button onclick="handleHomeworkAction('${homeworkId}', '${studentId}', '${isGraded ? 'graded' : isSubmitted ? 'submitted' : homework.submissionUrl ? 'uploaded' : 'pending'}')" 
-                                            class="w-full ${buttonColor} text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90">
-                                        ${buttonText}
-                                    </button>
+                                    <button onclick="handleHomeworkAction('${homeworkId}', '${studentId}', '${isGraded ? 'graded' : isSubmitted ? 'submitted' : homework.submissionUrl ? 'uploaded' : 'pending'}')" class="w-full ${buttonColor} text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90">${buttonText}</button>
                                 </div>
-                            </div>
-                        `;
+                            </div>`;
                     });
                 }
             }
-            
             return { studentName, studentInfo, sessionTopicsHtml, homeworkHtml };
         });
-        
+
         const studentResults = await Promise.all(studentPromises);
-        
-        // Build final HTML
+
         studentResults.forEach(({ studentName, studentInfo, sessionTopicsHtml, homeworkHtml }) => {
             academicsHtml += `
                 <div class="bg-gradient-to-r from-green-100 to-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6">
                     <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}${studentInfo?.isPending ? ' <span class="text-yellow-600 text-sm">(Pending Registration)</span>' : ''}</h2>
                     <p class="text-green-600">Academic progress and assignments</p>
                 </div>
-                
                 <div class="mb-8">
-                    <button onclick="toggleAcademicsAccordion('session-topics-${safeText(studentName)}')" 
-                            class="w-full flex justify-between items-center p-4 bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 mb-4">
-                        <div class="flex items-center">
-                            <span class="text-xl mr-3">📝</span>
-                            <h3 class="font-bold text-blue-800 text-lg">Session Topics</h3>
-                        </div>
+                    <button onclick="toggleAcademicsAccordion('session-topics-${safeText(studentName)}')" class="w-full flex justify-between items-center p-4 bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 mb-4">
+                        <div class="flex items-center"><span class="text-xl mr-3">📝</span><h3 class="font-bold text-blue-800 text-lg">Session Topics</h3></div>
                         <span id="session-topics-${safeText(studentName)}-arrow" class="text-blue-600 text-xl">▼</span>
                     </button>
-                    <div id="session-topics-${safeText(studentName)}-content" class="hidden">
-                        ${sessionTopicsHtml}
-                    </div>
+                    <div id="session-topics-${safeText(studentName)}-content" class="hidden">${sessionTopicsHtml}</div>
                 </div>
-                
                 <div class="mb-8">
-                    <button onclick="toggleAcademicsAccordion('homework-${safeText(studentName)}')" 
-                            class="w-full flex justify-between items-center p-4 bg-purple-100 border border-purple-300 rounded-lg hover:bg-purple-200 mb-4">
-                        <div class="flex items-center">
-                            <span class="text-xl mr-3">📚</span>
-                            <h3 class="font-bold text-purple-800 text-lg">Homework Assignments</h3>
-                        </div>
+                    <button onclick="toggleAcademicsAccordion('homework-${safeText(studentName)}')" class="w-full flex justify-between items-center p-4 bg-purple-100 border border-purple-300 rounded-lg hover:bg-purple-200 mb-4">
+                        <div class="flex items-center"><span class="text-xl mr-3">📚</span><h3 class="font-bold text-purple-800 text-lg">Homework Assignments</h3></div>
                         <span id="homework-${safeText(studentName)}-arrow" class="text-purple-600 text-xl">▼</span>
                     </button>
-                    <div id="homework-${safeText(studentName)}-content" class="hidden">
-                        ${homeworkHtml}
-                    </div>
-                </div>
-            `;
+                    <div id="homework-${safeText(studentName)}-content" class="hidden">${homeworkHtml}</div>
+                </div>`;
         });
 
         academicsContent.innerHTML = academicsHtml;
+
+        // Save to cache (store minimal student data - no Firestore Timestamps)
+        persistentCache.setTab(user.uid, 'academics', {
+            html:               academicsHtml,
+            studentNames:       userChildren,
+            studentNameIdPairs: [...studentIdMap.entries()],
+            minStudentData:     allStudentData.map(s => ({ id: s.id, name: s.name, isPending: s.isPending, collection: s.collection }))
+        });
 
     } catch (error) {
         console.error('Error loading academics data:', error);
@@ -1894,12 +1861,27 @@ async function loadAcademicsData(selectedStudent = null) {
                 <div class="text-4xl mb-4">❌</div>
                 <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Academic Data</h3>
                 <p class="text-gray-500">Unable to load academic data at this time.</p>
-                <button onclick="loadAcademicsData()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                    Try Again
-                </button>
-            </div>
-        `;
+                <button onclick="loadAcademicsData()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Try Again</button>
+            </div>`;
     }
+}
+
+// Silent background refresh for academics — updates cache and DOM only if data changed
+async function _silentRefreshAcademics(userId) {
+    try {
+        const user = auth.currentUser;
+        if (!user || user.uid !== userId) return;
+        const userDoc = await db.collection('parent_users').doc(userId).get();
+        const userData = userDoc.data();
+        const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone, userData.email || '');
+        const cached = persistentCache.getTab(userId, 'academics', 30 * 60 * 1000);
+        const cachedCount = cached ? (cached.studentNames || []).length : -1;
+        if (childrenResult.studentNames.length !== cachedCount) {
+            // Something changed — force a full reload
+            window._academicsForceRefresh = true;
+            loadAcademicsData();
+        }
+    } catch (e) { /* silent */ }
 }
 
 // Setup real-time listener
@@ -2706,6 +2688,40 @@ function renderReportData(userData, assessmentResults, monthlyResults, parentPho
     setTimeout(() => window.initializeCharts && window.initializeCharts(), 150);
 }
 
+// Pre-loads all tabs silently in background so every tab click is instant
+async function preloadAllTabs(userId) {
+    try {
+        const user = auth.currentUser;
+        if (!user || user.uid !== userId) return;
+
+        // Stagger the preloads so they don't all fire at once
+        setTimeout(async () => {
+            if (!persistentCache.getTab(userId, 'academics', 30 * 60 * 1000)) {
+                // Only pre-cache if academics DOM element isn't already showing
+                const el = document.getElementById('academicsContent');
+                if (!el || !el.innerHTML.trim()) loadAcademicsData().catch(() => {});
+            }
+        }, 3000);
+
+        setTimeout(async () => {
+            if (!persistentCache.getTab(userId, 'rewards', 4 * 60 * 60 * 1000)) {
+                const el = document.getElementById('rewardsContent');
+                if (!el || !el.innerHTML.trim()) loadReferralRewards(userId).catch(() => {});
+            }
+        }, 5000);
+
+        setTimeout(async () => {
+            if (!persistentCache.getTab(userId, 'settings', 4 * 60 * 60 * 1000)) {
+                const el = document.getElementById('settingsDynamicContent');
+                if (!el || !el.innerHTML.trim()) {
+                    if (window.settingsManager) window.settingsManager.loadSettingsData().catch(() => {});
+                }
+            }
+        }, 7000);
+
+    } catch (e) { /* silent */ }
+}
+
 // Silently fetches fresh data in the background after showing cached data.
 // Only updates the screen and cache if something actually changed.
 async function backgroundRefreshReports(parentPhone, userId, cachedAssessmentCount, cachedMonthlyCount) {
@@ -2782,6 +2798,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 );
             }, 1500); // small delay so the render completes first
 
+            // Pre-load all other tabs so they're instant on first click
+            preloadAllTabs(userId);
+
             return;
         }
     }
@@ -2810,6 +2829,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }, assessmentResults, monthlyResults);
 
         renderReportData(userData, assessmentResults, monthlyResults, parentPhone, userId);
+
+        // Pre-load all other tabs in background so they're instant on first click
+        preloadAllTabs(userId);
 
         setTimeout(() => {
             setupRealTimeMonitoring(parentPhone, userId);
@@ -3228,19 +3250,45 @@ class SettingsManager {
         const user = auth.currentUser;
         if (!user) return;
 
+        // ── Show cache instantly (4h TTL — settings rarely change) ───────────
+        const cached = persistentCache.getTab(user.uid, 'settings', 4 * 60 * 60 * 1000);
+        if (cached && !window._settingsForceRefresh) {
+            if (content) content.innerHTML = cached.html;
+            setTimeout(() => this._silentRefreshSettings(user.uid), 2000);
+            return;
+        }
+        window._settingsForceRefresh = false;
+
+        // ── No cache — full load ─────────────────────────────────────────────
         try {
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
             const userData = userDoc.data();
-            
             const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone, userData.email || '');
             const students = childrenResult.allStudentData;
-
             this.renderSettingsForm(userData, students);
-
+            // Cache the rendered HTML
+            if (content) persistentCache.setTab(user.uid, 'settings', { html: content.innerHTML });
         } catch (error) {
             console.error("Settings load error:", error);
-            content.innerHTML = `<p class="text-red-500">Error loading settings: ${error.message}</p>`;
+            if (content) content.innerHTML = `<p class="text-red-500">Error loading settings: ${error.message}</p>`;
         }
+    }
+
+    async _silentRefreshSettings(userId) {
+        try {
+            const user = auth.currentUser;
+            if (!user || user.uid !== userId) return;
+            const userDoc = await db.collection('parent_users').doc(userId).get();
+            const userData = userDoc.data();
+            const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone, userData.email || '');
+            const cached = persistentCache.getTab(userId, 'settings', 4 * 60 * 60 * 1000);
+            const cachedStudentCount = (cached?.html?.match(/studentName_/g) || []).length;
+            if (childrenResult.allStudentData.length !== cachedStudentCount) {
+                persistentCache.invalidateTab(userId, 'settings');
+                window._settingsForceRefresh = true;
+                this.loadSettingsData();
+            }
+        } catch (e) { /* silent */ }
     }
 
     renderSettingsForm(userData, students) {
@@ -3376,6 +3424,9 @@ class SettingsManager {
                 email: email
             });
 
+            // Invalidate settings cache so next visit shows fresh data
+            persistentCache.invalidateTab(user.uid, 'settings');
+
             const welcomeMsg = document.getElementById('welcomeMessage');
             if (welcomeMsg) welcomeMsg.textContent = `Welcome, ${name}!`;
 
@@ -3426,6 +3477,12 @@ class SettingsManager {
             };
 
             await db.collection(collectionName).doc(studentId).update(updateData);
+
+            // Invalidate caches so next visit shows updated student data
+            if (auth.currentUser) {
+                persistentCache.invalidateTab(auth.currentUser.uid, 'settings');
+                persistentCache.invalidateTab(auth.currentUser.uid, 'academics');
+            }
 
             this.propagateStudentNameChange(studentId, newName);
 
@@ -3862,6 +3919,17 @@ async function checkForNewAcademics() {
         const user = auth.currentUser;
         if (!user) return;
 
+        // ── Use academics cache if available — zero reads needed ─────────────
+        const cached = persistentCache.getTab(user.uid, 'academics', 30 * 60 * 1000);
+        if (cached) {
+            // Count unread items from cached HTML (homework cards from last 7 days)
+            // If there's any academics content, show a badge
+            const homeworkCount = (cached.html.match(/data-homework-id=/g) || []).length;
+            updateAcademicsTabBadge(homeworkCount > 0 ? homeworkCount : 0);
+            return;
+        }
+
+        // ── No cache — do normal Firestore reads ─────────────────────────────
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
@@ -3885,21 +3953,16 @@ async function checkForNewAcademics() {
                 sessionTopicsSnapshot.forEach(doc => {
                     const topic = doc.data();
                     const topicDate = topic.date?.toDate?.() || topic.createdAt?.toDate?.() || new Date(0);
-                    if (topicDate >= oneWeekAgo) {
-                        studentUnread++;
-                    }
+                    if (topicDate >= oneWeekAgo) studentUnread++;
                 });
                 
                 homeworkSnapshot.forEach(doc => {
                     const homework = doc.data();
                     const assignedDate = homework.assignedDate?.toDate?.() || homework.createdAt?.toDate?.() || new Date(0);
-                    if (assignedDate >= oneWeekAgo) {
-                        studentUnread++;
-                    }
+                    if (assignedDate >= oneWeekAgo) studentUnread++;
                 });
                 
                 totalUnread += studentUnread;
-                
             } catch (error) {
                 console.error(`Error checking academics for ${studentName}:`, error);
             }
@@ -4122,24 +4185,16 @@ function switchMainTab(tab) {
         academicsTab?.classList.remove('tab-inactive-main');
         academicsTab?.classList.add('tab-active-main', 'active');
         document.getElementById('academicsContentArea')?.classList.remove('hidden');
-        const academicsContent = document.getElementById('academicsContent');
-        if (!academicsContent || !academicsContent.innerHTML.trim() ||
-            academicsContent.innerHTML.includes('Loading')) {
-            loadAcademicsData();
-        }
+        // loadAcademicsData handles its own cache — shows instantly if cached, loads if not
+        loadAcademicsData();
     } else if (tab === 'rewards') {
         const rewardsTab = document.getElementById('rewardsTab');
         rewardsTab?.classList.remove('tab-inactive-main');
         rewardsTab?.classList.add('tab-active-main', 'active');
         document.getElementById('rewardsContentArea')?.classList.remove('hidden');
         const user = auth.currentUser;
-        if (user) {
-            const rewardsContent = document.getElementById('rewardsContent');
-            if (!rewardsContent || !rewardsContent.innerHTML.trim() ||
-                rewardsContent.innerHTML.includes('Loading')) {
-                loadReferralRewards(user.uid);
-            }
-        }
+        // loadReferralRewards handles its own cache — shows instantly if cached, loads if not
+        if (user) loadReferralRewards(user.uid);
     } else if (tab === 'payments') {
         const paymentsTab = document.getElementById('paymentsTab');
         paymentsTab?.classList.remove('tab-inactive-main');
@@ -4698,13 +4753,8 @@ function logout() {
     localStorage.removeItem('rememberMe');
     localStorage.removeItem('savedEmail');
     localStorage.removeItem('isAuthenticated');
-
-    // Clear this user's report cache on logout
-    const user = auth.currentUser;
-    if (user) persistentCache.invalidate(user.uid);
-    
+    // Cache is intentionally kept — so next login shows data instantly
     cleanupRealTimeListeners();
-    
     auth.signOut().then(() => {
         window.location.reload();
     });
