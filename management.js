@@ -127,7 +127,7 @@ function loadFromLocalStorage() {
                 sessionCache[key] = JSON.parse(storedData);
             }
         } catch (error) {
-            console.error(`Could not load '${key}' from localStorage:`, error);
+            // Silently remove corrupted cache entry
             localStorage.removeItem(CACHE_PREFIX + key);
         }
     }
@@ -139,6 +139,47 @@ function invalidateCache(key) {
 }
 
 loadFromLocalStorage();
+
+// ======================================================
+// TAB DOM CACHING SYSTEM
+// Saves/restores rendered tab DOM to avoid Firestore re-reads.
+// Parent Feedback & Messaging are excluded (always fetch fresh).
+// Click "Refresh" inside any tab to force a fresh fetch.
+// ======================================================
+const _tabDomCache = {};
+let _currentNavId = null;
+const _tabCacheExclude = new Set(['navParentFeedback', 'navMessaging']);
+
+function switchToTabCached(navId, renderFn) {
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+
+    // Save current tab's live DOM nodes (preserves event listeners)
+    if (_currentNavId && !_tabCacheExclude.has(_currentNavId)) {
+        const fragment = document.createDocumentFragment();
+        while (mainContent.firstChild) {
+            fragment.appendChild(mainContent.firstChild);
+        }
+        _tabDomCache[_currentNavId] = fragment;
+    }
+
+    // Clear container
+    mainContent.innerHTML = '';
+
+    // Restore cached DOM or render fresh
+    if (_tabDomCache[navId] && !_tabCacheExclude.has(navId)) {
+        mainContent.appendChild(_tabDomCache[navId]);
+        _currentNavId = navId;
+    } else {
+        _currentNavId = navId;
+        renderFn(mainContent);
+    }
+}
+
+// Call this from any tab's Refresh button to force re-render
+window.invalidateTabCache = function(navId) {
+    delete _tabDomCache[navId];
+};
 
 let payAdviceGifts = {};
 let currentPayData = [];
@@ -246,7 +287,7 @@ async function renderDashboardPanel(container) {
                             <i class="fas fa-file-signature text-white text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-purple-800">Total s</h3>
+                            <h3 class="text-lg font-semibold text-purple-800">Total Enrollments</h3>
                             <p class="text-sm text-purple-600">All enrollment applications</p>
                         </div>
                     </div>
@@ -392,161 +433,519 @@ async function loadDashboardData() {
 
 window.showAssignStudentModal = async function() {
     try {
-        // Load tutors and students data
         if (!sessionCache.tutors) {
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
-            const activeTutors = tutorsSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(tutor => !tutor.status || tutor.status === 'active');
-            sessionCache.tutors = activeTutors;
+            const snap = await getDocs(query(collection(db, "tutors")));
+            sessionCache.tutors = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(t => !t.status || t.status === 'active');
         }
-
         if (!sessionCache.students) {
-            const studentsSnapshot = await getDocs(query(collection(db, "students")));
-            const activeStudents = studentsSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(student => !student.status || student.status === 'active' || student.status === 'approved');
-            sessionCache.students = activeStudents;
+            const snap = await getDocs(query(collection(db, "students")));
+            sessionCache.students = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(s => !s.status || s.status === 'active' || s.status === 'approved');
         }
 
         const tutors = sessionCache.tutors || [];
         const students = sessionCache.students || [];
 
-        // Create modal HTML
-        const modalHTML = `
-            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl my-4">
-                    <div class="flex justify-between items-center p-6 border-b">
-                        <h3 class="text-xl font-bold text-blue-700">Assign Student to Tutor</h3>
-                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="p-6">
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Tutor <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <input type="text" id="assign-tutor-search" placeholder="Type to search tutors..." 
-                                    autocomplete="off"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <input type="hidden" id="assign-tutor-select" value="">
-                                <div id="assign-tutor-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto hidden">
-                                    ${tutors.map(tutor => `
-                                        <div class="tutor-option px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm" 
-                                            data-value="${tutor.id}" 
-                                            data-label="${(tutor.name || tutor.email || tutor.id)}${tutor.assignedStudentsCount ? ` (${tutor.assignedStudentsCount} students)` : ''}">
-                                            <span class="font-medium">${tutor.name || tutor.email || tutor.id}</span>
-                                            ${tutor.assignedStudentsCount ? `<span class="text-gray-400 ml-2 text-xs">${tutor.assignedStudentsCount} students</span>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Student <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <input type="text" id="assign-student-search" placeholder="Type to search students..." 
-                                    autocomplete="off"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <input type="hidden" id="assign-student-select" value="">
-                                <div id="assign-student-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto hidden">
-                                    ${students.map(student => `
-                                        <div class="student-option px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm" 
-                                            data-value="${student.id}"
-                                            data-parent-email="${student.parentEmail || ''}"
-                                            data-label="${student.studentName || student.name || student.email || student.id}${student.parentEmail ? ` — ${student.parentEmail}` : ''}">
-                                            <span class="font-medium">${student.studentName || student.name || student.id}</span>
-                                            ${student.grade ? `<span class="text-gray-400 ml-2 text-xs">${student.grade}</span>` : ''}
-                                            ${student.parentEmail ? `<div class="text-gray-400 text-xs">${student.parentEmail}</div>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Parent Email</label>
-                            <input type="email" id="assign-parent-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="parent@example.com" value="">
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Assignment Notes (Optional)</label>
-                            <textarea id="assignment-notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Add any notes about this assignment..."></textarea>
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-end gap-3 p-6 border-t bg-gray-50 rounded-b-lg">
-                        <button onclick="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                            Cancel
-                        </button>
-                        <button onclick="submitAssignment()" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            <i class="fas fa-user-plus mr-2"></i> Assign Student
-                        </button>
-                    </div>
-                </div>
+        const existing = document.getElementById('assign-student-modal');
+        if (existing) existing.remove();
+
+        const container = document.createElement('div');
+        container.id = 'assign-student-modal';
+
+        const studentOptsHTML = students.map(s =>
+            `<div class="asgn-student-opt px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0"
+                data-id="${escapeHtml(s.id)}"
+                data-name="${escapeHtml(s.studentName || s.name || '')}"
+                data-email="${escapeHtml(s.parentEmail || '')}"
+                data-label="${escapeHtml((s.studentName || s.name || s.id) + (s.parentEmail ? ' - ' + s.parentEmail : ''))}">
+                <span class="font-medium">${escapeHtml(s.studentName || s.name || s.id)}</span>
+                ${s.grade ? `<span class="text-gray-400 ml-2 text-xs">${escapeHtml(s.grade)}</span>` : ''}
+                ${s.parentEmail ? `<div class="text-gray-400 text-xs">${escapeHtml(s.parentEmail)}</div>` : ''}
+            </div>`).join('');
+
+        const tutorOptsHTML = tutors.map(t =>
+            `<div class="asgn-tutor-opt px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0"
+                data-id="${escapeHtml(t.id)}"
+                data-name="${escapeHtml(t.name || t.email || '')}"
+                data-email="${escapeHtml(t.email || '')}">
+                <span class="font-medium">${escapeHtml(t.name || t.email || t.id)}</span>
+                ${t.assignedStudentsCount ? `<span class="text-gray-400 ml-1 text-xs">(${t.assignedStudentsCount} students)</span>` : ''}
+                ${t.subjects && t.subjects.length ? `<div class="text-xs text-green-600">${escapeHtml(t.subjects.slice(0,3).join(', '))}</div>` : ''}
+            </div>`).join('');
+
+        container.innerHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-6">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-700 rounded-t-xl">
+              <h3 class="text-lg font-bold text-white"><i class="fas fa-user-plus mr-2"></i>Assign Student to Tutor</h3>
+              <button id="asgn-close-btn" class="text-white hover:text-blue-200 text-2xl leading-none font-bold">&times;</button>
             </div>
-        `;
+            <div class="p-6 space-y-5">
 
-        // Add modal to DOM
-        const modalContainer = document.createElement('div');
-        modalContainer.id = 'assign-student-modal';
-        modalContainer.innerHTML = modalHTML;
-        document.body.appendChild(modalContainer);
-        
-        // Setup searchable dropdowns
-        function setupSearchableDropdown(searchInputId, hiddenInputId, dropdownId, optionClass) {
-            const searchInput = document.getElementById(searchInputId);
-            const hiddenInput = document.getElementById(hiddenInputId);
-            const dropdown = document.getElementById(dropdownId);
-            if (!searchInput || !dropdown) return;
+              <!-- Student Type -->
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Student Type <span class="text-red-500">*</span></label>
+                <div class="flex gap-3">
+                  <button id="asgn-type-existing" class="flex-1 py-2 rounded-lg border-2 border-blue-500 bg-blue-50 text-blue-700 font-semibold text-sm transition-all">
+                    <i class="fas fa-search mr-1"></i> Existing Student
+                  </button>
+                  <button id="asgn-type-new" class="flex-1 py-2 rounded-lg border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-blue-400 transition-all">
+                    <i class="fas fa-user-plus mr-1"></i> New Student
+                  </button>
+                </div>
+              </div>
 
-            searchInput.addEventListener('focus', () => { dropdown.classList.remove('hidden'); });
+              <!-- Existing Student Search -->
+              <div id="asgn-existing-section">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Select Student <span class="text-red-500">*</span></label>
+                <div class="relative">
+                  <input type="text" id="asgn-existing-search" placeholder="Type student name to search..."
+                    autocomplete="off"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+                  <input type="hidden" id="asgn-existing-id">
+                  <div id="asgn-existing-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto hidden mt-1">
+                    ${studentOptsHTML}
+                  </div>
+                </div>
+              </div>
+
+              <!-- New Student Section -->
+              <div id="asgn-new-section" class="hidden space-y-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Class Type <span class="text-red-500">*</span></label>
+                  <div class="flex gap-3">
+                    <button id="asgn-class-single" class="flex-1 py-2 rounded-lg border-2 border-blue-500 bg-blue-50 text-blue-700 font-semibold text-sm">
+                      <i class="fas fa-user mr-1"></i> Single Student
+                    </button>
+                    <button id="asgn-class-group" class="flex-1 py-2 rounded-lg border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-blue-400">
+                      <i class="fas fa-users mr-1"></i> Group Class
+                    </button>
+                  </div>
+                </div>
+                <div id="asgn-single-fields">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Student Name <span class="text-red-500">*</span></label>
+                  <input type="text" id="asgn-new-single-name" placeholder="Enter student's full name"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+                <div id="asgn-group-fields" class="hidden">
+                  <div class="flex justify-between items-center mb-2">
+                    <label class="block text-sm font-medium text-gray-700">Students in Group <span class="text-red-500">*</span></label>
+                    <button id="asgn-add-student-row" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">
+                      <i class="fas fa-plus mr-1"></i> Add Student
+                    </button>
+                  </div>
+                  <div id="asgn-group-rows" class="space-y-2">
+                    <div class="asgn-group-row flex items-center gap-2">
+                      <input type="text" placeholder="Student 1 full name"
+                        class="asgn-group-name flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div class="asgn-group-row flex items-center gap-2">
+                      <input type="text" placeholder="Student 2 full name"
+                        class="asgn-group-name flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+                      <button class="asgn-remove-row text-red-400 hover:text-red-600 text-xl leading-none font-bold">&times;</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Parent Email -->
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Parent Email <span class="text-red-500">*</span></label>
+                <input type="email" id="assign-parent-email" placeholder="parent@example.com"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+                <p class="text-xs text-gray-400 mt-1">Required — used for all communications and records</p>
+              </div>
+
+              <!-- Tutor Assignments -->
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-sm font-semibold text-gray-700">Tutor Assignment(s) <span class="text-red-500">*</span></label>
+                  <button id="asgn-add-tutor-row" class="text-xs bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">
+                    <i class="fas fa-plus mr-1"></i> Add Another Tutor
+                  </button>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">Assign one or more tutors and specify what each teaches</p>
+                <div id="asgn-tutor-rows" class="space-y-3"></div>
+              </div>
+
+              <!-- Notes -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                <textarea id="assignment-notes" rows="2" placeholder="Any additional notes..."
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"></textarea>
+              </div>
+
+            </div>
+            <div class="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+              <button id="asgn-cancel-btn" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 text-sm">Cancel</button>
+              <button id="asgn-submit-btn" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
+                <i class="fas fa-user-plus mr-2"></i>Assign Student
+              </button>
+            </div>
+          </div>
+        </div>`;
+
+        document.body.appendChild(container);
+
+        // tutorOptsHTML is a closure variable, store it for row building
+        container._tutorOptsHTML = tutorOptsHTML;
+
+        // Close handlers
+        document.getElementById('asgn-close-btn').addEventListener('click', closeModal);
+        document.getElementById('asgn-cancel-btn').addEventListener('click', closeModal);
+        container.querySelector('.fixed.inset-0').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Student type toggle
+        let studentMode = 'existing';
+        document.getElementById('asgn-type-existing').addEventListener('click', function() {
+            studentMode = 'existing';
+            this.classList.add('border-blue-500','bg-blue-50','text-blue-700');
+            this.classList.remove('border-gray-200','text-gray-600');
+            const nb = document.getElementById('asgn-type-new');
+            nb.classList.remove('border-blue-500','bg-blue-50','text-blue-700');
+            nb.classList.add('border-gray-200','text-gray-600');
+            document.getElementById('asgn-existing-section').classList.remove('hidden');
+            document.getElementById('asgn-new-section').classList.add('hidden');
+        });
+        document.getElementById('asgn-type-new').addEventListener('click', function() {
+            studentMode = 'new';
+            this.classList.add('border-blue-500','bg-blue-50','text-blue-700');
+            this.classList.remove('border-gray-200','text-gray-600');
+            const eb = document.getElementById('asgn-type-existing');
+            eb.classList.remove('border-blue-500','bg-blue-50','text-blue-700');
+            eb.classList.add('border-gray-200','text-gray-600');
+            document.getElementById('asgn-existing-section').classList.add('hidden');
+            document.getElementById('asgn-new-section').classList.remove('hidden');
+        });
+
+        // Class type toggle
+        let classMode = 'single';
+        document.getElementById('asgn-class-single').addEventListener('click', function() {
+            classMode = 'single';
+            this.classList.add('border-blue-500','bg-blue-50','text-blue-700');
+            this.classList.remove('border-gray-200','text-gray-600');
+            const gb = document.getElementById('asgn-class-group');
+            gb.classList.remove('border-blue-500','bg-blue-50','text-blue-700');
+            gb.classList.add('border-gray-200','text-gray-600');
+            document.getElementById('asgn-single-fields').classList.remove('hidden');
+            document.getElementById('asgn-group-fields').classList.add('hidden');
+        });
+        document.getElementById('asgn-class-group').addEventListener('click', function() {
+            classMode = 'group';
+            this.classList.add('border-blue-500','bg-blue-50','text-blue-700');
+            this.classList.remove('border-gray-200','text-gray-600');
+            const sb = document.getElementById('asgn-class-single');
+            sb.classList.remove('border-blue-500','bg-blue-50','text-blue-700');
+            sb.classList.add('border-gray-200','text-gray-600');
+            document.getElementById('asgn-single-fields').classList.add('hidden');
+            document.getElementById('asgn-group-fields').classList.remove('hidden');
+        });
+
+        // Add group student row
+        document.getElementById('asgn-add-student-row').addEventListener('click', function() {
+            const rows = document.getElementById('asgn-group-rows');
+            const count = rows.querySelectorAll('.asgn-group-row').length + 1;
+            const row = document.createElement('div');
+            row.className = 'asgn-group-row flex items-center gap-2';
+            row.innerHTML = `
+              <input type="text" placeholder="Student ${count} full name"
+                class="asgn-group-name flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+              <button class="asgn-remove-row text-red-400 hover:text-red-600 text-xl leading-none font-bold">&times;</button>`;
+            rows.appendChild(row);
+            row.querySelector('.asgn-remove-row').addEventListener('click', () => row.remove());
+        });
+        document.querySelectorAll('.asgn-remove-row').forEach(btn => {
+            btn.addEventListener('click', () => btn.closest('.asgn-group-row').remove());
+        });
+
+        // Tutor row builder
+        let tutorRowCount = 0;
+        function addTutorRow(isFirst) {
+            tutorRowCount++;
+            const rowEl = document.createElement('div');
+            rowEl.className = 'asgn-tutor-row border border-gray-200 rounded-lg p-3 bg-gray-50';
+            rowEl.innerHTML = `
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tutor ${tutorRowCount}</span>
+                ${!isFirst ? `<button class="asgn-remove-tutor-row text-red-400 hover:text-red-600 text-xl leading-none font-bold">&times;</button>` : ''}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="relative">
+                  <label class="text-xs text-gray-600 mb-1 block">Tutor Name <span class="text-red-500">*</span></label>
+                  <input type="text" class="asgn-tutor-search w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Type to search..." autocomplete="off">
+                  <input type="hidden" class="asgn-tutor-id">
+                  <div class="asgn-tutor-dropdown absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-44 overflow-y-auto hidden mt-1">
+                    ${tutorOptsHTML}
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 mb-1 block">Subject / Category <span class="text-red-500">*</span></label>
+                  <input type="text" class="asgn-tutor-subject w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" placeholder="e.g. Mathematics, Piano, SAT Prep">
+                </div>
+              </div>`;
+
+            document.getElementById('asgn-tutor-rows').appendChild(rowEl);
+
+            const searchInput = rowEl.querySelector('.asgn-tutor-search');
+            const hiddenId = rowEl.querySelector('.asgn-tutor-id');
+            const dropdown = rowEl.querySelector('.asgn-tutor-dropdown');
+
+            searchInput.addEventListener('focus', () => dropdown.classList.remove('hidden'));
             searchInput.addEventListener('input', () => {
                 const term = searchInput.value.toLowerCase();
-                dropdown.querySelectorAll('.' + optionClass).forEach(opt => {
-                    const label = (opt.dataset.label || '').toLowerCase();
-                    opt.style.display = label.includes(term) ? '' : 'none';
+                hiddenId.value = '';
+                dropdown.querySelectorAll('.asgn-tutor-opt').forEach(opt => {
+                    const n = (opt.dataset.name || '').toLowerCase();
+                    const e = (opt.dataset.email || '').toLowerCase();
+                    opt.style.display = (n.includes(term) || e.includes(term)) ? '' : 'none';
                 });
                 dropdown.classList.remove('hidden');
-                hiddenInput.value = '';
             });
-            dropdown.querySelectorAll('.' + optionClass).forEach(opt => {
+            dropdown.querySelectorAll('.asgn-tutor-opt').forEach(opt => {
                 opt.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    searchInput.value = opt.querySelector('span.font-medium').textContent;
-                    hiddenInput.value = opt.dataset.value;
+                    searchInput.value = opt.dataset.name;
+                    hiddenId.value = opt.dataset.id;
                     dropdown.classList.add('hidden');
-                    // Auto-fill parent email if student selected
-                    if (opt.dataset.parentEmail !== undefined) {
-                        const emailInput = document.getElementById('assign-parent-email');
-                        if (emailInput && opt.dataset.parentEmail) emailInput.value = opt.dataset.parentEmail;
-                    }
                 });
             });
             document.addEventListener('click', (e) => {
                 if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
                     dropdown.classList.add('hidden');
                 }
-            }, { once: false });
+            });
+
+            const removeBtn = rowEl.querySelector('.asgn-remove-tutor-row');
+            if (removeBtn) removeBtn.addEventListener('click', () => rowEl.remove());
         }
 
-        setTimeout(() => {
-            setupSearchableDropdown('assign-tutor-search', 'assign-tutor-select', 'assign-tutor-dropdown', 'tutor-option');
-            setupSearchableDropdown('assign-student-search', 'assign-student-select', 'assign-student-dropdown', 'student-option');
-            document.getElementById('assign-tutor-search')?.focus();
-        }, 100);
-        
+        addTutorRow(true);
+        document.getElementById('asgn-add-tutor-row').addEventListener('click', () => addTutorRow(false));
+
+        // Existing student search
+        const existSearch = document.getElementById('asgn-existing-search');
+        const existId = document.getElementById('asgn-existing-id');
+        const existDrop = document.getElementById('asgn-existing-dropdown');
+
+        existSearch.addEventListener('focus', () => existDrop.classList.remove('hidden'));
+        existSearch.addEventListener('input', () => {
+            const term = existSearch.value.toLowerCase();
+            existId.value = '';
+            existDrop.querySelectorAll('.asgn-student-opt').forEach(opt => {
+                const label = (opt.dataset.label || '').toLowerCase();
+                opt.style.display = label.includes(term) ? '' : 'none';
+            });
+            existDrop.classList.remove('hidden');
+        });
+        existDrop.querySelectorAll('.asgn-student-opt').forEach(opt => {
+            opt.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                existSearch.value = opt.dataset.name;
+                existId.value = opt.dataset.id;
+                existDrop.classList.add('hidden');
+                if (opt.dataset.email) {
+                    document.getElementById('assign-parent-email').value = opt.dataset.email;
+                }
+            });
+        });
+        document.addEventListener('click', (e) => {
+            if (!existSearch.contains(e.target) && !existDrop.contains(e.target)) {
+                existDrop.classList.add('hidden');
+            }
+        });
+
+        // Submit
+        document.getElementById('asgn-submit-btn').addEventListener('click', () => submitAssignment(studentMode, classMode, tutors));
+
+        setTimeout(() => existSearch.focus(), 100);
+
     } catch (error) {
-        console.error('Error showing assign student modal:', error);
         alert('Failed to load assignment data. Please try again.');
     }
 };
+
+async function submitAssignment(studentMode, classMode, tutors) {
+    const parentEmail = (document.getElementById('assign-parent-email')?.value || '').trim();
+    const notes = (document.getElementById('assignment-notes')?.value || '').trim();
+
+    if (!parentEmail) {
+        alert('Parent email is required.');
+        document.getElementById('assign-parent-email')?.focus();
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) {
+        alert('Please enter a valid parent email address.');
+        document.getElementById('assign-parent-email')?.focus();
+        return;
+    }
+
+    // Collect tutor assignments
+    const tutorRows = document.querySelectorAll('#asgn-tutor-rows .asgn-tutor-row');
+    if (tutorRows.length === 0) { alert('Please add at least one tutor.'); return; }
+
+    const tutorAssignments = [];
+    for (let i = 0; i < tutorRows.length; i++) {
+        const row = tutorRows[i];
+        const tid = (row.querySelector('.asgn-tutor-id')?.value || '').trim();
+        const tsearch = (row.querySelector('.asgn-tutor-search')?.value || '').trim();
+        const tsubject = (row.querySelector('.asgn-tutor-subject')?.value || '').trim();
+        if (!tid) { alert(`Please select a tutor from the dropdown for Tutor ${i + 1}.`); return; }
+        if (!tsubject) { alert(`Please enter a subject/category for Tutor ${i + 1}.`); return; }
+        const tutorData = (tutors || sessionCache.tutors || []).find(t => t.id === tid);
+        tutorAssignments.push({
+            tutorId: tid,
+            tutorName: tutorData?.name || tsearch || '',
+            tutorEmail: tutorData?.email || '',
+            subject: sanitizeInput(tsubject, 200)
+        });
+    }
+
+    // Collect students
+    let studentsToAssign = [];
+    if (studentMode === 'existing') {
+        const sid = (document.getElementById('asgn-existing-id')?.value || '').trim();
+        if (!sid) { alert('Please select an existing student from the dropdown.'); return; }
+        const s = (sessionCache.students || []).find(st => st.id === sid);
+        studentsToAssign = [{ id: sid, name: s?.studentName || s?.name || sid, isNew: false }];
+    } else {
+        if (classMode === 'single') {
+            const name = (document.getElementById('asgn-new-single-name')?.value || '').trim();
+            if (!name) { alert('Please enter the student\'s name.'); document.getElementById('asgn-new-single-name')?.focus(); return; }
+            studentsToAssign = [{ id: null, name: sanitizeInput(name, 200), isNew: true }];
+        } else {
+            document.querySelectorAll('#asgn-group-rows .asgn-group-name').forEach(inp => {
+                const n = inp.value.trim();
+                if (n) studentsToAssign.push({ id: null, name: sanitizeInput(n, 200), isNew: true });
+            });
+            if (studentsToAssign.length === 0) { alert('Please enter at least one student name for the group class.'); return; }
+        }
+    }
+
+    const submitBtn = document.getElementById('asgn-submit-btn');
+    const originalHTML = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Assigning...';
+
+    try {
+        const batch = writeBatch(db);
+        const now = new Date().toISOString();
+        const nowTs = Timestamp.now();
+        const assignedBy = window.userData?.uid || 'system';
+        const assignedByEmail = window.userData?.email || 'system';
+        const isGroup = studentsToAssign.length > 1;
+        const groupId = isGroup ? ('grp_' + Date.now()) : null;
+
+        const createdStudentIds = [];
+
+        for (const student of studentsToAssign) {
+            let studentDocId = student.id;
+
+            if (student.isNew) {
+                const newRef = doc(collection(db, 'students'));
+                studentDocId = newRef.id;
+                createdStudentIds.push(studentDocId);
+                batch.set(newRef, {
+                    studentName: student.name,
+                    parentEmail: sanitizeInput(parentEmail, 200),
+                    status: 'active',
+                    createdAt: nowTs,
+                    createdBy: assignedByEmail,
+                    lastModified: now,
+                    notes: notes || '',
+                    groupId: groupId || null,
+                    isGroupClass: isGroup,
+                    tutorId: tutorAssignments[0]?.tutorId || '',
+                    tutorEmail: tutorAssignments[0]?.tutorEmail || '',
+                    tutorName: tutorAssignments[0]?.tutorName || '',
+                    subjectTutors: tutorAssignments.map(ta => ({
+                        tutorId: ta.tutorId,
+                        tutorName: ta.tutorName,
+                        tutorEmail: ta.tutorEmail,
+                        subject: ta.subject,
+                        assignedDate: nowTs,
+                        assignedBy: assignedByEmail
+                    }))
+                });
+            } else {
+                batch.update(doc(db, 'students', studentDocId), {
+                    parentEmail: sanitizeInput(parentEmail, 200),
+                    tutorId: tutorAssignments[0]?.tutorId || '',
+                    tutorEmail: tutorAssignments[0]?.tutorEmail || '',
+                    tutorName: tutorAssignments[0]?.tutorName || '',
+                    subjectTutors: tutorAssignments.map(ta => ({
+                        tutorId: ta.tutorId,
+                        tutorName: ta.tutorName,
+                        tutorEmail: ta.tutorEmail,
+                        subject: ta.subject,
+                        assignedDate: nowTs,
+                        assignedBy: assignedByEmail
+                    })),
+                    lastModified: now
+                });
+            }
+
+            for (const ta of tutorAssignments) {
+                const assignRef = doc(collection(db, 'tutorAssignments'));
+                batch.set(assignRef, {
+                    tutorId: ta.tutorId,
+                    tutorEmail: ta.tutorEmail,
+                    tutorName: ta.tutorName,
+                    subject: ta.subject,
+                    studentId: studentDocId,
+                    studentName: student.name,
+                    parentEmail: sanitizeInput(parentEmail, 200),
+                    assignedBy: assignedBy,
+                    assignedByEmail: assignedByEmail,
+                    assignedDate: now,
+                    status: 'active',
+                    notes: notes || '',
+                    isGroupClass: isGroup,
+                    groupId: groupId || null,
+                    lastModified: now
+                });
+            }
+        }
+
+        // Increment tutor counts (outside batch — needs reads first)
+        await batch.commit();
+
+        // Update tutor counts after batch
+        for (const ta of tutorAssignments) {
+            try {
+                const tutorRef = doc(db, 'tutors', ta.tutorId);
+                const tutorDoc = await getDoc(tutorRef);
+                if (tutorDoc.exists()) {
+                    const cur = tutorDoc.data().assignedStudentsCount || 0;
+                    await updateDoc(tutorRef, {
+                        assignedStudentsCount: cur + studentsToAssign.length,
+                        lastModified: now
+                    });
+                }
+            } catch(e) { /* non-critical */ }
+        }
+
+        invalidateCache('tutorAssignments');
+        invalidateCache('tutors');
+        invalidateCache('students');
+
+        closeModal();
+        await logManagementActivity('STUDENT_ASSIGNED',
+            `Assigned ${studentsToAssign.map(s => s.name).join(', ')} to ${tutorAssignments.map(t => t.tutorName + ' (' + t.subject + ')').join('; ')}`);
+        alert(`Successfully assigned ${studentsToAssign.length > 1 ? studentsToAssign.length + ' students' : '"' + studentsToAssign[0].name + '"'} to ${tutorAssignments.length} tutor${tutorAssignments.length > 1 ? 's' : ''}!`);
+        await refreshAllDashboardData();
+
+    } catch (error) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHTML;
+        alert('Failed to save assignment. Please try again.');
+    }
+}
+
 
 window.showArchiveStudentModal = async function() {
     try {
@@ -1026,9 +1425,7 @@ window.closeModal = function() {
     const modals = ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'];
     modals.forEach(modalId => {
         const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.remove();
-        }
+        if (modal) modal.remove();
     });
 };
 
@@ -1335,7 +1732,6 @@ async function logStudentEvent(studentId, eventType, changes = {}, description =
             description,
             metadata
         });
-        console.log(`Student event logged: ${eventType} for ${studentId}`);
     } catch (e) {
         console.error("Error logging student event:", e);
     }
@@ -1545,12 +1941,13 @@ function showTransitionStudentModal() {
                             <option value="14" selected>2 weeks</option>
                             <option value="21">3 weeks</option>
                             <option value="28">4 weeks</option>
+                            <option value="custom">Custom Date...</option>
                         </select>
                     </div>
                     
-                    <!-- Calculated End Date (read-only) -->
+                    <!-- End Date: auto-calculated or custom date picker -->
                     <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2 text-gray-700">End Date (auto-calculated)</label>
+                        <label class="block text-sm font-medium mb-2 text-gray-700" id="transition-end-date-label">End Date (auto-calculated)</label>
                         <input type="text" 
                                id="transition-end-date-display" 
                                class="w-full p-2 bg-gray-100 border rounded-md text-gray-700" 
@@ -1600,16 +1997,42 @@ function showTransitionStudentModal() {
         
         // Update end date display based on start date and duration
         function updateEndDate() {
-            const startDateStr = document.getElementById('transition-start-date').value;
-            if (!startDateStr) return;
-            const startDate = new Date(startDateStr);
-            const durationDays = parseInt(document.getElementById('transition-duration').value, 10);
-            const endDate = new Date(startDate);
-            endDate.setDate(startDate.getDate() + durationDays);
-            document.getElementById('transition-end-date-display').value = endDate.toISOString().split('T')[0];
+            const durationVal = document.getElementById('transition-duration').value;
+            const endDateInput = document.getElementById('transition-end-date-display');
+            const endDateLabel = document.getElementById('transition-end-date-label');
+
+            if (durationVal === 'custom') {
+                // Switch to an editable date picker
+                endDateLabel.textContent = 'End Date (select date)';
+                endDateInput.readOnly = false;
+                endDateInput.type = 'date';
+                endDateInput.classList.remove('bg-gray-100');
+                endDateInput.classList.add('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                endDateInput.min = new Date().toISOString().split('T')[0];
+                if (!endDateInput.value) {
+                    // Default to 2 weeks from today
+                    const def = new Date();
+                    def.setDate(def.getDate() + 14);
+                    endDateInput.value = def.toISOString().split('T')[0];
+                }
+            } else {
+                // Auto-calculate end date
+                endDateLabel.textContent = 'End Date (auto-calculated)';
+                endDateInput.readOnly = true;
+                endDateInput.type = 'text';
+                endDateInput.classList.add('bg-gray-100');
+                endDateInput.classList.remove('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                const startDateStr = document.getElementById('transition-start-date').value;
+                if (!startDateStr) return;
+                const startDate = new Date(startDateStr);
+                const durationDays = parseInt(durationVal, 10);
+                const endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + durationDays);
+                endDateInput.value = endDate.toISOString().split('T')[0];
+            }
         }
         
-        // Use hidden start date field (we'll keep the date picker but hide it)
+        // Use hidden start date field
         const startDateHtml = `<input type="date" id="transition-start-date" value="${new Date().toISOString().split('T')[0]}" class="hidden">`;
         document.querySelector('#transition-student-form').insertAdjacentHTML('afterbegin', startDateHtml);
         
@@ -1638,12 +2061,21 @@ function showTransitionStudentModal() {
             const tutorEmail = document.getElementById('transition-tutor').value;
             const startDate = document.getElementById('transition-start-date').value;
             const endDate = document.getElementById('transition-end-date-display').value;
-            const durationDays = parseInt(document.getElementById('transition-duration').value, 10);
+            const durationRaw = document.getElementById('transition-duration').value;
+            // If custom date selected, calculate durationDays from start→end date diff
+            const durationDays = durationRaw === 'custom'
+                ? Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+                : parseInt(durationRaw, 10);
             const reason = document.getElementById('transition-reason').value.trim();
             const allowReporting = document.getElementById('allow-reporting').checked;
             
             if (!studentId || !tutorEmail || !startDate || !endDate) {
                 alert("Please fill all required fields");
+                return;
+            }
+            
+            if (durationDays <= 0 || isNaN(durationDays)) {
+                alert("End date must be after the start date.");
                 return;
             }
             
@@ -2003,7 +2435,6 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
             parentDetails: parentDetails  // Store all parent info
         });
         
-        console.log("Group created with ID:", groupRef.id);
         
         const updatePromises = studentFees.map(async (sf) => {
             const studentDoc = await getDoc(doc(db, "students", sf.studentId));
@@ -2212,11 +2643,12 @@ function showEnhancedReassignStudentModal() {
                                 <option value="14" selected>2 weeks</option>
                                 <option value="21">3 weeks</option>
                                 <option value="28">4 weeks</option>
+                                <option value="custom">Custom Date...</option>
                             </select>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2 text-gray-700">End Date (auto-calculated)</label>
+                            <label class="block text-sm font-medium mb-2 text-gray-700" id="transition-end-date-reassign-label">End Date (auto-calculated)</label>
                             <input type="text" 
                                    id="transition-end-date-reassign-display" 
                                    class="w-full p-2 bg-gray-100 border rounded-md text-gray-700" 
@@ -2275,13 +2707,36 @@ function showEnhancedReassignStudentModal() {
         document.getElementById('transition-duration-reassign').required = false;
         
         function updateTemporaryEndDate() {
-            const startDateStr = document.getElementById('transition-start-date-reassign').value;
-            if (!startDateStr) return;
-            const startDate = new Date(startDateStr);
-            const durationDays = parseInt(document.getElementById('transition-duration-reassign').value, 10);
-            const endDate = new Date(startDate);
-            endDate.setDate(startDate.getDate() + durationDays);
-            document.getElementById('transition-end-date-reassign-display').value = endDate.toISOString().split('T')[0];
+            const durationVal = document.getElementById('transition-duration-reassign').value;
+            const endDateInput = document.getElementById('transition-end-date-reassign-display');
+            const endDateLabel = document.getElementById('transition-end-date-reassign-label');
+
+            if (durationVal === 'custom') {
+                endDateLabel.textContent = 'End Date (select date)';
+                endDateInput.readOnly = false;
+                endDateInput.type = 'date';
+                endDateInput.classList.remove('bg-gray-100');
+                endDateInput.classList.add('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                endDateInput.min = new Date().toISOString().split('T')[0];
+                if (!endDateInput.value) {
+                    const def = new Date();
+                    def.setDate(def.getDate() + 14);
+                    endDateInput.value = def.toISOString().split('T')[0];
+                }
+            } else {
+                endDateLabel.textContent = 'End Date (auto-calculated)';
+                endDateInput.readOnly = true;
+                endDateInput.type = 'text';
+                endDateInput.classList.add('bg-gray-100');
+                endDateInput.classList.remove('bg-white', 'focus:ring-2', 'focus:ring-orange-500', 'focus:border-orange-500');
+                const startDateStr = document.getElementById('transition-start-date-reassign').value;
+                if (!startDateStr) return;
+                const startDate = new Date(startDateStr);
+                const durationDays = parseInt(durationVal, 10);
+                const endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + durationDays);
+                endDateInput.value = endDate.toISOString().split('T')[0];
+            }
         }
         
         document.getElementById('transition-duration-reassign').addEventListener('change', updateTemporaryEndDate);
@@ -2367,12 +2822,21 @@ function showEnhancedReassignStudentModal() {
                 const tutorEmail = document.getElementById('reassign-tutor-temp').value;
                 const reason = document.getElementById('transition-reason-temp').value.trim();
                 const endDate = document.getElementById('transition-end-date-reassign-display').value;
-                const durationDays = parseInt(document.getElementById('transition-duration-reassign').value, 10);
+                const durationRaw = document.getElementById('transition-duration-reassign').value;
+                // If custom date selected, calculate durationDays from start→end date diff
+                const durationDays = durationRaw === 'custom'
+                    ? Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+                    : parseInt(durationRaw, 10);
                 const allowReporting = document.getElementById('allow-reporting-reassign').checked;
                 const startDate = document.getElementById('transition-start-date-reassign').value;
                 
                 if (!studentId || !tutorEmail || !reason) {
                     alert("Please select student, tutor and provide a reason");
+                    return;
+                }
+                
+                if (durationDays <= 0 || isNaN(durationDays)) {
+                    alert("End date must be after the start date.");
                     return;
                 }
                 
@@ -2384,7 +2848,7 @@ function showEnhancedReassignStudentModal() {
                     return;
                 }
                 
-                if (confirm(`Temporarily transition ${student.studentName} to ${newTutor.name} for ${durationDays} days (until ${endDate})?`)) {
+                if (confirm(`Temporarily transition ${student.studentName} to ${newTutor.name} until ${endDate} (${durationDays} days)?`)) {
                     await performTransition(
                         student, 
                         newTutor, 
@@ -2829,7 +3293,6 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             getDocs(collection(db, "groupClasses"))
         ]);
         
-        console.log(`Fetched: ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students`);
         
         const allTutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         const activeTutors = allTutors.filter(t => !t.status || t.status === 'active');
@@ -4963,10 +5426,10 @@ async function exportPayAdviceAsXLS() {
     }
 }
 
-// Remove the old downloadMultipleXLSFiles and downloadAsXLS functions as they're no longer needed
+
 
 // ======================================================
-// SUBSECTION 4.1B: Tenure Bonus Panel
+// SUBSECTION 4.1B: Tenure Bonus Panel (MANUAL ONLY)
 // ======================================================
 
 // Tenure Bonus constants
@@ -4978,29 +5441,37 @@ let tenureBonusLogs = [];
 let tenureBonusActiveSubTab = 'all'; // 'all', 'eligible', 'notEligible'
 
 function calculateTenureDetails(employmentDate) {
-    if (!employmentDate) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+    if (!employmentDate) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isOverOneYear: false, oneYearAnniversary: null, qualifiesForBonus: false };
     try {
         const start = new Date(employmentDate);
-        if (isNaN(start.getTime())) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+        if (isNaN(start.getTime())) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isOverOneYear: false, oneYearAnniversary: null, qualifiesForBonus: false };
         const now = new Date();
         let years = now.getFullYear() - start.getFullYear();
         let months = now.getMonth() - start.getMonth();
         if (now.getDate() < start.getDate()) months--;
         if (months < 0) { years--; months += 12; }
         const totalMonths = years * 12 + months;
-        const isEligible = totalMonths >= 12;
+        const isOverOneYear = totalMonths >= 12;
+
+        // Calculate the exact 1-year anniversary date
+        const oneYearAnniversary = new Date(start);
+        oneYearAnniversary.setFullYear(oneYearAnniversary.getFullYear() + 1);
+
+        // Tutor qualifies for bonus ONLY if their 1-year anniversary is ON or AFTER March 1, 2026
+        const qualifiesForBonus = oneYearAnniversary >= TENURE_BONUS_EFFECTIVE_DATE;
+
         let label = '';
         if (years > 0) label += `${years} year${years > 1 ? 's' : ''}`;
         if (months > 0) label += `${years > 0 ? ', ' : ''}${months} month${months > 1 ? 's' : ''}`;
         if (!label) label = 'Less than 1 month';
-        return { years, months, totalMonths, label, isEligible };
+        return { years, months, totalMonths, label, isOverOneYear, oneYearAnniversary, qualifiesForBonus };
     } catch (e) {
-        return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+        return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isOverOneYear: false, oneYearAnniversary: null, qualifiesForBonus: false };
     }
 }
 
 async function renderTenureBonusPanel(container) {
-    const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
+    const canApplyBonus = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
     
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -5010,15 +5481,12 @@ async function renderTenureBonusPanel(container) {
                         <i class="fas fa-award text-yellow-500"></i> Tenure Bonus
                     </h2>
                     <p class="text-sm text-gray-500 mt-1">
-                        Tutors who complete 1 full year receive a one-time ₦10,000 increase per regular student fee (effective from March 1, 2026). Transitioning students are excluded. Bonuses auto-apply when this tab is opened.
+                        Tutors who complete 1 full year receive a one-time ₦10,000 increase per regular student fee (effective from March 1, 2026). Transitioning students are excluded.
                     </p>
                 </div>
-                <div class="mt-3 md:mt-0 flex items-center gap-2">
+                <div class="mt-3 md:mt-0">
                     <button id="tb-refresh-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">
                         <i class="fas fa-sync-alt mr-1"></i> Refresh
-                    </button>
-                    <button id="tb-run-auto-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
-                        <i class="fas fa-magic mr-1"></i> Re-check & Upgrade
                     </button>
                 </div>
             </div>
@@ -5030,7 +5498,7 @@ async function renderTenureBonusPanel(container) {
                     <p id="tb-total-count" class="text-2xl font-extrabold text-blue-800">0</p>
                 </div>
                 <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                    <p class="text-xs font-bold text-green-700 uppercase">1+ Year (Eligible)</p>
+                    <p class="text-xs font-bold text-green-700 uppercase">Bonus Eligible</p>
                     <p id="tb-eligible-count" class="text-2xl font-extrabold text-green-800">0</p>
                 </div>
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
@@ -5132,11 +5600,6 @@ async function renderTenureBonusPanel(container) {
         loadTenureBonusData();
     });
 
-    // Wire auto-upgrade
-    document.getElementById('tb-run-auto-btn').addEventListener('click', () => {
-        runTenureAutoUpgrade();
-    });
-
     // Load data
     await loadTenureBonusData();
 }
@@ -5184,17 +5647,20 @@ async function loadTenureBonusData() {
             };
         });
 
-        // Sort: eligible first, then by tenure descending
+        // Sort: bonus-eligible first, then over 1 year, then by tenure descending
         tenureBonusTutors.sort((a, b) => {
-            if (a.tenure.isEligible && !b.tenure.isEligible) return -1;
-            if (!a.tenure.isEligible && b.tenure.isEligible) return 1;
+            const aReady = a.tenure.isOverOneYear && a.tenure.qualifiesForBonus && !a.bonusApplied;
+            const bReady = b.tenure.isOverOneYear && b.tenure.qualifiesForBonus && !b.bonusApplied;
+            if (aReady && !bReady) return -1;
+            if (!aReady && bReady) return 1;
             return b.tenure.totalMonths - a.tenure.totalMonths;
         });
 
         // Update counters
-        const eligible = tenureBonusTutors.filter(t => t.tenure.isEligible);
-        const notEligible = tenureBonusTutors.filter(t => !t.tenure.isEligible);
+        const overOneYear = tenureBonusTutors.filter(t => t.tenure.isOverOneYear);
+        const underOneYear = tenureBonusTutors.filter(t => !t.tenure.isOverOneYear);
         const upgraded = tenureBonusTutors.filter(t => t.bonusApplied);
+        const bonusEligible = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied);
 
         const totalEl = document.getElementById('tb-total-count');
         const eligibleEl = document.getElementById('tb-eligible-count');
@@ -5202,130 +5668,16 @@ async function loadTenureBonusData() {
         const upgradedEl = document.getElementById('tb-upgraded-count');
 
         if (totalEl) totalEl.textContent = tenureBonusTutors.length;
-        if (eligibleEl) eligibleEl.textContent = eligible.length;
-        if (notEligibleEl) notEligibleEl.textContent = notEligible.length;
+        if (eligibleEl) eligibleEl.textContent = bonusEligible.length;
+        if (notEligibleEl) notEligibleEl.textContent = underOneYear.length;
         if (upgradedEl) upgradedEl.textContent = upgraded.length;
 
         renderTenureBonusTable();
-
-        // Auto-apply: silently upgrade any eligible tutors who just clocked 1 year and haven't been upgraded yet
-        await silentAutoApplyTenureBonus();
 
     } catch (err) {
         console.error('Error loading tenure bonus data:', err);
         if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">Failed to load data: ${escapeHtml(err.message)}</td></tr>`;
     }
-}
-
-// Silent auto-apply: runs every time the tab loads, automatically upgrades any tutor
-// who has JUST clocked 1 year and hasn't been upgraded yet. No confirmation needed.
-let _silentAutoRunning = false;
-async function silentAutoApplyTenureBonus() {
-    if (_silentAutoRunning) return; // prevent double-run
-    _silentAutoRunning = true;
-
-    try {
-        const now = new Date();
-        if (now < TENURE_BONUS_EFFECTIVE_DATE) { _silentAutoRunning = false; return; }
-
-        // Find tutors who are eligible (1+ year), NOT already upgraded, and have regular students
-        const toUpgrade = tenureBonusTutors.filter(t => t.tenure.isEligible && !t.bonusApplied && t.studentCount > 0);
-
-        if (toUpgrade.length === 0) { _silentAutoRunning = false; return; }
-
-        let successCount = 0;
-        let totalBonusApplied = 0;
-        const upgradedNames = [];
-
-        for (const tutor of toUpgrade) {
-            try {
-                const batch = writeBatch(db);
-                const updatedStudents = [];
-                const tBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
-
-                for (const student of tutor.students) {
-                    const oldFee = student.studentFee || 0;
-                    const newFee = oldFee + TENURE_BONUS_AMOUNT;
-                    const studentRef = doc(db, "students", student.id);
-                    batch.update(studentRef, { studentFee: newFee });
-                    updatedStudents.push({
-                        studentId: student.id,
-                        studentName: student.studentName || student.name || 'Unknown',
-                        oldFee,
-                        newFee
-                    });
-                }
-
-                const bonusRef = doc(collection(db, "tenure_bonuses"));
-                batch.set(bonusRef, {
-                    tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    employmentDate: tutor.employmentDate || '',
-                    tenureMonths: tutor.tenure.totalMonths,
-                    studentCount: tutor.studentCount,
-                    bonusPerStudent: TENURE_BONUS_AMOUNT,
-                    totalBonus: tBonus,
-                    updatedStudents,
-                    appliedAt: Timestamp.now(),
-                    appliedBy: window.userData?.email || 'System (Auto)',
-                    type: 'auto_on_load'
-                });
-
-                const logRef = doc(collection(db, "tenure_bonus_logs"));
-                batch.set(logRef, {
-                    tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    action: 'auto_upgrade',
-                    details: `Auto-applied on tab load: ₦${TENURE_BONUS_AMOUNT.toLocaleString()} × ${tutor.studentCount} regular student(s) = ₦${tBonus.toLocaleString()}`,
-                    studentDetails: updatedStudents,
-                    appliedBy: window.userData?.email || 'System (Auto)',
-                    appliedByName: window.userData?.name || 'System',
-                    timestamp: Timestamp.now()
-                });
-
-                await batch.commit();
-                successCount++;
-                totalBonusApplied += tBonus;
-                upgradedNames.push(tutor.name);
-            } catch (err) {
-                console.error(`Silent auto-upgrade failed for ${tutor.name}:`, err);
-            }
-        }
-
-        if (successCount > 0) {
-            await logManagementActivity('Auto Tenure Bonus', `Auto-upgraded ${successCount} tutor(s): ${upgradedNames.join(', ')}. Total: ₦${totalBonusApplied.toLocaleString()}`);
-            invalidateCache('students');
-
-            // Show a non-blocking toast notification
-            showTenureBonusToast(`✅ Auto-upgraded ${successCount} tutor(s) who just clocked 1 year: ${upgradedNames.join(', ')}`, 'success');
-
-            // Reload data to reflect changes (without re-triggering auto-apply since they're now upgraded)
-            _silentAutoRunning = false;
-            await loadTenureBonusData();
-            return;
-        }
-    } catch (err) {
-        console.error('Silent auto-apply error:', err);
-    }
-    _silentAutoRunning = false;
-}
-
-function showTenureBonusToast(message, type = 'success') {
-    const existing = document.getElementById('tb-toast');
-    if (existing) existing.remove();
-
-    const bgColor = type === 'success' ? 'bg-green-600' : 'bg-blue-600';
-    const toast = document.createElement('div');
-    toast.id = 'tb-toast';
-    toast.className = `fixed top-4 right-4 z-50 ${bgColor} text-white px-5 py-3 rounded-lg shadow-xl max-w-md text-sm font-medium flex items-center gap-2`;
-    toast.style.transition = 'opacity 0.5s';
-    toast.innerHTML = `<i class="fas fa-award"></i> <span>${escapeHtml(message)}</span>`;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 500);
-    }, 8000);
 }
 
 function renderTenureBonusTable() {
@@ -5338,9 +5690,9 @@ function renderTenureBonusTable() {
 
     // Filter by sub-tab
     if (tenureBonusActiveSubTab === 'eligible') {
-        data = data.filter(t => t.tenure.isEligible);
+        data = data.filter(t => t.tenure.isOverOneYear);
     } else if (tenureBonusActiveSubTab === 'notEligible') {
-        data = data.filter(t => !t.tenure.isEligible);
+        data = data.filter(t => !t.tenure.isOverOneYear);
     }
 
     // Filter by search
@@ -5353,24 +5705,48 @@ function renderTenureBonusTable() {
         return;
     }
 
+    const canApplyBonus = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
+    const canManualAdjust = window.userData?.permissions?.actions?.canManualAdjustFee === true;
+
     tableBody.innerHTML = data.map(t => {
         const empDate = t.employmentDate ? new Date(t.employmentDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
         const empYear = t.employmentDate ? new Date(t.employmentDate).getFullYear() : '—';
+        const anniversaryStr = t.tenure.oneYearAnniversary ? t.tenure.oneYearAnniversary.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
+        // Determine status
         let statusBadge = '';
+        let rowClass = '';
+        let showApplyBtn = false;
+        let showManualBtn = false;
+        let showViewBtn = false;
+
         if (t.bonusApplied) {
             const appliedDate = t.bonusRecord?.appliedAt?.toDate ? t.bonusRecord.appliedAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
             statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800"><i class="fas fa-check-circle"></i> Upgraded (${escapeHtml(appliedDate)})</span>`;
-        } else if (t.tenure.isEligible) {
-            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"><i class="fas fa-clock"></i> Pending Upgrade</span>`;
+            rowClass = 'bg-green-50';
+            showViewBtn = true;
+        } else if (t.tenure.isOverOneYear && t.tenure.qualifiesForBonus) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"><i class="fas fa-clock"></i> Ready for Bonus</span>`;
+            rowClass = 'bg-orange-50';
+            showApplyBtn = canApplyBonus;
+            showManualBtn = canManualAdjust;
+        } else if (t.tenure.isOverOneYear && !t.tenure.qualifiesForBonus) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500"><i class="fas fa-ban"></i> Pre-Policy</span>
+                           <span class="block text-xs text-gray-400 mt-1">1yr anniversary: ${escapeHtml(anniversaryStr)} (before Mar 2026)</span>`;
+            rowClass = '';
+        } else if (!t.tenure.isOverOneYear && t.tenure.qualifiesForBonus) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800"><i class="fas fa-hourglass-half"></i> Upcoming</span>
+                           <span class="block text-xs text-blue-400 mt-1">Qualifies on: ${escapeHtml(anniversaryStr)}</span>`;
+            rowClass = '';
         } else {
             statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600"><i class="fas fa-hourglass-half"></i> Not Yet Eligible</span>`;
+            rowClass = '';
         }
 
-        const tenureColor = t.tenure.isEligible ? 'text-green-700 font-bold' : 'text-gray-600';
+        const tenureColor = t.tenure.isOverOneYear ? 'text-green-700 font-bold' : 'text-gray-600';
 
         return `
-            <tr class="${t.bonusApplied ? 'bg-green-50' : t.tenure.isEligible ? 'bg-orange-50' : ''}">
+            <tr class="${rowClass}">
                 <td class="px-4 py-3 font-medium">${escapeHtml(t.name || 'N/A')}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(t.email || 'N/A')}</td>
                 <td class="px-4 py-3 text-sm">
@@ -5382,15 +5758,17 @@ function renderTenureBonusTable() {
                 <td class="px-4 py-3">${statusBadge}</td>
                 <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
-                        ${!t.bonusApplied && t.tenure.isEligible ? `
+                        ${showApplyBtn ? `
                             <button class="tb-apply-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}">
                                 <i class="fas fa-check mr-1"></i>Apply Bonus
                             </button>
                         ` : ''}
-                        <button class="tb-manual-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}" data-name="${escapeHtml(t.name)}">
-                            <i class="fas fa-edit mr-1"></i>Manual Adjust
-                        </button>
-                        ${t.bonusApplied ? `
+                        ${showManualBtn ? `
+                            <button class="tb-manual-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}" data-name="${escapeHtml(t.name)}">
+                                <i class="fas fa-edit mr-1"></i>Manual Adjust
+                            </button>
+                        ` : ''}
+                        ${showViewBtn ? `
                             <button class="tb-view-btn bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}">
                                 <i class="fas fa-eye mr-1"></i>View
                             </button>
@@ -5437,8 +5815,12 @@ async function applyTenureBonus(tutorEmail) {
         return alert(`Tenure bonus is only effective from March 1, 2026. Current date is before the effective date.`);
     }
 
-    if (!tutor.tenure.isEligible) {
+    if (!tutor.tenure.isOverOneYear) {
         return alert('This tutor has not yet completed 1 full year of employment.');
+    }
+
+    if (!tutor.tenure.qualifiesForBonus) {
+        return alert('This tutor does not qualify. Their 1-year anniversary was before March 1, 2026 (the policy effective date).');
     }
 
     if (tutor.studentCount === 0) {
@@ -5488,7 +5870,7 @@ async function applyTenureBonus(tutorEmail) {
             updatedStudents: updatedStudents,
             appliedAt: Timestamp.now(),
             appliedBy: window.userData?.email || 'Unknown',
-            type: 'automatic'
+            type: 'manual'
         });
 
         // Create log entry
@@ -5520,99 +5902,6 @@ async function applyTenureBonus(tutorEmail) {
         console.error('Error applying tenure bonus:', err);
         alert(`Failed to apply tenure bonus: ${err.message}`);
     }
-}
-
-async function runTenureAutoUpgrade() {
-    const now = new Date();
-    if (now < TENURE_BONUS_EFFECTIVE_DATE) {
-        return alert(`Auto-upgrade is only available from March 1, 2026 onwards.`);
-    }
-
-    const eligibleNotUpgraded = tenureBonusTutors.filter(t => t.tenure.isEligible && !t.bonusApplied && t.studentCount > 0);
-
-    if (eligibleNotUpgraded.length === 0) {
-        return alert('No eligible tutors pending upgrade. All eligible tutors have already been upgraded, or no tutors have completed 1 year yet.');
-    }
-
-    const totalStudents = eligibleNotUpgraded.reduce((sum, t) => sum + t.studentCount, 0);
-    const totalBonus = totalStudents * TENURE_BONUS_AMOUNT;
-
-    const confirmed = confirm(
-        `Auto-Upgrade Summary\n\n` +
-        `• Tutors to upgrade: ${eligibleNotUpgraded.length}\n` +
-        `• Total students affected: ${totalStudents}\n` +
-        `• Bonus per student: ₦${TENURE_BONUS_AMOUNT.toLocaleString()}\n` +
-        `• Grand total increase: ₦${totalBonus.toLocaleString()}\n\n` +
-        `Tutors:\n${eligibleNotUpgraded.map(t => `  - ${t.name} (${t.studentCount} students)`).join('\n')}\n\n` +
-        `Proceed with auto-upgrade for all?`
-    );
-
-    if (!confirmed) return;
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const tutor of eligibleNotUpgraded) {
-        try {
-            const batch = writeBatch(db);
-            const updatedStudents = [];
-            const tBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
-
-            for (const student of tutor.students) {
-                const oldFee = student.studentFee || 0;
-                const newFee = oldFee + TENURE_BONUS_AMOUNT;
-                const studentRef = doc(db, "students", student.id);
-                batch.update(studentRef, { studentFee: newFee });
-                updatedStudents.push({
-                    studentId: student.id,
-                    studentName: student.studentName || student.name || 'Unknown',
-                    oldFee,
-                    newFee
-                });
-            }
-
-            const bonusRef = doc(collection(db, "tenure_bonuses"));
-            batch.set(bonusRef, {
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                employmentDate: tutor.employmentDate || '',
-                tenureMonths: tutor.tenure.totalMonths,
-                studentCount: tutor.studentCount,
-                bonusPerStudent: TENURE_BONUS_AMOUNT,
-                totalBonus: tBonus,
-                updatedStudents,
-                appliedAt: Timestamp.now(),
-                appliedBy: window.userData?.email || 'Unknown',
-                type: 'automatic_batch'
-            });
-
-            const logRef = doc(collection(db, "tenure_bonus_logs"));
-            batch.set(logRef, {
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                action: 'auto_upgrade',
-                details: `Auto-upgrade: ₦${TENURE_BONUS_AMOUNT.toLocaleString()} × ${tutor.studentCount} students = ₦${tBonus.toLocaleString()}`,
-                studentDetails: updatedStudents,
-                appliedBy: window.userData?.email || 'Unknown',
-                appliedByName: window.userData?.name || 'Unknown',
-                timestamp: Timestamp.now()
-            });
-
-            await batch.commit();
-            successCount++;
-        } catch (err) {
-            console.error(`Failed to upgrade ${tutor.name}:`, err);
-            failCount++;
-        }
-    }
-
-    await logManagementActivity('Batch Tenure Auto-Upgrade', `Upgraded ${successCount} tutors, ${failCount} failed. Total: ₦${totalBonus.toLocaleString()}`);
-
-    invalidateCache('students');
-
-    alert(`Auto-Upgrade Complete!\n\n✅ Successfully upgraded: ${successCount}\n${failCount > 0 ? `❌ Failed: ${failCount}` : ''}`);
-
-    await loadTenureBonusData();
 }
 
 function showManualFeeAdjustModal(tutorEmail, tutorName) {
@@ -5801,9 +6090,9 @@ function renderTenureBonusLog() {
         if (log.action === 'manual_adjust') {
             iconClass = 'fas fa-edit text-blue-500';
             bgClass = 'bg-blue-50 border-blue-200';
-        } else if (log.action === 'auto_upgrade') {
-            iconClass = 'fas fa-magic text-purple-500';
-            bgClass = 'bg-purple-50 border-purple-200';
+        } else if (log.action === 'bonus_applied') {
+            iconClass = 'fas fa-award text-green-500';
+            bgClass = 'bg-green-50 border-green-200';
         }
 
         const studentSummary = (log.studentDetails || []).map(s =>
@@ -5817,7 +6106,7 @@ function renderTenureBonusLog() {
                     <div class="flex-1 min-w-0">
                         <div class="flex flex-wrap items-center gap-2 mb-1">
                             <span class="font-bold text-sm">${escapeHtml(log.tutorName || 'Unknown')}</span>
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-white border font-medium">${escapeHtml(log.action === 'manual_adjust' ? 'Manual' : log.action === 'auto_upgrade' ? 'Auto' : 'Applied')}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-white border font-medium">${escapeHtml(log.action === 'manual_adjust' ? 'Manual Adjust' : 'Bonus Applied')}</span>
                         </div>
                         <p class="text-sm text-gray-700">${escapeHtml(log.details || '')}</p>
                         ${studentSummary ? `<div class="mt-2 flex flex-wrap">${studentSummary}</div>` : ''}
@@ -5861,11 +6150,32 @@ async function renderReferralsAdminPanel(container) {
 
         const referralDataMap = {};
 
+        // Build a phone+email → name map from students collection for fallback name resolution
+        const studentsSnap = await getDocs(collection(db, 'students'));
+        const parentNameByPhone = {};
+        const parentNameByEmail = {};
+        studentsSnap.docs.forEach(d => {
+            const sd = d.data();
+            if (sd.parentName) {
+                if (sd.parentPhone) parentNameByPhone[sd.parentPhone.replace(/\s/g,'')] = sd.parentName;
+                if (sd.parentEmail) parentNameByEmail[(sd.parentEmail||'').toLowerCase()] = sd.parentName;
+            }
+        });
+
         for (const parentDoc of parentsSnapshot.docs) {
             const data = parentDoc.data();
             const parentUid = parentDoc.id;
             
-            const parentName = capitalize(data.parentName || data.name || data.email || 'Unknown Parent');
+            // Try multiple sources for name resolution
+            let parentName = data.parentName || data.name || '';
+            if (!parentName && data.email) {
+                parentName = parentNameByEmail[(data.email||'').toLowerCase()] || '';
+            }
+            if (!parentName && data.phone) {
+                parentName = parentNameByPhone[(data.phone||'').replace(/\s/g,'')] || '';
+            }
+            if (!parentName) parentName = data.email || 'Unknown Parent';
+            parentName = capitalize(parentName);
             
             referralDataMap[parentUid] = {
                 uid: parentUid,
@@ -6569,8 +6879,8 @@ async function renderTutorReportsPanel(container) {
 if (typeof XLSX === 'undefined') {
     console.error('XLSX library not loaded. Excel export will not work.');
 }
-if (typeof html2canvas === 'undefined') {
-    console.error('html2canvas library not loaded. Invoice download will not work.');
+if (typeof window.jspdf === 'undefined') {
+    console.error('jsPDF library not loaded. PDF download will not work.');
 }
 if (typeof firebase === 'undefined' && typeof db === 'undefined') {
     console.error('Firebase not initialized. Check your Firebase setup.');
@@ -6627,7 +6937,7 @@ function parseFeeValue(feeValue) {
 function checkLibraries(libs) {
     const missing = libs.filter(lib => {
         if (lib === 'XLSX') return typeof XLSX === 'undefined';
-        if (lib === 'html2canvas') return typeof html2canvas === 'undefined';
+        if (lib === 'jspdf') return typeof window.jspdf === 'undefined';
         return false;
     });
     if (missing.length > 0) {
@@ -6646,7 +6956,6 @@ function checkLibraries(libs) {
 async function checkTutorAssignments(enrollmentId, studentNames = []) {
     try {
         const assignments = [];
-        console.log(`Checking assignments for Enrollment: ${enrollmentId}`);
 
         // Fetch from 'students' collection
         const studentsQuery = query(
@@ -8339,9 +8648,10 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         delete sessionCache.pendingStudents;
         // No need to delete students cache because we didn't create any students
 
-        // Refresh the view
+        // Refresh the view (invalidate cache since data changed)
         const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
         const mainContent = document.getElementById('main-content');
+        if (currentNavId) invalidateTabCache(currentNavId);
         if (currentNavId && allNavItems[currentNavId] && mainContent) {
             allNavItems[currentNavId].fn(mainContent);
         } else {
@@ -8635,7 +8945,6 @@ async function renderSummerBreakPanel(container) {
 }
 
 function switchTab(tab) {
-    console.log("🔄 Switching to tab:", tab);
     
     const breakTab = document.getElementById('break-tab');
     const recallTab = document.getElementById('recall-tab');
@@ -8649,7 +8958,6 @@ function switchTab(tab) {
         recallTab.classList.add('text-gray-500');
         breakView.classList.remove('hidden');
         recallView.classList.add('hidden');
-        console.log("✅ Switched to Break tab");
     } else {
         recallTab.classList.add('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
         recallTab.classList.remove('text-gray-500');
@@ -8657,15 +8965,12 @@ function switchTab(tab) {
         breakTab.classList.add('text-gray-500');
         recallView.classList.remove('hidden');
         breakView.classList.add('hidden');
-        console.log("✅ Switched to Recall tab");
         
         // Force refresh of recall requests when switching to recall tab
         setTimeout(() => {
             if (!window.sessionCache.recallRequests || window.sessionCache.recallRequests.length === 0) {
-                console.log("📥 No cached recall requests, fetching fresh data...");
                 fetchRecallRequests(true);
             } else {
-                console.log("📊 Using cached recall requests:", window.sessionCache.recallRequests.length);
                 renderRecallRequests(window.sessionCache.recallRequests);
             }
         }, 100);
@@ -8684,7 +8989,6 @@ function handleBreakSearch(searchTerm) {
 }
 
 async function fetchRecallRequests(forceRefresh = false) {
-    console.log("🔄 fetchRecallRequests called");
     
     try {
         // Check if Firestore is properly initialized
@@ -8703,10 +9007,8 @@ async function fetchRecallRequests(forceRefresh = false) {
         
         // Query the recall_requests collection
         const recallQuery = query(collection(db, "recall_requests"), where("status", "==", "pending"));
-        console.log("📋 Querying recall_requests collection...");
         
         const snapshot = await getDocs(recallQuery);
-        console.log("✅ Query complete, found", snapshot.size, "documents");
         
         const requests = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -8733,7 +9035,6 @@ async function fetchRecallRequests(forceRefresh = false) {
             };
         });
         
-        console.log("📊 Processed requests:", requests);
         
         // Sort by most recent
         requests.sort((a, b) => b.requestDate - a.requestDate);
@@ -8744,17 +9045,14 @@ async function fetchRecallRequests(forceRefresh = false) {
         const countElement = document.getElementById('recall-requests-count');
         if (countElement) {
             countElement.textContent = requests.length;
-            console.log("📈 Updated recall count to:", requests.length);
         }
         
         // Check if recall tab is active
         const recallView = document.getElementById('recall-requests-view');
         const isRecallTabActive = recallView && !recallView.classList.contains('hidden');
         
-        console.log("🎯 Recall tab active?", isRecallTabActive);
         
         if (isRecallTabActive) {
-            console.log("🎨 Rendering recall requests...");
             renderRecallRequests(requests);
         }
         
@@ -8773,7 +9071,7 @@ async function fetchRecallRequests(forceRefresh = false) {
                         <button onclick="fetchRecallRequests(true)" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                             Try Again
                         </button>
-                        <button onclick="console.log('Current cache:', window.sessionCache)" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                        <button onclick="void(0)" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700" style="display:none;">
                             Debug Cache
                         </button>
                     </div>
@@ -8784,7 +9082,6 @@ async function fetchRecallRequests(forceRefresh = false) {
 }
 
 function renderRecallRequests(requests) {
-    console.log("🎨 renderRecallRequests called with", requests?.length, "requests");
     
     const container = document.getElementById('recall-requests-list');
     if (!container) {
@@ -8793,7 +9090,6 @@ function renderRecallRequests(requests) {
     }
     
     if (!requests || requests.length === 0) {
-        console.log("📭 No recall requests to display");
         container.innerHTML = `
             <div class="text-center py-10">
                 <i class="fas fa-inbox text-purple-400 text-4xl mb-4"></i>
@@ -8807,7 +9103,6 @@ function renderRecallRequests(requests) {
         return;
     }
     
-    console.log("🎯 Rendering", requests.length, "recall requests");
     
     let html = '';
     
@@ -8867,24 +9162,20 @@ function renderRecallRequests(requests) {
     });
     
     container.innerHTML = html;
-    console.log("✅ HTML rendered successfully");
     
     // Add event listeners
     const approveBtns = document.querySelectorAll('.approve-recall-btn');
     const rejectBtns = document.querySelectorAll('.reject-recall-btn');
     
-    console.log("🔗 Found", approveBtns.length, "approve buttons and", rejectBtns.length, "reject buttons");
     
     approveBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            console.log("✅ Approve button clicked for request:", e.currentTarget.dataset.requestId);
             handleRecallRequest(e.currentTarget, 'approve');
         });
     });
     
     rejectBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            console.log("❌ Reject button clicked for request:", e.currentTarget.dataset.requestId);
             handleRecallRequest(e.currentTarget, 'reject');
         });
     });
@@ -9268,34 +9559,23 @@ function renderBreakStudentsFromCache(searchTerm = '', filterValue = 'all') {
 
 // And add this test function:
 async function testRecallRequests() {
-    console.log("🧪 Testing recall requests...");
     
     try {
         // Test 1: Check Firestore connection
-        console.log("🔍 Testing Firestore connection...");
-        console.log("Firestore db:", db);
         
         // Test 2: Check if collection exists by trying to get count
         const testQuery = query(collection(db, "recall_requests"));
         const testSnapshot = await getDocs(testQuery);
-        console.log("📊 Total recall_requests documents:", testSnapshot.size);
         
         // Test 3: Show all documents
         testSnapshot.forEach(doc => {
-            console.log("📄 Document ID:", doc.id, "Data:", doc.data());
         });
         
         // Test 4: Try the actual query
-        console.log("🔍 Running actual query...");
         const pendingQuery = query(collection(db, "recall_requests"), where("status", "==", "pending"));
         const pendingSnapshot = await getDocs(pendingQuery);
-        console.log("✅ Pending recall requests:", pendingSnapshot.size);
         
         if (pendingSnapshot.size === 0) {
-            console.log("📭 No pending recall requests found. Check if:");
-            console.log("1. The collection exists");
-            console.log("2. Documents have 'status' field set to 'pending'");
-            console.log("3. The tutor actually submitted a recall request");
         }
         
     } catch (error) {
@@ -9815,6 +10095,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             
             const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
             const mainContent = document.getElementById('main-content');
+            if (currentNavId) invalidateTabCache(currentNavId);
             if (currentNavId && allNavItems[currentNavId] && mainContent) {
                 allNavItems[currentNavId].fn(mainContent);
             }
@@ -10548,106 +10829,277 @@ window.viewStudentTutorHistory = function(studentId) {
     });
 };
 
-async function generateReportHTML(reportId) {
+// ======================================================
+// jsPDF DIRECT-DRAW PDF ENGINE (No canvas, no screenshots)
+// Requires: jspdf 2.5.x + jspdf-autotable 3.8.x
+// ======================================================
+
+// --- Cached logo (fetched once, reused forever) ---
+let _reportLogoBase64 = null;
+
+async function fetchReportLogo() {
+    if (_reportLogoBase64) return _reportLogoBase64;
+    try {
+        // Use Cloudinary's format transform to get PNG (jsPDF can't render SVG natively)
+        const pngUrl = 'https://res.cloudinary.com/dy2hxcyaf/image/upload/f_png,h_160/v1757700806/newbhlogo_umwqzy';
+        const response = await fetch(pngUrl, { mode: 'cors' });
+        const blob = await response.blob();
+        _reportLogoBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+        return _reportLogoBase64;
+    } catch (e) {
+        console.error('Logo fetch failed, PDF will generate without logo:', e);
+        return null;
+    }
+}
+
+// --- Fetch report data from Firestore ---
+async function getReportData(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
-    const reportData = reportDoc.data();
+    return reportDoc.data();
+}
 
-    const reportSections = {
-        "INTRODUCTION": reportData.introduction,
-        "TOPICS & REMARKS": reportData.topics,
-        "PROGRESS & ACHIEVEMENTS": reportData.progress,
-        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
-        "RECOMMENDATIONS": reportData.recommendations,
-        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+// --- Core: Build a jsPDF document from report data ---
+function buildReportPDF(reportData, logoBase64) {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    const pageW = pdf.internal.pageSize.getWidth();   // 210
+    const pageH = pdf.internal.pageSize.getHeight();   // 297
+    const marginL = 18;
+    const marginR = 18;
+    const contentW = pageW - marginL - marginR;        // 174
+    const bottomMargin = 25;
+    let y = 20; // current Y cursor
+
+    // Colors
+    const green700 = [21, 128, 61];    // #15803d
+    const green800 = [22, 101, 52];    // #166534
+    const green500 = [22, 163, 74];    // #16a34a
+    const greenLight = [209, 250, 229]; // #d1fae5
+    const gray100 = [243, 244, 246];
+    const gray500 = [107, 114, 128];
+    const black = [51, 51, 51];
+
+    // Helper: check page space, add new page if needed
+    function ensureSpace(needed) {
+        if (y + needed > pageH - bottomMargin) {
+            pdf.addPage();
+            y = 20;
+        }
+    }
+
+    // ===== HEADER =====
+    // Logo (centered)
+    if (logoBase64) {
+        try {
+            const logoH = 18;
+            const logoW = 18; // square-ish, auto scales
+            const logoX = (pageW - logoW) / 2;
+            pdf.addImage(logoBase64, 'PNG', logoX, y, logoW, logoH);
+            y += logoH + 3;
+        } catch (e) {
+            // Skip logo silently if it fails
+        }
+    }
+
+    // Company name
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.setTextColor(...green700);
+    pdf.text('Blooming Kids House', pageW / 2, y, { align: 'center' });
+    y += 9;
+
+    // Report title
+    pdf.setFontSize(16);
+    pdf.setTextColor(...green800);
+    pdf.text('MONTHLY LEARNING REPORT', pageW / 2, y, { align: 'center' });
+    y += 7;
+
+    // Date
+    const reportDate = reportData.submittedAt
+        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
+        : 'N/A';
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(...gray500);
+    pdf.text(`Date: ${reportDate}`, pageW / 2, y, { align: 'center' });
+    y += 10;
+
+    // ===== STUDENT INFO TABLE =====
+    pdf.autoTable({
+        startY: y,
+        margin: { left: marginL, right: marginR },
+        theme: 'plain',
+        styles: {
+            fontSize: 10,
+            cellPadding: { top: 3, bottom: 3, left: 5, right: 5 },
+            textColor: black,
+            lineColor: [229, 231, 235],
+            lineWidth: 0.2,
+        },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        body: [
+            [
+                { content: `Student's Name:  ${reportData.studentName || 'N/A'}`, styles: { fontStyle: 'bold' } },
+                { content: `Parent's Name:  ${reportData.parentName || 'N/A'}`, styles: { fontStyle: 'bold' } }
+            ],
+            [
+                { content: `Parent's Phone:  ${reportData.parentPhone || 'N/A'}`, styles: { fontStyle: 'bold' } },
+                { content: `Grade:  ${reportData.grade || 'N/A'}`, styles: { fontStyle: 'bold' } }
+            ],
+            [
+                { content: `Tutor's Name:  ${reportData.tutorName || 'N/A'}`, styles: { fontStyle: 'bold' } },
+                ''
+            ]
+        ],
+        columnStyles: {
+            0: { cellWidth: contentW / 2 },
+            1: { cellWidth: contentW / 2 }
+        },
+        tableLineColor: [229, 231, 235],
+        tableLineWidth: 0.3,
+    });
+
+    y = pdf.lastAutoTable.finalY + 10;
+
+    // ===== REPORT SECTIONS =====
+    const sections = [
+        { title: 'INTRODUCTION', content: reportData.introduction },
+        { title: 'TOPICS & REMARKS', content: reportData.topics },
+        { title: 'PROGRESS & ACHIEVEMENTS', content: reportData.progress },
+        { title: 'STRENGTHS AND WEAKNESSES', content: reportData.strengthsWeaknesses },
+        { title: 'RECOMMENDATIONS', content: reportData.recommendations },
+        { title: "GENERAL TUTOR'S COMMENTS", content: reportData.generalComments },
+    ];
+
+    sections.forEach(section => {
+        const text = (section.content && String(section.content).trim()) ? String(section.content).trim() : 'N/A';
+
+        // Wrap text to measure height
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        const wrappedLines = pdf.splitTextToSize(text, contentW - 10);
+        const textBlockH = wrappedLines.length * 5; // ~5mm per line at font 10
+        const sectionH = 12 + textBlockH + 8; // header(12) + text + padding(8)
+
+        ensureSpace(Math.min(sectionH, 80)); // at least try to keep header + some text together
+
+        // Section box border
+        const boxY = y;
+        const boxH = 12 + textBlockH + 8;
+        pdf.setDrawColor(229, 231, 235);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(marginL, boxY, contentW, boxH, 2, 2, 'S');
+
+        // Section title
+        y += 8;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(...green500);
+        pdf.text(section.title, marginL + 5, y);
+        y += 2;
+
+        // Green underline
+        pdf.setDrawColor(...greenLight);
+        pdf.setLineWidth(0.6);
+        pdf.line(marginL + 5, y, marginL + contentW - 5, y);
+        y += 5;
+
+        // Section body text
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(...black);
+
+        // Print wrapped lines, handling page breaks mid-text
+        wrappedLines.forEach(line => {
+            if (y > pageH - bottomMargin) {
+                pdf.addPage();
+                y = 20;
+            }
+            pdf.text(line, marginL + 5, y);
+            y += 5;
+        });
+
+        y += 6; // spacing between sections
+    });
+
+    // ===== FOOTER / SIGNATURE =====
+    ensureSpace(25);
+    y += 5;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(...black);
+    pdf.text('Best regards,', pageW - marginR, y, { align: 'right' });
+    y += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(reportData.tutorName || 'N/A', pageW - marginR, y, { align: 'right' });
+
+    return pdf;
+}
+
+// --- Generate HTML for preview (screen only, not PDF) ---
+function generateReportPreviewHTML(reportData) {
+    const reportDate = reportData.submittedAt
+        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
+        : 'N/A';
+    const logoUrl = 'https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg';
+    const sectionKeys = {
+        'INTRODUCTION': reportData.introduction,
+        'TOPICS & REMARKS': reportData.topics,
+        'PROGRESS & ACHIEVEMENTS': reportData.progress,
+        'STRENGTHS AND WEAKNESSES': reportData.strengthsWeaknesses,
+        'RECOMMENDATIONS': reportData.recommendations,
+        "GENERAL TUTOR'S COMMENTS": reportData.generalComments,
     };
-
-    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
-        return `
-            <div class="report-section">
-                <h2>${title}</h2>
-                <p>${displayContent}</p>
-            </div>
-        `;
+    const sectionsHTML = Object.entries(sectionKeys).map(([title, content]) => {
+        const safe = content ? String(content).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : 'N/A';
+        return `<div style="margin-bottom:20px;border:1px solid #e5e7eb;padding:15px;border-radius:8px;">
+            <h2 style="font-size:18px;font-weight:bold;color:#16a34a;margin:0 0 8px 0;padding-bottom:8px;border-bottom:2px solid #d1fae5;">${title}</h2>
+            <p style="line-height:1.6;white-space:pre-wrap;margin:0;color:#333;">${safe}</p>
+        </div>`;
     }).join('');
 
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const reportTemplate = `
-        <html>
-        <head>
-            <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
-                .report-container { max-width: 800px; margin: auto; padding: 20px; }
-                .header { text-align: center; margin-bottom: 40px; }
-                .header img { height: 80px; }
-                .header h1 { color: #166534; margin: 0; font-size: 24px; }
-                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
-                .header p { margin: 5px 0; color: #555; }
-                .student-info { 
-                    display: grid; 
-                    grid-template-columns: 1fr 1fr; 
-                    gap: 10px 20px; 
-                    margin-bottom: 30px; 
-                    background-color: #f9f9f9;
-                    border: 1px solid #eee;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .student-info p { margin: 5px 0; }
-                .report-section {
-                    page-break-inside: avoid;
-                    margin-bottom: 20px;
-                    border: 1px solid #e5e7eb;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .report-section h2 { 
-                    font-size: 18px; 
-                    font-weight: bold; 
-                    color: #16a34a; 
-                    margin-top: 0; 
-                    padding-bottom: 8px;
-                    border-bottom: 2px solid #d1fae5;
-                }
-                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
-                .footer { text-align: right; margin-top: 40px; }
-            </style>
-        </head>
-        <body>
-            <div class="report-container">
-                <div class="header">
-                    <img src="${logoUrl}" alt="Company Logo">
-                    <h2>Blooming Kids House</h2>
-                    <h1>MONTHLY LEARNING REPORT</h1>
-                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
-                </div>
-                <div class="student-info">
-                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
-                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
-                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
-                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
-                </div>
-                ${sectionsHTML}
-                <div class="footer">
-                    <p>Best regards,</p>
-                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
-                </div>
+    return `<html><head><style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#333;background:#f3f4f6;margin:0;padding:20px;}</style></head><body>
+        <div style="max-width:800px;margin:auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <div style="text-align:center;margin-bottom:30px;">
+                <img src="${logoUrl}" style="height:70px;margin-bottom:8px;" alt="Logo">
+                <h2 style="color:#15803d;margin:8px 0;font-size:24px;">Blooming Kids House</h2>
+                <h1 style="color:#166534;margin:0;font-size:20px;">MONTHLY LEARNING REPORT</h1>
+                <p style="color:#555;margin:5px 0;">Date: ${reportDate}</p>
             </div>
-        </body>
-        </html>
-    `;
-    return { html: reportTemplate, reportData: reportData };
+            <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:25px;background:#f9fafb;border:1px solid #eee;border-radius:8px;">
+                <tr><td style="padding:8px 12px;"><strong>Student:</strong> ${reportData.studentName || 'N/A'}</td><td style="padding:8px 12px;"><strong>Parent:</strong> ${reportData.parentName || 'N/A'}</td></tr>
+                <tr><td style="padding:8px 12px;"><strong>Phone:</strong> ${reportData.parentPhone || 'N/A'}</td><td style="padding:8px 12px;"><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td></tr>
+                <tr><td style="padding:8px 12px;"><strong>Tutor:</strong> ${reportData.tutorName || 'N/A'}</td><td></td></tr>
+            </table>
+            ${sectionsHTML}
+            <div style="text-align:right;margin-top:30px;">
+                <p>Best regards,</p>
+                <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+            </div>
+        </div>
+    </body></html>`;
 }
+
+// ===== PUBLIC API =====
 
 window.previewReport = async function(reportId) {
     try {
-        const { html } = await generateReportHTML(reportId);
+        const reportData = await getReportData(reportId);
+        const html = generateReportPreviewHTML(reportData);
         const newWindow = window.open();
-        newWindow.document.write(html);
-        newWindow.document.close();
+        if (newWindow) {
+            newWindow.document.write(html);
+            newWindow.document.close();
+        } else {
+            alert('Pop-ups blocked. Please allow pop-ups to preview.');
+        }
     } catch (error) {
         console.error("Error previewing report:", error);
         alert(`Error: ${error.message}`);
@@ -10657,79 +11109,76 @@ window.previewReport = async function(reportId) {
 window.downloadSingleReport = async function(reportId, event) {
     const button = event?.target || event;
     const originalText = button?.innerHTML || '';
-    
+
     try {
-        if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; button.disabled = true; }
-        
+        if (button?.innerHTML) {
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            button.disabled = true;
+        }
+
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
-        
+
         if (progressModal) {
             progressModal.classList.remove('hidden');
-            if (progressMessage) progressMessage.textContent = 'Generating PDF...';
-            if (progressBar) progressBar.style.width = '10%';
-            if (progressText) progressText.textContent = '10%';
+            if (progressMessage) progressMessage.textContent = 'Fetching report data...';
+            if (progressBar) progressBar.style.width = '15%';
+            if (progressText) progressText.textContent = '15%';
         }
 
-        const { html, reportData } = await generateReportHTML(reportId);
-        
+        // Fetch logo + data in parallel
+        const [logoBase64, reportData] = await Promise.all([
+            fetchReportLogo(),
+            getReportData(reportId)
+        ]);
+
         if (progressBar) progressBar.style.width = '50%';
         if (progressText) progressText.textContent = '50%';
-        if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
+        if (progressMessage) progressMessage.textContent = 'Building PDF...';
 
-        // Try html2pdf first, fallback to print window
-        if (typeof html2pdf !== 'undefined') {
-            const options = {
-                margin: 0.5,
-                filename: `${reportData.studentName}_Report_${Date.now()}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            await html2pdf().set(options).from(html).save();
-        } else {
-            // Fallback: open in new window for browser print-to-PDF
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {
-                newWindow.document.write(html);
-                newWindow.document.close();
-                newWindow.focus();
-                setTimeout(() => newWindow.print(), 800);
-            } else {
-                alert('Pop-ups blocked. Please allow pop-ups and try again, or right-click the preview button to print.');
-            }
-        }
-        
+        const pdf = buildReportPDF(reportData, logoBase64);
+
+        if (progressBar) progressBar.style.width = '90%';
+        if (progressText) progressText.textContent = '90%';
+        if (progressMessage) progressMessage.textContent = 'Saving file...';
+
+        const safeStudentName = (reportData.studentName || 'Student').replace(/[^a-z0-9]/gi, '_');
+        pdf.save(`${safeStudentName}_Report_${Date.now()}.pdf`);
+
         if (progressBar) progressBar.style.width = '100%';
         if (progressText) progressText.textContent = '100%';
         if (progressMessage) progressMessage.textContent = 'Done!';
-        setTimeout(() => { if (progressModal) progressModal.classList.add('hidden'); }, 1000);
-        
+        setTimeout(() => progressModal?.classList.add('hidden'), 1000);
+
     } catch (error) {
         console.error("Error downloading report:", error);
         alert(`Error downloading report: ${error.message}`);
-        const progressModal = document.getElementById('pdf-progress-modal');
-        if (progressModal) progressModal.classList.add('hidden');
+        document.getElementById('pdf-progress-modal')?.classList.add('hidden');
     } finally {
-        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        if (button && originalText) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
     }
 };
 
 window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     const originalButtonText = button.innerHTML;
-    
     try {
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
-        
+
         progressModal.classList.remove('hidden');
         progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
+
+        // Pre-fetch logo once for all reports
+        const logoBase64 = await fetchReportLogo();
 
         const zip = new JSZip();
         let processedCount = 0;
@@ -10742,69 +11191,41 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
                 progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
                 button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
 
-                const { html, reportData } = await generateReportHTML(report.id);
-                
-                const options = {
-                    margin: 0.5,
-                    image: { 
-                        type: 'jpeg', 
-                        quality: 0.98 
-                    },
-                    html2canvas: { 
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#FFFFFF'
-                    },
-                    jsPDF: { 
-                        unit: 'in', 
-                        format: 'a4', 
-                        orientation: 'portrait'
-                    }
-                };
+                const reportData = await getReportData(report.id);
+                const pdf = buildReportPDF(reportData, logoBase64);
 
-                const pdfBlob = await html2pdf().set(options).from(html).output('blob');
-                
                 const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
-                const reportDate = reportData.submittedAt ? 
-                    new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                    'unknown_date';
+                const reportDate = reportData.submittedAt
+                    ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0]
+                    : 'unknown_date';
                 const filename = `${safeStudentName}_${reportDate}.pdf`;
-                
+
+                const pdfBlob = pdf.output('blob');
                 zip.file(filename, pdfBlob);
-                
+
             } catch (error) {
                 console.error(`Error processing report ${report.id}:`, error);
             }
-            
             processedCount++;
-            
-            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         progressMessage.textContent = 'Creating ZIP file...';
         progressBar.style.width = '95%';
         progressText.textContent = '95%';
-        
-        const zipBlob = await zip.generateAsync({ 
-            type: "blob",
-            compression: "DEFLATE"
-        });
+
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 
         progressMessage.textContent = 'Download starting...';
         progressBar.style.width = '100%';
         progressText.textContent = '100%';
-        
+
         saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
-        
-        setTimeout(() => {
-            progressModal.classList.add('hidden');
-        }, 2000);
-        
+        setTimeout(() => progressModal.classList.add('hidden'), 2000);
+
     } catch (error) {
         console.error("Error creating zip file:", error);
         alert("Failed to create zip file. Please try again.");
-        document.getElementById('pdf-progress-modal').classList.add('hidden');
+        document.getElementById('pdf-progress-modal')?.classList.add('hidden');
     } finally {
         button.innerHTML = originalButtonText;
         button.disabled = false;
@@ -11454,13 +11875,23 @@ async function updateTutorOfMonthIfNeeded(tutor, score, monthKey, monthLabel) {
 async function renderAcademicFollowUpPanel(container) {
     container.innerHTML = `
     <div class="space-y-4">
-        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center justify-between">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center justify-between flex-wrap gap-3">
             <div>
                 <h2 class="text-xl font-bold text-gray-800">📊 Academic Follow-Up</h2>
                 <p class="text-sm text-gray-500">Topic entries & homework per tutor, month by month</p>
             </div>
-            <div id="afu-clock" class="text-sm font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                ${formatLagosDatetime()}
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" id="afu-search" placeholder="Search tutor name..." 
+                           class="pl-9 pr-4 py-2 border-2 border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-sm w-56">
+                </div>
+                <button id="afu-refresh-btn" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-1 text-sm font-medium">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <div id="afu-clock" class="text-sm font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                    ${formatLagosDatetime()}
+                </div>
             </div>
         </div>
 
@@ -11631,6 +12062,30 @@ async function renderAcademicFollowUpPanel(container) {
                 arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
             });
         });
+
+        // Name search filter
+        const afuSearchInput = document.getElementById('afu-search');
+        if (afuSearchInput) {
+            afuSearchInput.addEventListener('input', () => {
+                const term = afuSearchInput.value.toLowerCase().trim();
+                listEl.querySelectorAll('.afu-header').forEach(btn => {
+                    const card = btn.closest('.bg-white.rounded-2xl');
+                    if (!card) return;
+                    const name = btn.querySelector('.font-bold.text-gray-800')?.textContent?.toLowerCase() || '';
+                    const email = btn.querySelector('.text-xs.text-gray-400')?.textContent?.toLowerCase() || '';
+                    card.style.display = (!term || name.includes(term) || email.includes(term)) ? '' : 'none';
+                });
+            });
+        }
+
+        // Refresh button
+        const afuRefreshBtn = document.getElementById('afu-refresh-btn');
+        if (afuRefreshBtn) {
+            afuRefreshBtn.addEventListener('click', () => {
+                invalidateTabCache('navAcademicFollowUp');
+                renderAcademicFollowUpPanel(container);
+            });
+        }
 
         document.getElementById('afu-loading').classList.add('hidden');
         listEl.classList.remove('hidden');
@@ -12121,7 +12576,7 @@ const navigationGroups = {
         label: "Financial",
         items: [
             { id: "navPayAdvice", label: "Pay Advice", icon: "fas fa-file-invoice-dollar", fn: renderPayAdvicePanel },
-            { id: "navTenureBonus", label: "Tenure Bonus", icon: "fas fa-award", fn: renderTenureBonusPanel, perm: "viewPayAdvice" },
+            { id: "navTenureBonus", label: "Tenure Bonus", icon: "fas fa-award", fn: renderTenureBonusPanel, perm: "viewTenureBonus" },
             { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel, perm: "viewReferralsAdmin" }
         ]
     },
@@ -12200,7 +12655,7 @@ function initializeSidebarNavigation(staffData) {
                 document.getElementById('pageTitle').textContent = group.label;
                 
                 if (group.fn) {
-                    group.fn(document.getElementById('main-content'));
+                    switchToTabCached('navDashboard', group.fn);
                 }
             });
             navContainer.appendChild(dashboardItem);
@@ -12249,7 +12704,7 @@ function initializeSidebarNavigation(staffData) {
                     document.getElementById('pageTitle').textContent = itemLabel;
                     
                     if (navId && allNavItems[navId]) {
-                        allNavItems[navId].fn(document.getElementById('main-content'));
+                        switchToTabCached(navId, allNavItems[navId].fn);
                     }
                 });
             });
@@ -12304,7 +12759,7 @@ const allNavItems = {
     navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
-    navTenureBonus: { fn: renderTenureBonusPanel, perm: 'viewPayAdvice', label: 'Tenure Bonus' },
+    navTenureBonus: { fn: renderTenureBonusPanel, perm: 'viewTenureBonus', label: 'Tenure Bonus' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak', label: 'Summer Break' },
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
@@ -13061,9 +13516,22 @@ window.createManagementNotification = createManagementNotification;
 // SECTION: MANAGEMENT NOTIFICATION BELL
 // ======================================================
 
-async function initManagementNotifications() {
+async function initManagementNotifications(staffData) {
     const bellBtn = document.getElementById('notificationBell') || document.querySelector('[data-notification-bell]');
     if (!bellBtn) return;
+
+    // ── Role-based permission check ──
+    const role = staffData?.role || '';
+    const perms = staffData?.permissions?.tabs || {};
+    const isFullAccess = (role === 'director' || role === 'manager');
+
+    // Determine which notification buckets this user should see
+    const canSeeMessaging    = isFullAccess || perms.viewParentFeedback === true;
+    const canSeeFeedback     = isFullAccess || perms.viewParentFeedback === true;
+    const canSeeBreaks       = isFullAccess || perms.viewSummerBreak === true;
+    const canSeeTutors       = isFullAccess || perms.viewTutorManagement === true;
+    const canSeeEnrollments  = isFullAccess || perms.viewEnrollments === true;
+    const canSeeGeneral      = true; // management_notifications shown to all staff
 
     let allNotifications = [];
     const _unsubs = [];
@@ -13114,23 +13582,22 @@ async function initManagementNotifications() {
         if (localStorage.getItem(key)) return;
         const cutoff = new Date(Date.now() - 7*24*60*60*1000);
         const cutTS = Timestamp.fromDate(cutoff);
-        console.log('🧹 Auto-clearing items older than 7 days...');
         try {
             // Old read management_notifications
             const s1 = await getDocs(query(collection(db,'management_notifications'), where('read','==',true), limit(200)));
-            if (s1.size) { const b = writeBatch(db); let n=0; s1.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit(); console.log('  Cleared',n,'old notifications'); }
+            if (s1.size) { const b = writeBatch(db); let n=0; s1.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit();; }
             // Old broadcasts
             const s2 = await getDocs(query(collection(db,'broadcasts'), where('createdAt','<',cutTS), limit(200)));
-            if (s2.size) { const b = writeBatch(db); s2.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s2.size,'old broadcasts'); }
+            if (s2.size) { const b = writeBatch(db); s2.docs.forEach(d=>b.delete(d.ref)); await b.commit();; }
             // Old sent messages
             const s3 = await getDocs(query(collection(db,'management_sent_messages'), where('createdAt','<',cutTS), limit(200)));
-            if (s3.size) { const b = writeBatch(db); s3.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s3.size,'old sent msgs'); }
+            if (s3.size) { const b = writeBatch(db); s3.docs.forEach(d=>b.delete(d.ref)); await b.commit();; }
             // Old read inbox messages
             const s4 = await getDocs(query(collection(db,'tutor_to_management_messages'), where('managementRead','==',true), limit(200)));
-            if (s4.size) { const b = writeBatch(db); let n=0; s4.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit(); console.log('  Cleared',n,'old inbox msgs'); }
+            if (s4.size) { const b = writeBatch(db); let n=0; s4.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit();; }
             // Old management_activity
             const s5 = await getDocs(query(collection(db,'management_activity'), where('timestamp','<',cutTS), limit(200)));
-            if (s5.size) { const b = writeBatch(db); s5.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s5.size,'old activity logs'); }
+            if (s5.size) { const b = writeBatch(db); s5.docs.forEach(d=>b.delete(d.ref)); await b.commit();; }
             localStorage.setItem(key, '1');
         } catch(e) { console.warn('Auto-clear err:', e.message); }
     })();
@@ -13157,35 +13624,49 @@ async function initManagementNotifications() {
         _prevUnread = uc;
     }
 
-    // 1. management_notifications (unread)
+    // 1. management_notifications (all staff see general alerts)
+    if (canSeeGeneral) {
     _unsubs.push(onSnapshot(query(collection(db,'management_notifications'),where('read','==',false),limit(30)),
         s=>{bk1=s.docs.map(d=>({id:d.id,_collection:'management_notifications',_type:'management_notification',title:d.data().title||'Notification',message:d.data().message||'',createdAt:d.data().createdAt,read:false}));rebuild();},
         e=>console.warn('Bell[1]',e.message)));
-    // 2. Tutor messages (unread)
+    }
+    // 2. Tutor messages (only if can see messaging tab)
+    if (canSeeMessaging) {
     _unsubs.push(onSnapshot(query(collection(db,'tutor_to_management_messages'),where('managementRead','==',false),limit(20)),
         s=>{bk2=s.docs.map(d=>({id:d.id,_collection:'tutor_to_management_messages',_type:'tutor_message',title:'Message from '+(d.data().tutorName||'Tutor'),message:(d.data().message||'').slice(0,100),createdAt:d.data().createdAt,read:false,actionTab:'messaging'}));rebuild();},
         e=>console.warn('Bell[2]',e.message)));
-    // 3. Parent feedback (unread)
+    }
+    // 3. Parent feedback (only if can see feedback tab)
+    if (canSeeFeedback) {
     _unsubs.push(onSnapshot(query(collection(db,'parent_feedback'),where('read','==',false),limit(20)),
         s=>{bk3=s.docs.map(d=>({id:d.id,_collection:'parent_feedback',_type:'parent_feedback',title:'Feedback from '+(d.data().parentName||'Parent'),message:'Student: '+(d.data().studentName||'N/A')+' · '+(d.data().message||'').slice(0,80),createdAt:d.data().submittedAt||d.data().timestamp||d.data().createdAt,read:false,actionTab:'feedback'}));rebuild();},
         e=>console.warn('Bell[3]',e.message)));
-    // 4. Recall requests (pending)
+    }
+    // 4. Recall requests (only if can see breaks/summer tab)
+    if (canSeeBreaks) {
     _unsubs.push(onSnapshot(query(collection(db,'recall_requests'),where('status','==','pending'),limit(20)),
         s=>{bk4=s.docs.map(d=>({id:d.id,_collection:'recall_requests',_type:'recall_request',title:'Recall: '+(d.data().studentName||'Student'),message:'Tutor: '+(d.data().tutorName||d.data().tutorEmail||'N/A'),createdAt:d.data().createdAt,read:false,actionTab:'breaks'}));rebuild();},
         e=>console.warn('Bell[4]',e.message)));
-    // 5. Students on break
+    }
+    // 5. Students on break (only if can see summer break tab)
+    if (canSeeBreaks) {
     _unsubs.push(onSnapshot(query(collection(db,'students'),where('summerBreak','==',true),limit(30)),
         s=>{bk5=s.docs.filter(d=>d.data().breakNotifRead!==true).map(d=>({id:d.id,_collection:'students',_type:'student_break',title:(d.data().studentName||'Student')+' on break',message:'Tutor: '+(d.data().tutorName||'N/A'),createdAt:d.data().breakDate,_bd:d.data().breakDate,read:false,actionTab:'breaks'}));rebuild();},
         e=>console.warn('Bell[5]',e.message)));
-    // 6. Placement tests
+    }
+    // 6. Placement tests (only if can see tutor management)
+    if (canSeeTutors) {
     _unsubs.push(onSnapshot(query(collection(db,'tutors'),where('placementTestStatus','==','completed'),limit(20)),
         s=>{bk6=s.docs.filter(d=>d.data().placementTestAcknowledged!==true).map(d=>({id:d.id,_collection:'tutors',_type:'placement_test',title:'Placement: '+(d.data().name||d.data().email),message:(d.data().name||d.data().email)+' completed test',createdAt:d.data().placementTestDate||d.data().updatedAt,read:false,actionTab:'tutors'}));rebuild();},
         e=>console.warn('Bell[6]',e.message)));
-    // 7. Enrollments (last 3 days)
+    }
+    // 7. New enrollments (only if can see enrollments tab)
+    if (canSeeEnrollments) {
     const threeAgo = Timestamp.fromDate(new Date(Date.now()-3*24*60*60*1000));
     _unsubs.push(onSnapshot(query(collection(db,'enrollments'),where('createdAt','>',threeAgo),limit(20)),
         s=>{bk7=s.docs.filter(d=>d.data().managementSeen!==true).map(d=>({id:d.id,_collection:'enrollments',_type:'new_enrollment',title:'New enrollment: '+(d.data().studentName||'Student'),message:(d.data().parentName||'Parent')+' enrolled '+(d.data().studentName||'student'),createdAt:d.data().createdAt,read:false,actionTab:'enrollments'}));rebuild();},
         e=>console.warn('Bell[7]',e.message)));
+    }
 
     // Cleanup old polling interval if exists
     if (window._notifPollInterval) { clearInterval(window._notifPollInterval); window._notifPollInterval = null; }
@@ -13298,7 +13779,7 @@ async function initManagementNotifications() {
                     const navMap = {
                         messaging:   'navMessaging',
                         feedback:    'navParentFeedback',
-                        breaks:      'navBreaks',
+                        breaks:      'navSummerBreak',
                         tutors:      'navTutorManagement',
                         enrollments: 'navEnrollments',
                     };
@@ -13409,7 +13890,6 @@ onAuthStateChanged(auth, async (user) => {
     }
     
     if (user) {
-        console.log("User authenticated:", user.email);
         
         try {
             const staffDocRef = doc(db, "staff", user.email);
@@ -13426,8 +13906,11 @@ onAuthStateChanged(auth, async (user) => {
                 
                 setupSidebarToggle();
                 
-                // Initialize notifications bell
-                setTimeout(() => initManagementNotifications(), 500);
+                // Initialize dark mode toggle
+                initDarkModeToggle();
+                
+                // Initialize notifications bell — pass role + permissions for filtering
+                setTimeout(() => initManagementNotifications(staffData), 500);
                 
                 // Wire activity log button
                 const activityBtn = document.getElementById('activityLogBtn');
@@ -13437,6 +13920,13 @@ onAuthStateChanged(auth, async (user) => {
                 
                 if (sidebarLogoutBtn) {
                     sidebarLogoutBtn.addEventListener('click', () => {
+                        try {
+                            Object.keys(localStorage).forEach(k => {
+                                if (k.startsWith(CACHE_PREFIX) || k.startsWith('mgmt_')) {
+                                    localStorage.removeItem(k);
+                                }
+                            });
+                        } catch(e) {}
                         signOut(auth).then(() => {
                             window.location.href = "management-auth.html";
                         });
@@ -13471,8 +13961,8 @@ onAuthStateChanged(auth, async (user) => {
                     <div class="bg-white p-8 rounded-lg shadow-md text-center">
                         <i class="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
                         <h2 class="text-2xl font-bold text-red-600 mb-2">Error Loading Dashboard</h2>
-                        <p class="text-gray-600 mb-4">There was an error loading your dashboard. Please try again.</p>
-                        <p class="text-sm text-gray-500 mb-6">Error: ${error.message}</p>
+                        <p class="text-gray-600 mb-4">There was an error loading your dashboard. Please refresh and try again.</p>
+                        <p class="text-sm text-gray-400 mb-6">If this keeps happening, please contact your administrator.</p>
                         <button onclick="window.location.reload()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
                             Refresh Page
                         </button>
@@ -13486,12 +13976,38 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ======================================================
+// SECTION: DARK MODE TOGGLE
+// ======================================================
+
+function initDarkModeToggle() {
+    const btn = document.getElementById('darkModeToggle');
+    if (!btn) return;
+
+    // Apply saved preference immediately
+    const saved = localStorage.getItem('mgmt_dark_mode');
+    if (saved === 'true') {
+        document.body.classList.add('dark-mode');
+        btn.innerHTML = '<i class="fas fa-sun"></i>';
+        btn.title = 'Switch to Light Mode';
+    } else {
+        btn.innerHTML = '<i class="fas fa-moon"></i>';
+        btn.title = 'Switch to Dark Mode';
+    }
+
+    btn.addEventListener('click', () => {
+        const isDark = document.body.classList.toggle('dark-mode');
+        btn.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        btn.title = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        try { localStorage.setItem('mgmt_dark_mode', String(isDark)); } catch(e) {}
+    });
+}
+
+// ======================================================
 // SECTION: GOD MODE MOBILE PATCH SYSTEM
 // INSTRUCTION: Paste this at the very bottom of management.js
 // ======================================================
 
 (function initMobilePatches() {
-    console.log("📱 Initializing God Mode Mobile Patches...");
 
     // 1. INJECT GLOBAL CSS FIXES (Solves Dark Shade & Scrolling)
     const patchStyles = document.createElement('style');
@@ -13570,5 +14086,4 @@ onAuthStateChanged(auth, async (user) => {
 
     // Start watching the body for changes
     observer.observe(document.body, { childList: true, subtree: true });
-    console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
