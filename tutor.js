@@ -51,10 +51,14 @@ function cleanupAllListeners() {
  ******************************************************************************/
 
 // Cloudinary Configuration
+// ⚠️  SECURITY: Do NOT hardcode apiKey here.
+// For signed uploads, generate the signature server-side via a Firebase Cloud Function.
+// The apiKey below is the PUBLIC key only — the API secret must never be in client code.
 const CLOUDINARY_CONFIG = {
     cloudName: 'dwjq7j5zp',
     uploadPreset: 'tutor_homework',
-    apiKey: '963245294794452'
+    // apiKey exposed in client JS is a security risk — rotate immediately and use signed uploads.
+    // See: https://cloudinary.com/documentation/upload_images#authenticated_requests
 };
 
 // Global state to hold report submission status
@@ -557,7 +561,7 @@ function updateActiveTab(activeTabId) {
     // Clean up tab-specific real-time listeners when switching tabs
     cleanupTabListeners();
 
-    const navTabs = ['navDashboard', 'navStudentDatabase', 'navScheduleManagement', 'navAcademic', 'navCourses'];
+    const navTabs = ['navDashboard', 'navStudentDatabase', 'navScheduleManagement', 'navAcademic', 'navCourses', 'navPlacementTests'];
     navTabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
@@ -1366,6 +1370,18 @@ function showDailyTopicModal(student) {
                         <span>One topic per line recommended.</span>
                         <span>Date: ${escapeHtml(localDateString)}</span>
                     </div>
+                    <!-- Feature 5: Last month's topic shortcut (populated by JS) -->
+                    <div id="last-topic-shortcut" class="mt-3" style="display:none;">
+                        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;">
+                            <div style="font-size:.72rem;font-weight:800;color:#92400e;margin-bottom:4px;">
+                                📋 Last month's topic for this student:
+                            </div>
+                            <div id="last-topic-text" style="font-size:.82rem;color:#78350f;font-style:italic;margin-bottom:8px;white-space:pre-wrap;"></div>
+                            <button id="copy-last-topic-btn" style="background:#f59e0b;color:#fff;
+                                border:none;border-radius:7px;padding:5px 12px;font-size:.75rem;
+                                font-weight:700;cursor:pointer;">↑ Copy to today's input</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-topic-btn" class="btn btn-secondary">Close</button>
@@ -1381,6 +1397,49 @@ function showDailyTopicModal(student) {
     
     loadDailyTopicHistory(student.id);
     setTimeout(() => document.getElementById('topic-topics').focus(), 100);
+
+    // ── FEATURE 5: Load last month's topic for copy shortcut ─────────────────
+    (async () => {
+        try {
+            const lastMonth = new Date();
+            lastMonth.setDate(1);
+            lastMonth.setMonth(lastMonth.getMonth() - 1);
+            const snap = await getDocs(query(
+                collection(db, 'daily_topics'),
+                where('studentId', '==', student.id)
+            ));
+            let bestText = null, bestDate = null;
+            snap.forEach(d => {
+                const data = d.data();
+                const dt   = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || 0);
+                if (dt.getMonth() === lastMonth.getMonth() && dt.getFullYear() === lastMonth.getFullYear()) {
+                    if (!bestDate || dt > bestDate) { bestDate = dt; bestText = data.topics; }
+                }
+            });
+            if (bestText) {
+                const box    = document.getElementById('last-topic-shortcut');
+                const textEl = document.getElementById('last-topic-text');
+                const copyBtn = document.getElementById('copy-last-topic-btn');
+                if (box && textEl && copyBtn) {
+                    textEl.textContent = bestText.length > 140 ? bestText.slice(0, 140) + '…' : bestText;
+                    box.style.display  = 'block';
+                    copyBtn.addEventListener('click', () => {
+                        const ta = document.getElementById('topic-topics');
+                        if (ta) {
+                            ta.value = bestText;
+                            ta.focus();
+                            copyBtn.textContent        = '✅ Copied!';
+                            copyBtn.style.background   = '#16a34a';
+                            setTimeout(() => {
+                                copyBtn.textContent      = '↑ Copy to today\'s input';
+                                copyBtn.style.background = '#f59e0b';
+                            }, 2200);
+                        }
+                    });
+                }
+            }
+        } catch (_) { /* non-critical, silent */ }
+    })();
 
     // Event Delegation for Edit/Delete buttons
     const historyContainer = document.getElementById('topic-history');
@@ -3373,8 +3432,25 @@ function msgLoadChat(convId, name, modal, tutorId) {
     msgContainer.innerHTML = '<div style="text-align:center;margin:20px;"><div class="spinner" style="margin:auto;"></div></div>';
     modal.querySelector('#chat-inputs').style.display = 'flex';
 
-    // Mark as read
+    // Mark conversation unread count as read
     updateDoc(doc(db, "conversations", convId), { unreadCount: 0 }).catch(() => {});
+
+    // ── FEATURE 6: Mark individual incoming messages as read (enables read receipts) ─
+    (async () => {
+        try {
+            const unreadQ  = query(
+                collection(db, "conversations", convId, "messages"),
+                where("read", "==", false)
+            );
+            const snap = await getDocs(unreadQ);
+            const incoming = snap.docs.filter(d => d.data().senderId !== tutorId);
+            if (incoming.length) {
+                const batch = writeBatch(db);
+                incoming.forEach(d => batch.update(d.ref, { read: true, readAt: new Date() }));
+                await batch.commit();
+            }
+        } catch (_) { /* non-critical */ }
+    })();
 
     if (unsubChatListener) unsubChatListener();
 
@@ -3393,7 +3469,15 @@ function msgLoadChat(convId, name, modal, tutorId) {
             if (msg.subject) html += `<div style="font-weight:700;font-size:0.78rem;margin-bottom:4px;opacity:0.85;">${escapeHtml(msg.subject)}</div>`;
             if (msg.content) html += `<div>${escapeHtml(msg.content)}</div>`;
             if (msg.imageUrl) html += `<img src="${escapeHtml(msg.imageUrl)}" style="max-width:200px;border-radius:8px;margin-top:6px;cursor:pointer;" onclick="window.open('${escapeHtml(msg.imageUrl)}','_blank')">`;
-            html += `<div style="font-size:0.65rem;opacity:0.7;margin-top:4px;text-align:right;">${escapeHtml(msgFormatTime(msg.createdAt))}${msg.isUrgent ? ' 🔴' : ''}</div>`;
+            // Feature 6: read receipt tick — ✓ sent, ✓✓ seen
+            const receipt = isMe
+                ? `<span style="margin-left:3px;font-size:.6rem;opacity:${msg.read ? '1' : '0.55'};
+                    color:${msg.read ? '#bbf7d0' : 'inherit'};" title="${msg.read ? 'Seen' : 'Sent'}">
+                    ${msg.read ? '✓✓' : '✓'}</span>`
+                : '';
+            html += `<div style="font-size:0.65rem;opacity:0.7;margin-top:4px;text-align:right;">
+                ${escapeHtml(msgFormatTime(msg.createdAt))}${receipt}${msg.isUrgent ? ' 🔴' : ''}
+            </div>`;
             inner.innerHTML = html;
             bubble.appendChild(inner);
             msgContainer.appendChild(bubble);
@@ -4372,7 +4456,13 @@ function renderTutorDashboard(container, tutor) {
 
         <!-- Performance Scorecard always visible on dashboard -->
         <div id="performance-widget" class="mb-4"></div>
-        
+
+        <!-- Student Activity Summary (Feature 4) -->
+        <div id="activity-summary" class="mb-4"></div>
+
+        <!-- Report Deadline Countdown Banner (Feature 1) -->
+        <div id="deadline-banner" class="mb-4"></div>
+
         <div class="card">
             <div class="card-header">
                 <h3 class="font-bold text-lg">🔍 Search & Filter</h3>
@@ -4461,7 +4551,87 @@ function renderTutorDashboard(container, tutor) {
 
     loadTutorReports(tutor.email);
 
-    // Start Lagos clock on dashboard
+    // ── FEATURE 1: Live Report Deadline Countdown Banner ─────────────────────
+    (function startDeadlineBanner() {
+        const el = document.getElementById('deadline-banner');
+        if (!el) return;
+
+        function tick() {
+            const now  = new Date();
+            const day  = now.getDate();
+            // Report window: 19th 00:00 → 25th 23:59 (Lagos / local month)
+            const openMs  = new Date(now.getFullYear(), now.getMonth(), 19, 0,  0,  0).getTime();
+            const closeMs = new Date(now.getFullYear(), now.getMonth(), 25, 23, 59, 59).getTime();
+            const nowMs   = now.getTime();
+
+            let bg, badgeColor, badgeText, icon, title, subtitle;
+
+            if (nowMs >= openMs && nowMs <= closeMs) {
+                // Window is OPEN – countdown to close
+                const left  = closeMs - nowMs;
+                const d     = Math.floor(left / 86400000);
+                const h     = Math.floor((left % 86400000) / 3600000);
+                const m     = Math.floor((left % 3600000)  / 60000);
+                const s     = Math.floor((left % 60000)    / 1000);
+                const urgent = d === 0 && h < 6;
+                bg          = urgent ? 'linear-gradient(90deg,#7f1d1d,#b91c1c)' : 'linear-gradient(90deg,#14532d,#15803d)';
+                badgeColor  = urgent ? '#fca5a5' : '#86efac';
+                badgeText   = 'OPEN';
+                icon        = urgent ? '⚠️' : '📋';
+                title       = urgent ? 'Report deadline is very soon!' : 'Report window is OPEN — submit before the 25th';
+                const pad   = n => String(n).padStart(2,'0');
+                subtitle    = `Closes 25th · ${d > 0 ? d+'d ' : ''}${pad(h)}h ${pad(m)}m ${pad(s)}s remaining`;
+            } else if (nowMs < openMs) {
+                // Before window – countdown to open
+                const left  = openMs - nowMs;
+                const d     = Math.floor(left / 86400000);
+                const h     = Math.floor((left % 86400000) / 3600000);
+                const m     = Math.floor((left % 3600000)  / 60000);
+                const pad   = n => String(n).padStart(2,'0');
+                bg          = 'linear-gradient(90deg,#1e3a5f,#1e40af)';
+                badgeColor  = '#93c5fd';
+                badgeText   = 'UPCOMING';
+                icon        = '🕐';
+                title       = 'Report submission window not yet open';
+                subtitle    = `Opens on the 19th · ${d > 0 ? d+'d ' : ''}${pad(h)}h ${pad(m)}m away`;
+            } else {
+                // After window
+                const nextOpen = new Date(now.getFullYear(), now.getMonth() + 1, 19, 0, 0, 0);
+                const dAway = Math.ceil((nextOpen - now) / 86400000);
+                bg         = 'linear-gradient(90deg,#374151,#4b5563)';
+                badgeColor = '#d1d5db';
+                badgeText  = 'CLOSED';
+                icon       = '🔒';
+                title      = 'Report window closed for this month';
+                subtitle   = `Next window opens on the 19th · ${dAway} day${dAway !== 1 ? 's' : ''} away`;
+            }
+
+            el.innerHTML = `
+                <div style="background:${bg};border-radius:14px;padding:12px 18px;
+                    display:flex;align-items:center;gap:12px;
+                    box-shadow:0 4px 16px rgba(0,0,0,.18);">
+                    <span style="font-size:1.4rem;flex-shrink:0;">${icon}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#fff;font-weight:800;font-size:.88rem;">${escapeHtml(title)}</div>
+                        <div style="color:rgba(255,255,255,.72);font-size:.76rem;
+                            font-family:'Courier New',monospace;margin-top:2px;">${escapeHtml(subtitle)}</div>
+                    </div>
+                    <span style="background:rgba(255,255,255,.12);color:${badgeColor};
+                        font-size:.68rem;font-weight:800;padding:4px 10px;border-radius:999px;
+                        white-space:nowrap;">${badgeText}</span>
+                </div>`;
+        }
+
+        tick();
+        if (window._deadlineTimer) clearInterval(window._deadlineTimer);
+        window._deadlineTimer = setInterval(() => {
+            if (!document.getElementById('deadline-banner')) {
+                clearInterval(window._deadlineTimer);
+            } else {
+                tick();
+            }
+        }, 1000);
+    })();
     (function startTutorClock() {
         function getLagosTime() {
             return new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
@@ -4481,6 +4651,88 @@ function renderTutorDashboard(container, tutor) {
                 if (el) el.textContent = formatLagosDT();
                 else clearInterval(window._tutorClockInterval);
             }, 1000);
+        }
+    })();
+
+    // ── FEATURE 4: Student Activity Summary ──────────────────────────────────
+    (async function renderActivitySummary() {
+        const widget = document.getElementById('activity-summary');
+        if (!widget) return;
+        widget.innerHTML = `<div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;
+            padding:14px 18px;display:flex;align-items:center;gap:8px;">
+            <div class="spinner" style="width:16px;height:16px;flex-shrink:0;"></div>
+            <span style="font-size:.8rem;color:#94a3b8;">Loading activity…</span></div>`;
+        try {
+            const te       = tutor.email;
+            const now      = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            const [stuSnap, topicSnap, hwSnap] = await Promise.all([
+                getDocs(query(collection(db, 'students'),            where('tutorEmail', '==', te))),
+                getDocs(query(collection(db, 'daily_topics'),        where('tutorEmail', '==', te))),
+                getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', te)))
+            ]);
+
+            const activeStudents = stuSnap.docs.filter(d => {
+                const s = d.data();
+                return !s.summerBreak && !['archived','graduated','transferred'].includes(s.status);
+            }).length;
+
+            let topicsThisMonth = 0;
+            topicSnap.forEach(d => {
+                const ts = d.data().createdAt;
+                const dt = ts?.toDate ? ts.toDate() : new Date(ts || 0);
+                if (dt >= monthStart) topicsThisMonth++;
+            });
+
+            let hwAssigned = 0, hwSubmitted = 0;
+            hwSnap.forEach(d => {
+                const data = d.data();
+                const ts   = data.assignedDate || data.createdAt;
+                const dt   = ts?.toDate ? ts.toDate() : new Date(ts || 0);
+                if (dt >= monthStart) {
+                    hwAssigned++;
+                    if (data.status === 'submitted' || data.status === 'graded') hwSubmitted++;
+                }
+            });
+
+            const rate      = hwAssigned > 0 ? Math.round((hwSubmitted / hwAssigned) * 100) : 0;
+            const rateColor = rate >= 75 ? '#16a34a' : rate >= 40 ? '#d97706' : '#dc2626';
+
+            const stats = [
+                { icon: '👥', label: 'Active Students',    value: String(activeStudents),   color: '#6366f1' },
+                { icon: '📚', label: 'Topics This Month',  value: String(topicsThisMonth),  color: '#0891b2' },
+                { icon: '📝', label: 'H/W Assigned',       value: String(hwAssigned),       color: '#d97706' },
+                { icon: '✅', label: 'H/W Submitted',      value: `${hwSubmitted} (${rate}%)`, color: rateColor },
+            ];
+
+            widget.innerHTML = `
+                <div style="background:#fff;border-radius:16px;border:1px solid #e2e8f0;
+                    padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,.04);">
+                    <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;
+                        letter-spacing:.08em;color:#94a3b8;margin-bottom:12px;">
+                        📊 This Month's Activity · ${escapeHtml(monthLabel)}
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+                        ${stats.map(s => `
+                            <div style="background:#f8fafc;border-radius:12px;padding:12px;
+                                text-align:center;border:1px solid #f1f5f9;">
+                                <div style="font-size:1.4rem;margin-bottom:4px;">${s.icon}</div>
+                                <div style="font-size:1.1rem;font-weight:900;color:${s.color};">
+                                    ${escapeHtml(s.value)}
+                                </div>
+                                <div style="font-size:.65rem;color:#94a3b8;margin-top:2px;font-weight:600;">
+                                    ${escapeHtml(s.label)}
+                                </div>
+                            </div>`).join('')}
+                    </div>
+                </div>`;
+        } catch (e) {
+            console.error('Activity summary error:', e);
+            if (document.getElementById('activity-summary')) {
+                document.getElementById('activity-summary').innerHTML = '';
+            }
         }
     })();
 
@@ -4564,6 +4816,11 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
         }
 
+        // ⚠️  BUG FIX: The type field may be stored as "creative_writing" OR "creative-writing"
+        // depending on which part of the app wrote it. We query for "creative_writing" (the
+        // value written by tutor_submissions batch) but also catch docs with no strict type
+        // by checking in _renderDashboardReports via a loose match. If submissions still don't
+        // appear, verify the `type` field in Firestore — it must be exactly "creative_writing".
         let creativeWritingQuery = query(
             collection(db, "tutor_submissions"),
             where("tutorEmail", "==", tutorEmail),
@@ -4640,8 +4897,11 @@ function _renderDashboardReports(rtData, tutorEmail, statusFilter) {
         if (data.studentId && !activeStudentIds.has(data.studentId)) return;
         if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
 
+        // FIX: match both "creative-writing" (hyphen) and "creative_writing" (underscore)
+        const isCWAnswer = (a) => a.type === 'creative-writing' || a.type === 'creative_writing';
+
         const needsFeedback = data.answers && data.answers.some(answer => 
-            answer.type === 'creative-writing' && 
+            isCWAnswer(answer) && 
             (!answer.tutorReport || answer.tutorReport.trim() === '')
         );
 
@@ -4764,7 +5024,7 @@ function buildReportCard(docRef, data, needsFeedback) {
             <span style="background:#d1fae5;color:#065f46;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;">✅ Graded</span>
         </div>
         <div style="padding:12px 16px;">
-            ${data.answers ? data.answers.filter(a => a.type === 'creative-writing').map(answer => `
+            ${data.answers ? data.answers.filter(a => a.type === 'creative-writing' || a.type === 'creative_writing').map(answer => `
                 <div style="background:#f0f9ff;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:3px solid #60a5fa;">
                     <div style="font-size:.75rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Student Response</div>
                     <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.5;">${escapeHtml(answer.textAnswer || "No response")}</p>
@@ -4821,7 +5081,7 @@ function openPendingFeedbackModal(item) {
     let writingHTML = '';
     if (item.collection === 'student_results') {
         // Find the creative-writing answers
-        const cwAnswers = (item.answers || []).filter(a => a.type === 'creative-writing');
+        const cwAnswers = (item.answers || []).filter(a => a.type === 'creative-writing' || a.type === 'creative_writing');
         if (cwAnswers.length > 0) {
             writingHTML = cwAnswers.map((a, idx) => `
                 <div style="background:#f0f9ff;border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:3px solid #60a5fa;">
@@ -4913,7 +5173,7 @@ function openPendingFeedbackModal(item) {
                     // Update tutorReport on every creative-writing answer that's still blank
                     let updated = false;
                     answers.forEach(a => {
-                        if (a.type === 'creative-writing' && (!a.tutorReport || a.tutorReport.trim() === '')) {
+                        if ((a.type === 'creative-writing' || a.type === 'creative_writing') && (!a.tutorReport || a.tutorReport.trim() === '')) {
                             a.tutorReport = feedback;
                             updated = true;
                         }
@@ -5483,18 +5743,25 @@ async function renderStudentDatabase(container, tutor) {
         const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
         
         const reportFormHTML = `
-            <h3 class="text-xl font-bold mb-4">Monthly Report for ${escapeHtml(student.studentName)}</h3>
-            <div class="bg-blue-50 p-3 rounded-lg mb-4"><p class="text-sm font-semibold text-blue-800">Month: ${escapeHtml(currentMonthYear)}</p><p class="text-xs text-blue-600 mt-1">All fields are required</p></div>
+            <h3 class="text-xl font-bold mb-1">Monthly Report for ${escapeHtml(student.studentName)}</h3>
+            <div class="bg-blue-50 p-3 rounded-lg mb-4">
+                <p class="text-sm font-semibold text-blue-800">Month: ${escapeHtml(currentMonthYear)}</p>
+                <p class="text-xs text-blue-600 mt-1">All fields are required · draft auto-saves as you type</p>
+            </div>
             <div class="space-y-4">
                 <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${escapeHtml(existingReport.introduction || '')}</textarea></div>
-                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics...">${escapeHtml(existingReport.topics || '')}</textarea></div>
-                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress...">${escapeHtml(existingReport.progress || '')}</textarea></div>
-                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths...">${escapeHtml(existingReport.strengthsWeaknesses || '')}</textarea></div>
+                <div><label class="block font-semibold">Topics &amp; Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics...">${escapeHtml(existingReport.topics || '')}</textarea></div>
+                <div><label class="block font-semibold">Progress &amp; Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress...">${escapeHtml(existingReport.progress || '')}</textarea></div>
+                <div><label class="block font-semibold">Strengths &amp; Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths...">${escapeHtml(existingReport.strengthsWeaknesses || '')}</textarea></div>
                 <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${escapeHtml(existingReport.recommendations || '')}</textarea></div>
                 <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${escapeHtml(existingReport.generalComments || '')}</textarea></div>
-                <div class="flex justify-end space-x-2">
-                    <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                <div class="flex items-center justify-between flex-wrap gap-2 mt-2">
+                    <span id="report-autosave-pill" style="font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#94a3b8;transition:all .3s;">No unsaved changes</span>
+                    <div class="flex gap-2">
+                        <button id="cancel-report-btn" class="bg-gray-500 text-white px-5 py-2 rounded">Cancel</button>
+                        <button id="preview-report-btn" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;padding:8px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer;">👁️ Preview</button>
+                        <button id="modal-action-btn" class="bg-green-600 text-white px-5 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                    </div>
                 </div>
             </div>`;
         
@@ -5503,16 +5770,84 @@ async function renderStudentDatabase(container, tutor) {
         reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
         document.body.appendChild(reportModal);
 
-        // Validation Listeners
+        // ── FEATURE 2: Auto-save draft with visible indicator ─────────────────
+        const autosavePill = reportModal.querySelector('#report-autosave-pill');
+        let _asTimer = null;
+        function triggerAutosave() {
+            if (autosavePill) {
+                autosavePill.style.background = '#fef3c7';
+                autosavePill.style.color      = '#92400e';
+                autosavePill.textContent       = '✏️ Saving draft…';
+            }
+            clearTimeout(_asTimer);
+            _asTimer = setTimeout(async () => {
+                const draft = {
+                    introduction:        document.getElementById('report-intro')?.value  || '',
+                    topics:              document.getElementById('report-topics')?.value || '',
+                    progress:            document.getElementById('report-progress')?.value || '',
+                    strengthsWeaknesses: document.getElementById('report-sw')?.value     || '',
+                    recommendations:     document.getElementById('report-recs')?.value   || '',
+                    generalComments:     document.getElementById('report-general')?.value || ''
+                };
+                savedReports[student.id] = { ...(savedReports[student.id] || {}), ...draft };
+                try {
+                    await saveReportsToFirestore(tutor.email, savedReports);
+                    if (autosavePill) {
+                        autosavePill.style.background = '#d1fae5';
+                        autosavePill.style.color      = '#065f46';
+                        autosavePill.textContent       = '✅ Draft saved';
+                        setTimeout(() => {
+                            if (autosavePill) {
+                                autosavePill.style.background = '#f0fdf4';
+                                autosavePill.style.color      = '#16a34a';
+                                autosavePill.textContent       = '✓ Draft saved';
+                            }
+                        }, 2000);
+                    }
+                } catch (_) {
+                    if (autosavePill) {
+                        autosavePill.style.background = '#fee2e2';
+                        autosavePill.style.color      = '#991b1b';
+                        autosavePill.textContent       = '⚠️ Save failed — check connection';
+                    }
+                }
+            }, 1400);
+        }
+
+        // Validation red/green border + autosave trigger on every keystroke
         const textareas = reportModal.querySelectorAll('.required-field');
         textareas.forEach(textarea => {
             textarea.addEventListener('input', function() {
-                if (this.value.trim() === '') { this.classList.add('border-red-300'); this.classList.remove('border-green-300'); } 
-                else { this.classList.remove('border-red-300'); this.classList.add('border-green-300'); }
+                if (this.value.trim() === '') {
+                    this.classList.add('border-red-300');
+                    this.classList.remove('border-green-300');
+                } else {
+                    this.classList.remove('border-red-300');
+                    this.classList.add('border-green-300');
+                }
+                triggerAutosave();
             });
         });
 
         document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
+
+        // ── FEATURE 3: Parent Preview button ─────────────────────────────────
+        document.getElementById('preview-report-btn').addEventListener('click', () => {
+            showParentReportPreview({
+                studentName:         student.studentName,
+                grade:               student.grade,
+                parentName:          student.parentName,
+                reportMonth:         currentMonthYear,
+                tutorName:           tutor.name || 'Your Tutor',
+                introduction:        document.getElementById('report-intro')?.value  || '',
+                topics:              document.getElementById('report-topics')?.value || '',
+                progress:            document.getElementById('report-progress')?.value || '',
+                strengthsWeaknesses: document.getElementById('report-sw')?.value     || '',
+                recommendations:     document.getElementById('report-recs')?.value   || '',
+                generalComments:     document.getElementById('report-general')?.value || ''
+            });
+        });
+
         document.getElementById('modal-action-btn').addEventListener('click', async () => {
             const requiredFields = ['report-intro', 'report-topics', 'report-progress', 'report-sw', 'report-recs', 'report-general'];
             const missing = requiredFields.filter(id => !document.getElementById(id).value.trim());
@@ -5525,13 +5860,104 @@ async function renderStudentDatabase(container, tutor) {
                 parentPhone: student.parentPhone, 
                 normalizedParentPhone: typeof normalizePhoneNumber === 'function' ? normalizePhoneNumber(student.parentPhone) : student.parentPhone,
                 reportMonth: currentMonthYear,
-                introduction: document.getElementById('report-intro').value, topics: document.getElementById('report-topics').value,
-                progress: document.getElementById('report-progress').value, strengthsWeaknesses: document.getElementById('report-sw').value,
-                recommendations: document.getElementById('report-recs').value, generalComments: document.getElementById('report-general').value
+                introduction:        document.getElementById('report-intro').value,
+                topics:              document.getElementById('report-topics').value,
+                progress:            document.getElementById('report-progress').value,
+                strengthsWeaknesses: document.getElementById('report-sw').value,
+                recommendations:     document.getElementById('report-recs').value,
+                generalComments:     document.getElementById('report-general').value
             };
             reportModal.remove();
             showFeeConfirmationModal(student, reportData);
         });
+    }
+
+    // ── FEATURE 3: Parent Report Preview (full parent-portal card) ────────────
+    function showParentReportPreview(r) {
+        const sections = [
+            { label: '📖 Introduction',            key: 'introduction'        },
+            { label: '📚 Topics & Remarks',         key: 'topics'              },
+            { label: '🌟 Progress & Achievements',  key: 'progress'            },
+            { label: '💪 Strengths & Weaknesses',   key: 'strengthsWeaknesses' },
+            { label: '💡 Recommendations',          key: 'recommendations'     },
+            { label: '💬 General Comments',         key: 'generalComments'     },
+        ];
+        const sectionsHTML = sections.map(s => `
+            <div style="margin-bottom:16px;">
+                <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;
+                    letter-spacing:.08em;color:#6366f1;margin-bottom:5px;">${escapeHtml(s.label)}</div>
+                <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;
+                    border:1px solid #e2e8f0;font-size:.875rem;color:#1e293b;
+                    line-height:1.65;white-space:pre-wrap;">
+                    ${r[s.key] ? escapeHtml(r[s.key]) : '<span style="color:#94a3b8;font-style:italic;">Not filled in yet</span>'}
+                </div>
+            </div>`).join('');
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML = `
+            <div style="background:#fff;border-radius:22px;width:100%;max-width:620px;
+                max-height:92vh;display:flex;flex-direction:column;
+                box-shadow:0 32px 80px rgba(0,0,0,.4);overflow:hidden;">
+                <!-- Header -->
+                <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);
+                    padding:18px 22px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+                    <div style="width:42px;height:42px;background:rgba(255,255,255,.15);
+                        border-radius:12px;display:flex;align-items:center;
+                        justify-content:center;font-size:1.3rem;flex-shrink:0;">👁️</div>
+                    <div style="flex:1;">
+                        <div style="color:#fff;font-weight:900;font-size:.95rem;">Parent View Preview</div>
+                        <div style="color:rgba(255,255,255,.65);font-size:.72rem;margin-top:1px;">
+                            Exactly what ${escapeHtml(r.parentName || 'the parent')} will see after you submit
+                        </div>
+                    </div>
+                    <button id="pvp-close" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+                        color:#fff;width:32px;height:32px;border-radius:50%;
+                        font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+                </div>
+                <!-- Report Card body -->
+                <div style="flex:1;overflow-y:auto;padding:20px 22px;">
+                    <!-- Student chip -->
+                    <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+                        border:1.5px solid #bbf7d0;border-radius:16px;
+                        padding:14px 16px;margin-bottom:20px;
+                        display:flex;align-items:center;gap:12px;">
+                        <div style="width:46px;height:46px;border-radius:14px;background:#16a34a;
+                            color:#fff;font-weight:900;font-size:1.2rem;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            ${escapeHtml((r.studentName || '?').charAt(0).toUpperCase())}
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-weight:900;font-size:1rem;color:#14532d;">${escapeHtml(r.studentName || '')}</div>
+                            <div style="font-size:.76rem;color:#16a34a;margin-top:2px;">
+                                ${escapeHtml(r.grade || '')} · ${escapeHtml(r.reportMonth || '')}
+                            </div>
+                            <div style="font-size:.7rem;color:#4ade80;margin-top:1px;">
+                                Prepared by ${escapeHtml(r.tutorName || 'Tutor')}
+                            </div>
+                        </div>
+                        <span style="background:#16a34a;color:#fff;font-size:.68rem;
+                            font-weight:800;padding:4px 12px;border-radius:999px;">Monthly Report</span>
+                    </div>
+                    ${sectionsHTML}
+                    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+                        padding:10px 14px;font-size:.75rem;color:#92400e;text-align:center;margin-top:4px;">
+                        ⚠️ Preview only — this will be visible to the parent after you submit
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div style="padding:14px 22px;border-top:1px solid #f1f5f9;
+                    display:flex;justify-content:flex-end;background:#fafafa;flex-shrink:0;">
+                    <button id="pvp-close-2" style="background:#4f46e5;color:#fff;border:none;
+                        border-radius:10px;padding:10px 24px;font-weight:700;
+                        cursor:pointer;font-size:.875rem;">Close Preview</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const close = () => overlay.remove();
+        overlay.querySelector('#pvp-close').addEventListener('click', close);
+        overlay.querySelector('#pvp-close-2').addEventListener('click', close);
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
     }
 
     function showFeeConfirmationModal(student, reportData) {
@@ -6507,11 +6933,8 @@ onSnapshot(settingsDocRef, (docSnap) => {
         isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
         isPlacementTestEnabled  = data.isPlacementTestEnabled   ?? false;
 
-        console.log('✅ Global settings updated:', {
-            isSubmissionEnabled, isTutorAddEnabled, isSummerBreakEnabled,
-            isBypassApprovalEnabled, showStudentFees, showEditDeleteButtons,
-            isTransitionAddEnabled, isPreschoolAddEnabled
-        });
+        // NOTE: Admin flags must NOT be logged to console — tutors can see DevTools.
+        // console.log removed intentionally for security.
 
         // Re‑render student database if it's currently visible
         const mainContent = document.getElementById('mainContent');
@@ -6810,6 +7233,160 @@ async function loadCourseMaterials(studentId, container, tutor) {
 }
 
 /*******************************************************************************
+ * FEATURE 7: PLACEMENT TESTS TAB
+ * Surfaces all students with a pending Placement Test button in one dedicated
+ * view, so tutors don't have to hunt through the Student Database.
+ ******************************************************************************/
+async function renderPlacementTestsTab(container, tutor) {
+    updateActiveTab('navPlacementTests');
+    startPersistentClock();
+
+    container.innerHTML = `
+        <div class="hero-section">
+            <h1 class="hero-title">📋 Placement Tests</h1>
+            <p class="hero-subtitle">Students awaiting a placement test — launch directly from here</p>
+        </div>
+        <div id="placement-tab-content" class="mt-4">
+            <div class="card"><div class="card-body text-center">
+                <div class="spinner mx-auto mb-3"></div>
+                <p class="text-gray-500">Loading students…</p>
+            </div></div>
+        </div>`;
+
+    const out = document.getElementById('placement-tab-content');
+
+    try {
+        const PLACEMENT_CUTOFF = new Date('2026-02-26T00:00:00');
+
+        const [studentSnap, resultsSnap] = await Promise.all([
+            getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutor.email))),
+            getDocs(query(collection(db, 'student_results'), where('tutorEmail', '==', tutor.email)))
+        ]);
+
+        // Build sets for fast lookup (mirrors renderStudentDatabase logic)
+        const studentsWithResults     = new Set();
+        const studentsWithResultNames = new Set();
+        resultsSnap.forEach(d => {
+            const r = d.data();
+            if (r.studentId)   studentsWithResults.add(r.studentId);
+            if (r.studentName) studentsWithResultNames.add(r.studentName.trim().toLowerCase());
+        });
+
+        const eligible = [];
+        studentSnap.forEach(d => {
+            const s  = { id: d.id, ...d.data() };
+            if (['archived','graduated','transferred'].includes(s.status)) return;
+            if (s.summerBreak) return;
+            const createdAt = s.createdAt?.toDate ? s.createdAt.toDate() : (s.createdAt ? new Date(s.createdAt) : null);
+            const isNewEnough = createdAt && createdAt >= PLACEMENT_CUTOFF;
+            const gradeOk     = isPlacementTestEligible(s.grade);
+            const hasResult   = studentsWithResults.has(s.id) ||
+                                studentsWithResultNames.has((s.studentName || '').trim().toLowerCase());
+            const notDone     = (s.placementTestStatus || '') !== 'completed';
+            if (isNewEnough && gradeOk && !hasResult && notDone) eligible.push(s);
+        });
+
+        if (eligible.length === 0) {
+            out.innerHTML = `
+                <div class="card"><div class="card-body text-center py-10">
+                    <div style="font-size:2.5rem;margin-bottom:10px;">🎉</div>
+                    <p class="font-bold text-gray-700">No pending placement tests!</p>
+                    <p class="text-sm text-gray-400 mt-1">All eligible students have completed their tests.</p>
+                </div></div>`;
+            return;
+        }
+
+        const COLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+        const cards  = eligible.map(s => {
+            const color    = COLORS[s.studentName.charCodeAt(0) % COLORS.length];
+            const initials = (s.studentName || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+            const createdAt = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt || 0);
+            const addedLabel = createdAt ? createdAt.toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'}) : '—';
+            return `
+                <div style="background:#fff;border-radius:16px;border:1px solid #e0e7ff;
+                    box-shadow:0 2px 8px rgba(99,102,241,.08);padding:18px;display:flex;
+                    align-items:center;gap:14px;">
+                    <div style="width:46px;height:46px;border-radius:14px;background:${color};
+                        color:#fff;font-weight:900;font-size:1rem;display:flex;
+                        align-items:center;justify-content:center;flex-shrink:0;">
+                        ${escapeHtml(initials)}
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:800;color:#1e293b;font-size:.95rem;">
+                            ${escapeHtml(s.studentName)}
+                        </div>
+                        <div style="font-size:.75rem;color:#64748b;margin-top:2px;">
+                            ${escapeHtml(s.grade || 'N/A')} · Parent: ${escapeHtml(s.parentName || 'N/A')}
+                        </div>
+                        <div style="font-size:.7rem;color:#94a3b8;margin-top:1px;">
+                            Added ${escapeHtml(addedLabel)}
+                        </div>
+                    </div>
+                    <button class="pt-launch-btn"
+                        data-student-id="${escapeHtml(s.id)}"
+                        data-student-name="${escapeHtml(s.studentName)}"
+                        data-grade="${escapeHtml(s.grade)}"
+                        data-parent-email="${escapeHtml(s.parentEmail || '')}"
+                        data-parent-name="${escapeHtml(s.parentName || '')}"
+                        data-parent-phone="${escapeHtml(s.parentPhone || '')}"
+                        data-tutor-email="${escapeHtml(tutor.email)}"
+                        data-tutor-name="${escapeHtml(tutor.name || '')}"
+                        style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;
+                            border:none;border-radius:10px;padding:9px 16px;font-size:.8rem;
+                            font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                        🚀 Launch Test
+                    </button>
+                </div>`;
+        }).join('');
+
+        out.innerHTML = `
+            <div style="margin-bottom:12px;font-size:.82rem;color:#64748b;font-weight:600;">
+                ${eligible.length} student${eligible.length !== 1 ? 's' : ''} awaiting placement test
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">${cards}</div>`;
+
+        // Wire up launch buttons (same logic as launch-placement-btn in renderStudentDatabase)
+        out.querySelectorAll('.pt-launch-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId   = btn.getAttribute('data-student-id');
+                const studentName = btn.getAttribute('data-student-name');
+                const grade       = btn.getAttribute('data-grade');
+                const parentEmail = btn.getAttribute('data-parent-email');
+                const parentName  = btn.getAttribute('data-parent-name');
+                const parentPhone = btn.getAttribute('data-parent-phone');
+                const tutorEmail  = btn.getAttribute('data-tutor-email');
+                const tutorName   = btn.getAttribute('data-tutor-name');
+
+                const derivedCountry = (typeof getCountryFromPhone === 'function') ? getCountryFromPhone(parentPhone) || '' : '';
+                const payload = {
+                    studentUid: studentId, studentName, grade,
+                    parentEmail, studentEmail: parentEmail,
+                    parentName, parentPhone, country: derivedCountry,
+                    tutorEmail, tutorName,
+                    launchedBy: 'tutor', launchedAt: Date.now()
+                };
+                try {
+                    localStorage.setItem('studentData',  JSON.stringify(payload));
+                    localStorage.setItem('studentName',  studentName);
+                    localStorage.setItem('studentEmail', parentEmail);
+                    localStorage.setItem('grade',        grade);
+                    localStorage.setItem('studentUid',   studentId);
+                } catch (e) {
+                    showCustomAlert('⚠️ Could not save to localStorage. Check browser privacy settings.');
+                    return;
+                }
+                window.open('subject-select.html', '_blank');
+            });
+        });
+
+    } catch (err) {
+        console.error('Placement Tests tab error:', err);
+        out.innerHTML = `<div class="card"><div class="card-body text-center text-red-500">
+            Error loading placement tests: ${escapeHtml(err.message)}</div></div>`;
+    }
+}
+
+/*******************************************************************************
  * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
  ******************************************************************************/
 
@@ -6871,7 +7448,14 @@ async function initTutorApp() {
                 tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 window.tutorData = tutorData;
                 
-                // Expose Firebase config so the grading-tab can initialise its own Firebase instance
+                // ✅ Auth verified — remove the full-page guard overlay
+                clearTimeout(window._authGuardTimeout);
+                const _guard = document.getElementById('auth-guard');
+                if (_guard) {
+                    _guard.style.transition = 'opacity 0.3s';
+                    _guard.style.opacity = '0';
+                    setTimeout(() => _guard.remove(), 320);
+                }
                 if (!window.__firebaseConfig) {
                     // Try to read the config from the already-initialised Firebase app
                     try {
@@ -6965,6 +7549,8 @@ async function initTutorApp() {
     addNavListener('navAcademic', renderAcademic);
     // NEW: Courses tab listener
     addNavListener('navCourses', renderCourses);
+    // Feature 7: Placement Tests dedicated tab
+    addNavListener('navPlacementTests', renderPlacementTestsTab);
     
     // ── Game window helper ─────────────────────────────────────────────────
     // Call window.openGameWindow(url) from HTML game buttons.
