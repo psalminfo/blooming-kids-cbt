@@ -5593,7 +5593,7 @@ async function loadTenureBonusData() {
 
     } catch (err) {
         console.error('Error loading tenure bonus data:', err);
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">Failed to load data: ${escapeHtml(err.message)}</td></tr>`;
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">Failed to load data. Please refresh and try again.</td></tr>`;
     }
 }
 
@@ -12530,7 +12530,7 @@ async function renderUserDirectoryPanel(container) {
         } catch(err) {
             console.error('User Directory load error:', err);
             const loadingEl = document.getElementById('ud-loading');
-            if (loadingEl) loadingEl.innerHTML = "<p class="text-red-500">Error loading data. Please refresh and try again.</p>";
+            if (loadingEl) loadingEl.innerHTML = '<p class="text-red-500">Error loading data. Please refresh and try again.</p>';
         }
     }
 
