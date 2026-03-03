@@ -117,32 +117,75 @@ if (!window.realTimeIntervals) {
 }
 
 // ============================================================================
-// DATA CACHE (Cost Optimization)
+// DATA CACHE (Persistent across sessions via localStorage)
 // ============================================================================
 
 class DataCache {
-    constructor(ttlMs = 5 * 60 * 1000) { // 5 minute default TTL
+    constructor(ttlMs = 5 * 60 * 1000) { // in-memory TTL kept for legacy callers
         this._store = new Map();
         this._ttl = ttlMs;
     }
     get(key) {
         const entry = this._store.get(key);
         if (!entry) return null;
-        if (Date.now() - entry.time > this._ttl) {
-            this._store.delete(key);
-            return null;
-        }
+        if (Date.now() - entry.time > this._ttl) { this._store.delete(key); return null; }
         return entry.data;
     }
-    set(key, data) {
-        this._store.set(key, { data, time: Date.now() });
-    }
-    invalidate(key) {
-        if (key) { this._store.delete(key); } else { this._store.clear(); }
-    }
+    set(key, data) { this._store.set(key, { data, time: Date.now() }); }
+    invalidate(key) { if (key) { this._store.delete(key); } else { this._store.clear(); } }
 }
 
 const dataCache = new DataCache();
+
+// Persistent cache — survives page refresh and re-login
+// Stores report data per user UID in localStorage with a 24h TTL
+const persistentCache = {
+    _TTL: 24 * 60 * 60 * 1000, // 24 hours
+    _MAX_BYTES: 3 * 1024 * 1024, // 3 MB guard per entry
+
+    _key(userId) { return `bkh_reports_${userId}`; },
+
+    get(userId) {
+        try {
+            const raw = localStorage.getItem(this._key(userId));
+            if (!raw) return null;
+            const entry = JSON.parse(raw);
+            if (Date.now() - entry.savedAt > this._TTL) {
+                localStorage.removeItem(this._key(userId));
+                return null;
+            }
+            return entry;
+        } catch (e) { return null; }
+    },
+
+    set(userId, userData, assessmentResults, monthlyResults) {
+        try {
+            const entry = {
+                savedAt: Date.now(),
+                userData,
+                assessmentResults,
+                monthlyResults
+            };
+            const serialized = JSON.stringify(entry);
+            // Guard against storing oversized data
+            if (serialized.length > this._MAX_BYTES) return;
+            localStorage.setItem(this._key(userId), serialized);
+        } catch (e) { /* localStorage full or unavailable — silent fallback */ }
+    },
+
+    invalidate(userId) {
+        try {
+            if (userId) {
+                localStorage.removeItem(this._key(userId));
+            } else {
+                // Clear all bkh report caches
+                Object.keys(localStorage)
+                    .filter(k => k.startsWith('bkh_reports_'))
+                    .forEach(k => localStorage.removeItem(k));
+            }
+        } catch (e) {}
+    }
+};
 
 // ============================================================================
 // FEEDBACK MODAL FUNCTIONS — redirected to FAB modal
@@ -1941,6 +1984,8 @@ function setupRealTimeMonitoring(parentPhone, userId) {
                         const phoneFields = [data.parentPhone, data.parent_phone, data.guardianPhone, data.motherPhone, data.fatherPhone];
                         for (const fieldPhone of phoneFields) {
                             if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                                // Invalidate cache so next background refresh fetches fresh data
+                                if (auth.currentUser) persistentCache.invalidate(auth.currentUser.uid);
                                 showNewReportNotification();
                                 break;
                             }
@@ -1964,6 +2009,8 @@ function setupRealTimeMonitoring(parentPhone, userId) {
                         const phoneFields = [data.parentPhone, data.parent_phone, data.guardianPhone, data.motherPhone, data.fatherPhone];
                         for (const fieldPhone of phoneFields) {
                             if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                                // Invalidate cache so next background refresh fetches fresh data
+                                if (auth.currentUser) persistentCache.invalidate(auth.currentUser.uid);
                                 showNewReportNotification();
                                 break;
                             }
@@ -2585,171 +2632,193 @@ function toggleAccordion(elementId) {
 // SECTION 14: PARALLEL REPORT LOADING
 // ============================================================================
 
+// Renders report data from plain arrays — works from cache or fresh fetch
+function renderReportData(userData, assessmentResults, monthlyResults, parentPhone, userId) {
+    const reportContent  = document.getElementById('reportContent');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const authArea       = document.getElementById('authArea');
+    const reportArea     = document.getElementById('reportArea');
+    const authLoader     = document.getElementById('authLoader');
+
+    if (!reportContent) return;
+
+    currentUserData = {
+        parentName:  userData.parentName  || 'Parent',
+        parentPhone: parentPhone,
+        email:       userData.email       || ''
+    };
+
+    if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
+    if (authLoader)     authLoader.classList.add('hidden');
+    if (authArea && reportArea) {
+        authArea.classList.add('hidden');
+        reportArea.classList.remove('hidden');
+    }
+
+    if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+        reportContent.innerHTML = `
+            <div class="text-center py-16">
+                <div class="text-6xl mb-6">📊</div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto mb-6">No reports found for your account yet.</p>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
+                    <button onclick="manualRefreshReportsV2()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center mx-auto">
+                        <span class="mr-2">🔄</span> Check Now
+                    </button>
+                </div>
+            </div>`;
+        return;
+    }
+
+    const studentReportsMap = new Map();
+    [...assessmentResults, ...monthlyResults].forEach(report => {
+        const name = report.studentName;
+        if (!name) return;
+        if (!studentReportsMap.has(name)) studentReportsMap.set(name, { assessments: [], monthly: [] });
+        if (report.type === 'assessment') studentReportsMap.get(name).assessments.push(report);
+        else if (report.type === 'monthly') studentReportsMap.get(name).monthly.push(report);
+    });
+
+    userChildren = Array.from(studentReportsMap.keys());
+
+    const formattedReportsByStudent = new Map();
+    for (const [studentName, reports] of studentReportsMap) {
+        const assessmentsBySession = new Map();
+        reports.assessments.forEach(r => {
+            const k = Math.floor(r.timestamp / 86400);
+            if (!assessmentsBySession.has(k)) assessmentsBySession.set(k, []);
+            assessmentsBySession.get(k).push(r);
+        });
+        const monthlyBySession = new Map();
+        reports.monthly.forEach(r => {
+            const k = Math.floor(r.timestamp / 86400);
+            if (!monthlyBySession.has(k)) monthlyBySession.set(k, []);
+            monthlyBySession.get(k).push(r);
+        });
+        formattedReportsByStudent.set(studentName, {
+            assessments: assessmentsBySession,
+            monthly:     monthlyBySession,
+            studentData: { name: studentName, isPending: false }
+        });
+    }
+
+    reportContent.innerHTML = createYearlyArchiveReportView(formattedReportsByStudent);
+    setTimeout(() => window.initializeCharts && window.initializeCharts(), 150);
+}
+
+// Silently fetches fresh data in the background after showing cached data.
+// Only updates the screen and cache if something actually changed.
+async function backgroundRefreshReports(parentPhone, userId, cachedAssessmentCount, cachedMonthlyCount) {
+    try {
+        const userDoc = await db.collection('parent_users').doc(userId).get();
+        if (!userDoc.exists) return;
+        const userData = userDoc.data();
+
+        const searchResults = await searchAllReportsForParent(parentPhone, userData.email || '', userId);
+        const { assessmentResults, monthlyResults } = searchResults;
+
+        const changed = assessmentResults.length !== cachedAssessmentCount ||
+                        monthlyResults.length      !== cachedMonthlyCount;
+
+        if (changed) {
+            // Save fresh data to cache
+            persistentCache.set(userId, {
+                parentName: userData.parentName || 'Parent',
+                email:      userData.email      || ''
+            }, assessmentResults, monthlyResults);
+
+            // Re-render with updated data
+            renderReportData(userData, assessmentResults, monthlyResults, parentPhone, userId);
+
+            // Show subtle update indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'fixed bottom-4 right-4 bg-green-500 text-white text-sm px-4 py-2 rounded-lg shadow-lg z-40 fade-in';
+            indicator.textContent = '✓ Reports updated';
+            document.body.appendChild(indicator);
+            setTimeout(() => indicator.remove(), 3000);
+        }
+
+        // Always refresh real-time monitoring with latest data
+        setupRealTimeMonitoring(parentPhone, userId);
+        addManualRefreshButton();
+        addLogoutButton();
+
+    } catch (e) {
+        // Silent — parent already sees cached data, no need to show an error
+    }
+}
+
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
-    const cacheKey = `reports_${userId}`;
+    const reportContent = document.getElementById('reportContent');
+    const authLoader    = document.getElementById('authLoader');
+    const authArea      = document.getElementById('authArea');
+    const reportArea    = document.getElementById('reportArea');
+
+    // ── STEP 1: Try persistent cache first ───────────────────────────────────
     if (!forceRefresh) {
-        const cached = dataCache.get(cacheKey);
+        const cached = persistentCache.get(userId);
         if (cached) {
-            renderReportData(cached.userData, cached.searchResults, parentPhone, userId);
+            // Show cached data instantly — no spinner, no wait
+            if (authArea)   authArea.classList.add('hidden');
+            if (reportArea) reportArea.classList.remove('hidden');
+            if (authLoader) authLoader.classList.add('hidden');
+            localStorage.setItem('isAuthenticated', 'true');
+
+            renderReportData(
+                cached.userData,
+                cached.assessmentResults,
+                cached.monthlyResults,
+                parentPhone,
+                userId
+            );
+
+            // ── STEP 2: Silently refresh in background ────────────────────────
+            setTimeout(() => {
+                backgroundRefreshReports(
+                    parentPhone,
+                    userId,
+                    cached.assessmentResults.length,
+                    cached.monthlyResults.length
+                );
+            }, 1500); // small delay so the render completes first
+
             return;
         }
     }
-    
-    const reportArea = document.getElementById("reportArea");
-    const reportContent = document.getElementById("reportContent");
-    const authArea = document.getElementById("authArea");
-    const authLoader = document.getElementById("authLoader");
-    const welcomeMessage = document.getElementById("welcomeMessage");
 
+    // ── STEP 3: No cache — normal load with spinner ───────────────────────────
     if (auth.currentUser && authArea && reportArea) {
-        authArea.classList.add("hidden");
-        reportArea.classList.remove("hidden");
-        authLoader.classList.add("hidden");
+        authArea.classList.add('hidden');
+        reportArea.classList.remove('hidden');
         localStorage.setItem('isAuthenticated', 'true');
-    } else {
-        localStorage.removeItem('isAuthenticated');
     }
-
-    if (authLoader) authLoader.classList.remove("hidden");
-    
-    // Show skeleton loader immediately
+    if (authLoader) authLoader.classList.remove('hidden');
     showSkeletonLoader('reportContent', 'dashboard');
 
     try {
-        // Fetch user doc first so we have the email for the targeted report search.
         const userDoc = await db.collection('parent_users').doc(userId).get();
-        
-        if (!userDoc.exists) {
-            throw new Error("User profile not found");
-        }
-        
+        if (!userDoc.exists) throw new Error('User profile not found');
         const userData = userDoc.data();
 
-        // Now run the report search with the real email — no collection scans needed.
         const searchResults = await searchAllReportsForParent(parentPhone, userData.email || '', userId);
-        
-        // Update UI immediately
-        currentUserData = {
-            parentName: userData.parentName || 'Parent',
-            parentPhone: parentPhone,
-            email: userData.email || ''
-        };
-
-        if (welcomeMessage) {
-            welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
-        }
-
         const { assessmentResults, monthlyResults } = searchResults;
 
+        // Save to persistent cache for next login
+        persistentCache.set(userId, {
+            parentName: userData.parentName || 'Parent',
+            email:      userData.email      || ''
+        }, assessmentResults, monthlyResults);
 
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            reportContent.innerHTML = `
-                <div class="text-center py-16">
-                    <div class="text-6xl mb-6">📊</div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
-                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
-                        No reports found for your account yet. This usually means:
-                    </p>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
-                        <ul class="text-left text-gray-700 space-y-3">
-                            <li>• Your child's tutor hasn't submitted their first assessment or monthly report yet</li>
-                            <li>• The phone number/email used doesn't match what the tutor has on file</li>
-                            <li>• Reports are being processed and will appear soon</li>
-                        </ul>
-                    </div>
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
-                        <h3 class="font-semibold text-green-800 mb-2">What happens next?</h3>
-                        <p class="text-green-700 mb-4">
-                            <strong>We're automatically monitoring for new reports!</strong> When your child's tutor submits 
-                            their first report, it will appear here automatically. You don't need to do anything.
-                        </p>
-                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                            <button onclick="manualRefreshReportsV2()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
-                                <span class="mr-2">🔄</span> Check Now
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Setup monitoring in background
-            setTimeout(() => {
-                setupRealTimeMonitoring(parentPhone, userId);
-            }, 1000);
-            
-            return;
-        }
+        renderReportData(userData, assessmentResults, monthlyResults, parentPhone, userId);
 
-        // Process reports
-        let reportsHtml = '';
-        const studentReportsMap = new Map();
-
-        [...assessmentResults, ...monthlyResults].forEach(report => {
-            const studentName = report.studentName;
-            if (!studentName) return;
-            
-            if (!studentReportsMap.has(studentName)) {
-                studentReportsMap.set(studentName, {
-                    assessments: [],
-                    monthly: []
-                });
-            }
-            
-            if (report.type === 'assessment') {
-                studentReportsMap.get(studentName).assessments.push(report);
-            } else if (report.type === 'monthly') {
-                studentReportsMap.get(studentName).monthly.push(report);
-            }
-        });
-
-        userChildren = Array.from(studentReportsMap.keys());
-        
-        const formattedReportsByStudent = new Map();
-        
-        for (const [studentName, reports] of studentReportsMap) {
-            const assessmentsBySession = new Map();
-            reports.assessments.forEach(report => {
-                const sessionKey = Math.floor(report.timestamp / 86400);
-                if (!assessmentsBySession.has(sessionKey)) {
-                    assessmentsBySession.set(sessionKey, []);
-                }
-                assessmentsBySession.get(sessionKey).push(report);
-            });
-            
-            const monthlyBySession = new Map();
-            reports.monthly.forEach(report => {
-                const sessionKey = Math.floor(report.timestamp / 86400);
-                if (!monthlyBySession.has(sessionKey)) {
-                    monthlyBySession.set(sessionKey, []);
-                }
-                monthlyBySession.get(sessionKey).push(report);
-            });
-            
-            formattedReportsByStudent.set(studentName, {
-                assessments: assessmentsBySession,
-                monthly: monthlyBySession,
-                studentData: { name: studentName, isPending: false }
-            });
-        }
-
-        reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
-        reportContent.innerHTML = reportsHtml;
-        setTimeout(() => window.initializeCharts && window.initializeCharts(), 150);
-
-        // Setup other features in background
         setTimeout(() => {
-            if (authArea && reportArea) {
-                authArea.classList.add("hidden");
-                reportArea.classList.remove("hidden");
-            }
-            
             setupRealTimeMonitoring(parentPhone, userId);
             addManualRefreshButton();
             addLogoutButton();
         }, 100);
 
     } catch (error) {
-        console.error("❌ PARALLEL LOAD Error:", error);
+        console.error('❌ PARALLEL LOAD Error:', error);
         if (reportContent) {
             reportContent.innerHTML = `
                 <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-6 rounded-xl shadow-md">
@@ -2770,11 +2839,10 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                             </div>
                         </div>
                     </div>
-                </div>
-            `;
+                </div>`;
         }
     } finally {
-        if (authLoader) authLoader.classList.add("hidden");
+        if (authLoader) authLoader.classList.add('hidden');
     }
 }
 
@@ -4630,6 +4698,10 @@ function logout() {
     localStorage.removeItem('rememberMe');
     localStorage.removeItem('savedEmail');
     localStorage.removeItem('isAuthenticated');
+
+    // Clear this user's report cache on logout
+    const user = auth.currentUser;
+    if (user) persistentCache.invalidate(user.uid);
     
     cleanupRealTimeListeners();
     
@@ -7074,8 +7146,9 @@ async function submitNewStudent() {
         const docRef = await db.collection('enrollments').add(studentDoc);
 
 
-        // Invalidate cache so the dashboard reloads fresh
+        // Invalidate both caches so the dashboard reloads fresh
         dataCache.invalidate();
+        if (auth.currentUser) persistentCache.invalidate(auth.currentUser.uid);
 
         showMessage(`${name} has been added! Estimated first month fee: ₦${(feeCalc.totalFee || feeCalc.proratedFee).toLocaleString()}`, 'success');
         hideAddStudentModal();
