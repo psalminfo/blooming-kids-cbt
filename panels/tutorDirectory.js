@@ -414,8 +414,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         
         // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
-            originalTutorEmail: student.tutorEmail || null,
-            originalTutorName: student.tutorName || null,
+            originalTutorEmail: student.tutorEmail,
+            originalTutorName: student.tutorName,
             tutorEmail: newTutor.email,
             tutorName: newTutor.name,
             isTransitioning: true,
@@ -432,8 +432,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         const transitionRef = await addDoc(collection(db, "tutorTransitions"), {
             studentId: student.id,
             studentName: student.studentName,
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
+            originalTutorEmail: student.tutorEmail || null,
+            originalTutorName: student.tutorName || null,
             temporaryTutorEmail: newTutor.email,
             temporaryTutorName: newTutor.name,
             startDate: startDate,
@@ -1617,9 +1617,9 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        // Cache students globally so handleEditStudent can access them
+        // Cache for handleEditStudent
         window.__allStudents = allStudents;
-        
+
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -2745,18 +2745,32 @@ export function showAssignStudentModal() {
 // GLOBAL EXPORTS
 // ======================================================
 
-// Edit student handler - opens reassign modal for editing student-tutor assignment
+// Edit student handler - opens reassign modal and pre-selects the student
 function handleEditStudent(studentId) {
     const student = window.__allStudents?.find(s => s.id === studentId);
     if (!student) {
         alert('Student not found. Please refresh and try again.');
         return;
     }
-    if (window.showEnhancedReassignStudentModal) {
-        window.showEnhancedReassignStudentModal(student);
-    } else {
+    if (!window.showEnhancedReassignStudentModal) {
         alert('Edit functionality not available. Please refresh the page.');
+        return;
     }
+    // Open the modal
+    window.showEnhancedReassignStudentModal();
+    // Pre-select the student after modal renders
+    setTimeout(() => {
+        const input = document.getElementById('reassign-student-input');
+        const hiddenInput = document.getElementById('reassign-student-hidden');
+        const infoDiv = document.getElementById('student-info');
+        const nameEl = document.getElementById('selected-student-name');
+        const detailsEl = document.getElementById('selected-student-details');
+        if (input) input.value = student.studentName || '';
+        if (hiddenInput) hiddenInput.value = student.id;
+        if (nameEl) nameEl.textContent = student.studentName || '';
+        if (detailsEl) detailsEl.textContent = `Grade: ${student.grade || 'N/A'} | Current Tutor: ${student.tutorName || 'Unassigned'}`;
+        if (infoDiv) infoDiv.classList.remove('hidden');
+    }, 200);
 }
 
 function handleDeleteStudent(studentId) {
