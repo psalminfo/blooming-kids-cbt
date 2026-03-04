@@ -4176,8 +4176,11 @@ function initializeParentPortalV2() {
             if (email && tempPassword) {
                 auth.signInWithEmailAndPassword(email, tempPassword)
                     .then(() => {
-                        // Clear sessionStorage after successful sign in
-                        localStorage.removeItem('bkh_new_parent');
+                        console.log('✅ Auto-login success — credentials kept for password setup');
+                        // NOTE: bkh_new_parent is intentionally NOT cleared here.
+                        // saveFirstTimePassword() needs the temp credentials to
+                        // re-authenticate before calling updatePassword().
+                        // It will clear localStorage after the password is saved.
                     })
                     .catch((err) => {
                         console.warn('Auto-login failed:', err.message);
@@ -5258,7 +5261,24 @@ window.saveFirstTimePassword = async function(uid) {
         // Update Firebase Auth password
         const user = auth.currentUser;
         if (!user) throw new Error('Not authenticated');
-        
+
+        // Re-authenticate using stored temp credentials if available
+        // (required by Firebase before updatePassword)
+        const storedData = localStorage.getItem('bkh_new_parent');
+        if (storedData) {
+            try {
+                const { email, tempPassword } = JSON.parse(storedData);
+                if (email && tempPassword) {
+                    const credential = firebase.auth.EmailAuthProvider.credential(email, tempPassword);
+                    await user.reauthenticateWithCredential(credential);
+                    console.log('✅ Re-authentication successful');
+                }
+            } catch (reAuthErr) {
+                console.warn('Re-auth skipped:', reAuthErr.message);
+                // Continue anyway — if session is still fresh it may work
+            }
+        }
+
         await user.updatePassword(pwd);
         
         // Update Firestore record
@@ -5268,6 +5288,10 @@ window.saveFirstTimePassword = async function(uid) {
             passwordSetAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        // Now safe to clear the temp credentials
+        localStorage.removeItem('bkh_new_parent');
+        console.log('✅ Temp credentials cleared after password set');
+
         showMsg('Password saved successfully! Welcome to your portal!', false);
         
         setTimeout(() => {
