@@ -100,6 +100,13 @@ window.showAssignStudentModal = async function() {
                         </div>
                         
                         <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Tutor Fee (₦)</label>
+                            <input type="number" id="assign-tutor-fee" min="0" value="0"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="e.g. 50000">
+                        </div>
+
+                        <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Assignment Notes (Optional)</label>
                             <textarea id="assignment-notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Add any notes about this assignment..."></textarea>
                         </div>
@@ -169,5 +176,82 @@ window.showAssignStudentModal = async function() {
     } catch (error) {
         console.error('Error showing assign student modal:', error);
         alert('Failed to load assignment data. Please try again.');
+    }
+};
+
+window.closeModal = function() {
+    const modal = document.getElementById('assign-student-modal');
+    if (modal) modal.remove();
+};
+
+window.submitAssignment = async function() {
+    const tutorId    = document.getElementById('assign-tutor-select')?.value;
+    const studentId  = document.getElementById('assign-student-select')?.value;
+    const parentEmail = document.getElementById('assign-parent-email')?.value.trim();
+    const tutorFee   = Number(document.getElementById('assign-tutor-fee')?.value) || 0;
+    const notes      = document.getElementById('assignment-notes')?.value.trim();
+
+    if (!tutorId) { alert('Please select a tutor.'); return; }
+    if (!studentId) { alert('Please select a student.'); return; }
+
+    const btn = document.querySelector('#assign-student-modal button[onclick="submitAssignment()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving...'; }
+
+    try {
+        const tutor   = (sessionCache.tutors || []).find(t => t.id === tutorId);
+        const student = (sessionCache.students || []).find(s => s.id === studentId);
+
+        if (!tutor || !student) throw new Error('Tutor or student data not found. Please refresh.');
+
+        const timestamp = new Date().toISOString();
+        const assignedBy = window.userData?.email || 'management';
+
+        // Update student document with tutor assignment and fee
+        await updateDoc(doc(db, 'students', studentId), {
+            tutorId:    tutorId,
+            tutorEmail: tutor.email || null,
+            tutorName:  tutor.name  || tutor.email || null,
+            tutorFee:   tutorFee,
+            parentEmail: parentEmail || student.parentEmail || null,
+            assignmentNotes: notes || null,
+            updatedAt:  timestamp,
+            updatedBy:  assignedBy
+        });
+
+        // Notify tutor
+        await addDoc(collection(db, 'tutor_notifications'), {
+            tutorEmail: tutor.email,
+            type: 'new_student',
+            title: 'New Student Assigned',
+            message: `${student.studentName || student.name || studentId} has been assigned to you.${notes ? ' Note: ' + notes : ''}`,
+            studentName: student.studentName || student.name || studentId,
+            tutorFee,
+            read: false,
+            createdAt: Timestamp.now()
+        });
+
+        // Log activity
+        if (window.logManagementActivity) {
+            await logManagementActivity('STUDENT_ASSIGNED', {
+                studentId,
+                studentName: student.studentName || student.name,
+                tutorId,
+                tutorName: tutor.name || tutor.email,
+                tutorFee,
+                assignedBy
+            });
+        }
+
+        alert(`"${student.studentName || student.name}" assigned to "${tutor.name || tutor.email}" successfully!`);
+        window.closeModal();
+
+        // Refresh directory if available
+        if (window.fetchAndRenderDirectory) window.fetchAndRenderDirectory(true);
+        if (window.invalidateCache) { window.invalidateCache('students'); window.invalidateCache('tutorAssignments'); }
+
+    } catch (err) {
+        console.error('Assignment error:', err);
+        alert('Failed to assign student: ' + err.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Assign Student'; }
     }
 };
