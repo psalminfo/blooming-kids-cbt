@@ -414,8 +414,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         
         // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
-            originalTutorEmail: student.tutorEmail || null,
-            originalTutorName: student.tutorName || null,
+            originalTutorEmail: student.tutorEmail,
+            originalTutorName: student.tutorName,
             tutorEmail: newTutor.email,
             tutorName: newTutor.name,
             isTransitioning: true,
@@ -432,8 +432,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         const transitionRef = await addDoc(collection(db, "tutorTransitions"), {
             studentId: student.id,
             studentName: student.studentName,
-            originalTutorEmail: student.tutorEmail || null,
-            originalTutorName: student.tutorName || null,
+            originalTutorEmail: student.tutorEmail,
+            originalTutorName: student.tutorName,
             temporaryTutorEmail: newTutor.email,
             temporaryTutorName: newTutor.name,
             startDate: startDate,
@@ -1617,7 +1617,6 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        window.__allStudents = allStudents; // cache for handleEditStudent
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -2422,7 +2421,6 @@ export function showAssignStudentModal() {
         const academicEmail = document.getElementById('am-tutor-academic-email').value;
         const academicName  = document.getElementById('am-tutor-academic-name').value;
         const academicSubj  = document.getElementById('am-tutor-academic-subject').value.trim();
-        const academicFee   = Number(document.getElementById('am-tutor-academic-fee')?.value) || 0;
 
         if (!studentName || !grade || !days || !startTime || !endTime || !subjectsRaw) {
             alert('Please fill in all required student fields.'); return;
@@ -2446,7 +2444,6 @@ export function showAssignStudentModal() {
             tutorEmail: academicEmail,
             tutorName: academicName,
             subject: academicSubj || subjects.join(', '),
-            tutorFee: academicFee,
             assignedDate: new Date().toISOString()
         }];
 
@@ -2454,7 +2451,6 @@ export function showAssignStudentModal() {
         const ecEmail   = document.getElementById('am-tutor-ec-email')?.value;
         const ecName    = document.getElementById('am-tutor-ec-name')?.value;
         const ecSubject = document.getElementById('am-tutor-ec-subject')?.value.trim();
-        const ecFee     = Number(document.getElementById('am-tutor-ec-fee')?.value) || 0;
         const ecVisible = !document.getElementById('am-ec-section')?.classList.contains('hidden');
         if (ecVisible && ecEmail) {
             subjectAssignments.push({
@@ -2462,7 +2458,6 @@ export function showAssignStudentModal() {
                 tutorEmail: ecEmail,
                 tutorName: ecName,
                 subject: ecSubject || 'Extra-Curricular',
-                tutorFee: ecFee,
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2471,7 +2466,6 @@ export function showAssignStudentModal() {
         const tpEmail   = document.getElementById('am-tutor-tp-email')?.value;
         const tpName    = document.getElementById('am-tutor-tp-name')?.value;
         const tpSubject = document.getElementById('am-tutor-tp-subject')?.value.trim();
-        const tpFee     = Number(document.getElementById('am-tutor-tp-fee')?.value) || 0;
         const tpVisible = !document.getElementById('am-tp-section')?.classList.contains('hidden');
         if (tpVisible && tpEmail) {
             subjectAssignments.push({
@@ -2479,7 +2473,6 @@ export function showAssignStudentModal() {
                 tutorEmail: tpEmail,
                 tutorName: tpName,
                 subject: tpSubject || 'Test Prep',
-                tutorFee: tpFee,
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2495,7 +2488,6 @@ export function showAssignStudentModal() {
             parentPhone,
             parentEmail,
             studentFee,
-            tutorFee: academicFee,
             // Primary academic tutor (legacy fields kept for backward compat)
             tutorEmail: academicEmail,
             tutorName: academicName,
@@ -2754,5 +2746,136 @@ window.showTransitionStudentModal = showTransitionStudentModal;
 window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
+// ── Edit Student Modal ───────────────────────────────────────────────────────
+function handleEditStudent(studentId) {
+    const student = window.__allStudents?.find(s => s.id === studentId);
+    if (!student) { alert('Student not found. Please refresh.'); return; }
+
+    const existing = document.getElementById('edit-student-modal');
+    if (existing) existing.remove();
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="edit-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+            <div class="bg-white w-full max-w-lg rounded-lg shadow-xl" style="max-height:90vh;overflow-y:auto;">
+                <div class="flex justify-between items-center p-5 border-b sticky top-0 bg-white z-10">
+                    <h3 class="text-xl font-bold text-gray-800">Edit Student</h3>
+                    <button onclick="document.getElementById('edit-student-modal').remove()" class="text-gray-400 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                </div>
+                <form id="edit-student-form" class="p-5 space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Student Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="edit-studentName" value="${escapeHtml(student.studentName || '')}"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                        <select id="edit-grade" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                            ${buildGradeOptions(student.grade)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Days/Week</label>
+                        <input type="text" id="edit-days" value="${escapeHtml(student.days || '')}"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                            <select id="edit-start-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                                ${buildTimeOptions(student.schedule?.[0]?.start)}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                            <select id="edit-end-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                                ${buildTimeOptions(student.schedule?.[0]?.end)}
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Academic Subjects</label>
+                        <input type="text" id="edit-subjects" value="${escapeHtml((student.subjects || []).join(', '))}"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                        <input type="text" id="edit-parentName" value="${escapeHtml(student.parentName || '')}"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
+                        <input type="text" id="edit-parentPhone" value="${escapeHtml(student.parentPhone || '')}"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                        <input type="email" id="edit-parentEmail" value="${escapeHtml(student.parentEmail || '')}"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦)</label>
+                        <input type="number" id="edit-tutorFee" value="${student.tutorFee ?? student.studentFee ?? 0}" min="0"
+                            class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2 border-t">
+                        <button type="button" onclick="document.getElementById('edit-student-modal').remove()"
+                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+                        <button type="submit"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `);
+
+    document.getElementById('edit-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = 'Saving...';
+        try {
+            const updates = {
+                studentName: document.getElementById('edit-studentName').value.trim(),
+                grade:       document.getElementById('edit-grade').value,
+                days:        document.getElementById('edit-days').value.trim(),
+                subjects:    document.getElementById('edit-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
+                parentName:  document.getElementById('edit-parentName').value.trim(),
+                parentPhone: document.getElementById('edit-parentPhone').value.trim(),
+                parentEmail: document.getElementById('edit-parentEmail').value.trim(),
+                tutorFee:    Number(document.getElementById('edit-tutorFee').value) || 0,
+                updatedAt:   new Date().toISOString(),
+                updatedBy:   window.userData?.name || window.userData?.email || 'management'
+            };
+            const startTime = document.getElementById('edit-start-time').value;
+            const endTime   = document.getElementById('edit-end-time').value;
+            if (startTime && endTime) {
+                updates.academicTime = `${formatTimeTo12h(startTime)} - ${formatTimeTo12h(endTime)}`;
+            }
+            if (!updates.studentName) {
+                alert('Student name is required.');
+                btn.disabled = false; btn.textContent = 'Save Changes';
+                return;
+            }
+            await updateDoc(doc(db, 'students', studentId), updates);
+            alert('"' + updates.studentName + '" updated successfully!');
+            document.getElementById('edit-student-modal').remove();
+            invalidateCache('students');
+            fetchAndRenderDirectory(true);
+        } catch(err) {
+            console.error('Edit student error:', err);
+            alert('Failed to save: ' + err.message);
+            btn.disabled = false; btn.textContent = 'Save Changes';
+        }
+    });
+}
+
+function handleDeleteStudent(studentId) {
+    if (!confirm('Are you sure you want to delete this student? This cannot be undone.')) return;
+    deleteDoc(doc(db, 'students', studentId))
+        .then(() => { alert('Student deleted.'); fetchAndRenderDirectory(true); })
+        .catch(err => alert('Error deleting student: ' + err.message));
+}
+
+window.handleEditStudent = handleEditStudent;
+window.handleDeleteStudent = handleDeleteStudent;
 
 // ======================================================
