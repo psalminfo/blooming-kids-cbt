@@ -2891,7 +2891,7 @@ class EnrollmentApp {
 
                 // createUserWithEmailAndPassword already signs the user in automatically
                 // Store credentials in sessionStorage so parent.html can sign them in on load
-                sessionStorage.setItem('bkh_new_parent', JSON.stringify({
+                localStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
                     referralCode: newReferralCode,
