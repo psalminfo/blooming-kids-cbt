@@ -4,9 +4,15 @@
 // ============================================================
 
 import { db } from '../core/firebase.js';
-import { collection, addDoc, getDocs, query, orderBy, limit, where,
-         updateDoc, doc, Timestamp, onSnapshot, writeBatch } from '../core/firebase.js';
+import {
+         Timestamp, addDoc, collection, doc,
+         getDocs, limit, onSnapshot, orderBy,
+         query, updateDoc, where, writeBatch
+    } from '../core/firebase.js';
 import { escapeHtml, sanitizeInput } from '../core/utils.js';
+
+export async function createManagementNotification(type, title, message, extraData = {}) {
+    try {
         await addDoc(collection(db, 'management_notifications'), {
             type,
             title: sanitizeInput(title, 200),
