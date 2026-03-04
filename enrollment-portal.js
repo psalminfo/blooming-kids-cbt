@@ -2815,7 +2815,7 @@ class EnrollmentApp {
 
         // Redirect on confirm
         goBtn.addEventListener('click', () => {
-            window.location.href = 'parent.html';
+            window.open('parent.html', '_blank');
         });
     }
 
@@ -2954,10 +2954,8 @@ class EnrollmentApp {
                     });
                 }
 
-                // FIX: Sign the user in immediately so parent.html receives an authenticated session
-                await firebase.auth().signInWithEmailAndPassword(parentEmail, randomPassword);
-
-                // FIX: Store temp credentials in sessionStorage so parent.html can show the "set your password" prompt
+                // User is already signed in after createUserWithEmailAndPassword
+                // Store temp credentials in sessionStorage so parent.html can show the "set your password" prompt
                 sessionStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
