@@ -4167,30 +4167,34 @@ function initializeParentPortalV2() {
     setupGlobalErrorHandler();
 
     // AUTO-LOGIN: Check if coming from enrollment portal
-    // If bkh_new_parent is in sessionStorage, sign them in silently
-    // onAuthStateChanged will then fire and load the dashboard automatically
     const newParentData = localStorage.getItem('bkh_new_parent');
     if (newParentData) {
         try {
             const { email, tempPassword } = JSON.parse(newParentData);
             if (email && tempPassword) {
-                auth.signInWithEmailAndPassword(email, tempPassword)
+                // Resolve auth at runtime — window.auth may not be set if using modular SDK
+                const _auth = window.auth || (typeof firebase !== 'undefined' ? firebase.auth() : null);
+                if (!_auth) {
+                    console.warn('❌ Auto-login: no auth instance found');
+                    localStorage.removeItem('bkh_new_parent');
+                    authManager.initialize();
+                    return;
+                }
+                console.log('🔄 Auto-login: signing in', email);
+                _auth.signInWithEmailAndPassword(email, tempPassword)
                     .then(() => {
-                        console.log('✅ Auto-login success — credentials kept for password setup');
-                        // NOTE: bkh_new_parent is intentionally NOT cleared here.
-                        // saveFirstTimePassword() needs the temp credentials to
-                        // re-authenticate before calling updatePassword().
-                        // It will clear localStorage after the password is saved.
+                        console.log('✅ Auto-login success — keeping credentials for re-auth during password setup');
+                        // Do NOT clear bkh_new_parent here — saveFirstTimePassword needs it to re-authenticate
                     })
                     .catch((err) => {
-                        console.warn('Auto-login failed:', err.message);
+                        console.warn('❌ Auto-login failed:', err.code, err.message);
                         localStorage.removeItem('bkh_new_parent');
                         authManager.initialize();
                     });
-                // Don't initialize authManager yet - let signIn trigger onAuthStateChanged
                 return;
             }
         } catch(e) {
+            console.warn('❌ Auto-login parse error:', e.message);
             localStorage.removeItem('bkh_new_parent');
         }
     }
@@ -5258,12 +5262,14 @@ window.saveFirstTimePassword = async function(uid) {
     if (spinner) spinner.style.display = 'block';
     
     try {
-        // Update Firebase Auth password
-        const user = auth.currentUser;
-        if (!user) throw new Error('Not authenticated');
+        // Get auth safely at runtime
+        const _auth = window.auth || (typeof firebase !== 'undefined' ? firebase.auth() : null);
+        if (!_auth) throw new Error('Firebase auth not available');
+        const user = _auth.currentUser;
+        if (!user) throw new Error('Not authenticated — please refresh and try again');
 
-        // Re-authenticate using stored temp credentials if available
-        // (required by Firebase before updatePassword)
+        // Re-authenticate with temp credentials before updatePassword
+        // Firebase requires a recent login before allowing password changes
         const storedData = localStorage.getItem('bkh_new_parent');
         if (storedData) {
             try {
@@ -5274,26 +5280,25 @@ window.saveFirstTimePassword = async function(uid) {
                     console.log('✅ Re-authentication successful');
                 }
             } catch (reAuthErr) {
-                console.warn('Re-auth skipped:', reAuthErr.message);
-                // Continue anyway — if session is still fresh it may work
+                console.warn('⚠️ Re-auth skipped:', reAuthErr.message);
             }
         }
 
         await user.updatePassword(pwd);
-        
+
+        // Clear temp credentials now that password is set
+        localStorage.removeItem('bkh_new_parent');
+        console.log('✅ Temp credentials cleared');
+
         // Update Firestore record
         await db.collection('parent_users').doc(uid).update({
             passwordResetComplete: true,
             firstLoginCompleted: true,
             passwordSetAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
-        // Now safe to clear the temp credentials
-        localStorage.removeItem('bkh_new_parent');
-        console.log('✅ Temp credentials cleared after password set');
 
         showMsg('Password saved successfully! Welcome to your portal!', false);
-        
+
         setTimeout(() => {
             const modal = document.getElementById('firstTimePasswordModal');
             if (modal) modal.remove();

@@ -2661,7 +2661,7 @@ class EnrollmentApp {
             btn.disabled = true;
 
             // Show simple OK popup - invoice stays visible behind it
-            this._showGoToPortalPopup();
+            this._showGoToPortalPopup(portalResult);
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2716,7 +2716,7 @@ class EnrollmentApp {
     // PASSWORD MODAL — shown after successful enrollment
     // Blocks redirect until parent confirms they've saved their credentials
     // ==============================================
-    _showGoToPortalPopup() {
+    _showGoToPortalPopup(portalResult = null) {
         const existing = document.getElementById('bkh-goto-portal-popup');
         if (existing) existing.remove();
 
@@ -2749,6 +2749,17 @@ class EnrollmentApp {
         document.body.appendChild(modal);
 
         document.getElementById('bkh-ok-btn').addEventListener('click', () => {
+            // Re-write credentials to localStorage right before opening the tab
+            // This ensures the new tab always has fresh credentials to read
+            const stored = localStorage.getItem('bkh_new_parent');
+            if (!stored && portalResult?.isNew) {
+                localStorage.setItem('bkh_new_parent', JSON.stringify({
+                    email: portalResult.email || '',
+                    tempPassword: portalResult.password,
+                    isFirstLogin: true
+                }));
+                console.log('✅ bkh_new_parent re-written before opening portal tab');
+            }
             modal.remove();
             window.open('parent.html', '_blank');
         });
@@ -2890,16 +2901,18 @@ class EnrollmentApp {
                 }
 
                 // createUserWithEmailAndPassword already signs the user in automatically
-                // Store credentials in sessionStorage so parent.html can sign them in on load
-                sessionStorage.setItem('bkh_new_parent', JSON.stringify({
+                // Store credentials in localStorage so parent.html (new tab) can sign them in on load
+                // NOTE: sessionStorage is tab-scoped and cannot be read by a new tab — must use localStorage
+                localStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
                     referralCode: newReferralCode,
                     parentName: parentName,
                     isFirstLogin: true
                 }));
+                console.log('✅ bkh_new_parent written to localStorage for:', parentEmail);
 
-                return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
+                return { isNew: true, uid: user.uid, email: parentEmail, password: randomPassword, referralCode: newReferralCode };
             }
         } catch (error) {
             console.error('Error setting up parent portal account:', error);
