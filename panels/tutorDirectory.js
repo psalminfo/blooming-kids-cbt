@@ -414,8 +414,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         
         // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
+            originalTutorEmail: student.tutorEmail || null,
+            originalTutorName: student.tutorName || null,
             tutorEmail: newTutor.email,
             tutorName: newTutor.name,
             isTransitioning: true,
@@ -1617,6 +1617,9 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
+        // Cache students globally so handleEditStudent can access them
+        window.__allStudents = allStudents;
+        
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -2741,6 +2744,31 @@ export function showAssignStudentModal() {
 // ======================================================
 // GLOBAL EXPORTS
 // ======================================================
+
+// Edit student handler - opens reassign modal for editing student-tutor assignment
+function handleEditStudent(studentId) {
+    const student = window.__allStudents?.find(s => s.id === studentId);
+    if (!student) {
+        alert('Student not found. Please refresh and try again.');
+        return;
+    }
+    if (window.showEnhancedReassignStudentModal) {
+        window.showEnhancedReassignStudentModal(student);
+    } else {
+        alert('Edit functionality not available. Please refresh the page.');
+    }
+}
+
+function handleDeleteStudent(studentId) {
+    if (!confirm('Are you sure you want to delete this student? This cannot be undone.')) return;
+    const studentRef = doc(db, 'students', studentId);
+    deleteDoc(studentRef)
+        .then(() => {
+            alert('Student deleted successfully.');
+            fetchAndRenderDirectory(true);
+        })
+        .catch(err => alert('Error deleting student: ' + err.message));
+}
 
 window.showTransitionStudentModal = showTransitionStudentModal;
 window.showCreateGroupClassModal = showCreateGroupClassModal;
