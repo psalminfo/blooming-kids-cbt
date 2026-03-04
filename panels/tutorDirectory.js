@@ -1969,6 +1969,11 @@ export function showAssignStudentModal() {
                 <input type="text" id="${rowId}-subject" placeholder="e.g. Mathematics / Piano / SAT"
                        class="w-full rounded-md border border-gray-300 shadow-sm p-1.5 text-sm">
             </div>
+            <div class="mt-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tutor Fee (₦) *</label>
+                <input type="number" id="${rowId}-fee" placeholder="e.g. 50000" min="0" value="0"
+                       class="w-full rounded-md border border-gray-300 shadow-sm p-1.5 text-sm">
+            </div>
         </div>`;
     }
 
@@ -2069,7 +2074,7 @@ export function showAssignStudentModal() {
 
                         <!-- Fee -->
                         <div class="mb-3">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Student Fee (₦) <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦) <span class="text-red-500">*</span></label>
                             <input type="number" id="assign-studentFee" value="0" min="0"
                                 class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
                         </div>
@@ -2422,6 +2427,7 @@ export function showAssignStudentModal() {
         const academicEmail = document.getElementById('am-tutor-academic-email').value;
         const academicName  = document.getElementById('am-tutor-academic-name').value;
         const academicSubj  = document.getElementById('am-tutor-academic-subject').value.trim();
+        const academicFee   = Number(document.getElementById('am-tutor-academic-fee')?.value) || 0;
 
         if (!studentName || !grade || !days || !startTime || !endTime || !subjectsRaw) {
             alert('Please fill in all required student fields.'); return;
@@ -2445,6 +2451,7 @@ export function showAssignStudentModal() {
             tutorEmail: academicEmail,
             tutorName: academicName,
             subject: academicSubj || subjects.join(', '),
+            tutorFee: academicFee,
             assignedDate: new Date().toISOString()
         }];
 
@@ -2452,6 +2459,7 @@ export function showAssignStudentModal() {
         const ecEmail   = document.getElementById('am-tutor-ec-email')?.value;
         const ecName    = document.getElementById('am-tutor-ec-name')?.value;
         const ecSubject = document.getElementById('am-tutor-ec-subject')?.value.trim();
+        const ecFee     = Number(document.getElementById('am-tutor-ec-fee')?.value) || 0;
         const ecVisible = !document.getElementById('am-ec-section')?.classList.contains('hidden');
         if (ecVisible && ecEmail) {
             subjectAssignments.push({
@@ -2459,6 +2467,7 @@ export function showAssignStudentModal() {
                 tutorEmail: ecEmail,
                 tutorName: ecName,
                 subject: ecSubject || 'Extra-Curricular',
+                tutorFee: ecFee,
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2467,6 +2476,7 @@ export function showAssignStudentModal() {
         const tpEmail   = document.getElementById('am-tutor-tp-email')?.value;
         const tpName    = document.getElementById('am-tutor-tp-name')?.value;
         const tpSubject = document.getElementById('am-tutor-tp-subject')?.value.trim();
+        const tpFee     = Number(document.getElementById('am-tutor-tp-fee')?.value) || 0;
         const tpVisible = !document.getElementById('am-tp-section')?.classList.contains('hidden');
         if (tpVisible && tpEmail) {
             subjectAssignments.push({
@@ -2474,6 +2484,7 @@ export function showAssignStudentModal() {
                 tutorEmail: tpEmail,
                 tutorName: tpName,
                 subject: tpSubject || 'Test Prep',
+                tutorFee: tpFee,
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2489,6 +2500,7 @@ export function showAssignStudentModal() {
             parentPhone,
             parentEmail,
             studentFee,
+            tutorFee: academicFee,
             // Primary academic tutor (legacy fields kept for backward compat)
             tutorEmail: academicEmail,
             tutorName: academicName,
@@ -2761,54 +2773,28 @@ function handleEditStudent(studentId) {
                     <button onclick="document.getElementById('edit-student-modal').remove()" class="text-gray-400 hover:text-gray-700 text-2xl font-bold">&times;</button>
                 </div>
                 <form id="edit-student-form" class="p-5 space-y-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Student Name <span class="text-red-500">*</span></label>
-                        <input type="text" id="edit-studentName" value="${escapeHtml(student.studentName || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
-                        <select id="edit-grade" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                            ${buildGradeOptions(student.grade)}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Days/Week</label>
-                        <input type="text" id="edit-days" value="${escapeHtml(student.days || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Student Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="edit-studentName" value="${escapeHtml(student.studentName || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                        <select id="edit-grade" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">${buildGradeOptions(student.grade)}</select></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Days/Week</label>
+                        <input type="text" id="edit-days" value="${escapeHtml(student.days || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                            <select id="edit-start-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                                ${buildTimeOptions(student.schedule?.[0]?.start)}
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                            <select id="edit-end-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                                ${buildTimeOptions(student.schedule?.[0]?.end)}
-                            </select>
-                        </div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                            <select id="edit-start-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">${buildTimeOptions(student.schedule?.[0]?.start)}</select></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                            <select id="edit-end-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">${buildTimeOptions(student.schedule?.[0]?.end)}</select></div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Academic Subjects</label>
-                        <input type="text" id="edit-subjects" value="${escapeHtml((student.subjects || []).join(', '))}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
-                        <input type="text" id="edit-parentName" value="${escapeHtml(student.parentName || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
-                        <input type="text" id="edit-parentPhone" value="${escapeHtml(student.parentPhone || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
-                        <input type="email" id="edit-parentEmail" value="${escapeHtml(student.parentEmail || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦)</label>
-                        <input type="number" id="edit-tutorFee" value="${student.tutorFee ?? student.studentFee ?? 0}" min="0" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
-                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Academic Subjects</label>
+                        <input type="text" id="edit-subjects" value="${escapeHtml((student.subjects || []).join(', '))}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                        <input type="text" id="edit-parentName" value="${escapeHtml(student.parentName || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
+                        <input type="text" id="edit-parentPhone" value="${escapeHtml(student.parentPhone || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                        <input type="email" id="edit-parentEmail" value="${escapeHtml(student.parentEmail || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦)</label>
+                        <input type="number" id="edit-tutorFee" value="${student.tutorFee ?? student.studentFee ?? 0}" min="0" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
                     <div class="flex justify-end gap-2 pt-2 border-t">
                         <button type="button" onclick="document.getElementById('edit-student-modal').remove()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
                         <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Save Changes</button>
