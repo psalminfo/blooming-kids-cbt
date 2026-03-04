@@ -2650,37 +2650,19 @@ class EnrollmentApp {
             // STEP 2: Attempt Parent Portal Setup
             const portalResult = await this.setupParentPortal(result.enrollmentData);
 
-            // Handle successful portal creation
-            if (portalResult && portalResult.isNew) {
-                // New parent - already signed in, sessionStorage set
-                // Show success, then open parent portal in new tab
-                this.showAlert("Enrollment complete! Your parent portal is opening in a new tab...", "success");
-                btn.innerHTML = 'Enrollment Complete!';
-                btn.disabled = true;
-                setTimeout(() => {
-                    const invoiceElement = document.getElementById('invoice-content');
-                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
-                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-                }, 1000);
-                setTimeout(() => { window.open('parent.html', '_blank'); }, 2500);
-            } else if (portalResult && !portalResult.isNew) {
-                // Existing parent - linked successfully
-                this.showAlert('Your existing parent account has been linked. Opening your portal...', 'info');
-                btn.innerHTML = 'Enrollment Complete!';
-                btn.disabled = true;
-                setTimeout(() => {
-                    const invoiceElement = document.getElementById('invoice-content');
-                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
-                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-                }, 1000);
-                setTimeout(() => { window.open('parent.html', '_blank'); }, 2500);
-            } else {
-                // Portal setup failed - enrollment still saved
-                this.showAlert("Enrollment saved! Please log into the parent portal to complete your account setup.", "warning");
-                btn.innerHTML = 'Enrollment Complete';
-                btn.disabled = true;
-                setTimeout(() => { window.open('parent.html', '_blank'); }, 3000);
-            }
+            // Send email notifications
+            setTimeout(() => {
+                const invoiceElement = document.getElementById('invoice-content');
+                const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+                this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+            }, 1000);
+
+            // Show invoice with a Go to Portal button - don't auto-redirect
+            btn.innerHTML = 'Enrollment Complete!';
+            btn.disabled = true;
+
+            // Show portal access button on the invoice
+            this._showPortalAccessButton(portalResult);
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2735,6 +2717,48 @@ class EnrollmentApp {
     // PASSWORD MODAL — shown after successful enrollment
     // Blocks redirect until parent confirms they've saved their credentials
     // ==============================================
+    _showPortalAccessButton(portalResult) {
+        // Remove existing button if any
+        const existing = document.getElementById('bkh-portal-access-btn');
+        if (existing) existing.remove();
+
+        const isNew = portalResult && portalResult.isNew;
+
+        const wrapper = document.createElement('div');
+        wrapper.id = 'bkh-portal-access-btn';
+        wrapper.style.cssText = `
+            position:fixed; bottom:32px; left:50%; transform:translateX(-50%);
+            z-index:99999; text-align:center;
+        `;
+        wrapper.innerHTML = \`
+            <div style="background:#fff; border-radius:16px; padding:24px 32px;
+                        box-shadow:0 8px 40px rgba(0,0,0,0.18); max-width:420px;">
+                <div style="font-size:36px; margin-bottom:8px;">🎉</div>
+                <h3 style="margin:0 0 8px; color:#1a1a2e; font-size:18px; font-weight:800;">
+                    Enrollment Complete!
+                </h3>
+                <p style="margin:0 0 20px; color:#555; font-size:14px;">
+                    \${isNew
+                        ? 'Your parent portal account has been created. Click below to access your portal and set your password.'
+                        : 'Your account has been linked. Click below to access your parent portal.'}
+                </p>
+                <button id="bkh-go-portal-btn"
+                    style="background:linear-gradient(135deg,#4a7c59,#2f5240); color:#fff;
+                           border:none; border-radius:10px; padding:14px 28px;
+                           font-size:16px; font-weight:700; cursor:pointer; width:100%;">
+                    Go to My Parent Portal →
+                </button>
+            </div>
+        \`;
+
+        document.body.appendChild(wrapper);
+
+        document.getElementById('bkh-go-portal-btn').addEventListener('click', () => {
+            window.open('parent.html', '_blank');
+            wrapper.remove();
+        });
+    }
+
     _showPasswordModal(portalResult) {
         // Remove any existing modal
         const existing = document.getElementById('bkh-password-modal');
@@ -2952,8 +2976,8 @@ class EnrollmentApp {
                     });
                 }
 
-                // User is already signed in after createUserWithEmailAndPassword
-                // Store credentials in sessionStorage so parent.html can auto-login in new tab
+                // User already signed in after createUserWithEmailAndPassword
+                // Store credentials so parent.html can sign them in on load
                 sessionStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
