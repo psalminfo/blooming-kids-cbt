@@ -4166,6 +4166,32 @@ function initializeParentPortalV2() {
     setupEventListeners();
     setupGlobalErrorHandler();
 
+    // AUTO-LOGIN: Check if coming from enrollment portal
+    // If bkh_new_parent is in sessionStorage, sign them in silently
+    // onAuthStateChanged will then fire and load the dashboard automatically
+    const newParentData = localStorage.getItem('bkh_new_parent');
+    if (newParentData) {
+        try {
+            const { email, tempPassword } = JSON.parse(newParentData);
+            if (email && tempPassword) {
+                auth.signInWithEmailAndPassword(email, tempPassword)
+                    .then(() => {
+                        // Clear sessionStorage after successful sign in
+                        localStorage.removeItem('bkh_new_parent');
+                    })
+                    .catch((err) => {
+                        console.warn('Auto-login failed:', err.message);
+                        localStorage.removeItem('bkh_new_parent');
+                        authManager.initialize();
+                    });
+                // Don't initialize authManager yet - let signIn trigger onAuthStateChanged
+                return;
+            }
+        } catch(e) {
+            localStorage.removeItem('bkh_new_parent');
+        }
+    }
+
     authManager.initialize();
 
     window.addEventListener('beforeunload', () => {
