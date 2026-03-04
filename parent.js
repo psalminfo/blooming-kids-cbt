@@ -4166,32 +4166,6 @@ function initializeParentPortalV2() {
     setupEventListeners();
     setupGlobalErrorHandler();
 
-    // AUTO-LOGIN: Check if coming from enrollment portal
-    // If bkh_new_parent is in sessionStorage, sign them in silently
-    // onAuthStateChanged will then fire and load the dashboard automatically
-    const newParentData = localStorage.getItem('bkh_new_parent');
-    if (newParentData) {
-        try {
-            const { email, tempPassword } = JSON.parse(newParentData);
-            if (email && tempPassword) {
-                auth.signInWithEmailAndPassword(email, tempPassword)
-                    .then(() => {
-                        // Clear sessionStorage after successful sign in
-                        localStorage.removeItem('bkh_new_parent');
-                    })
-                    .catch((err) => {
-                        console.warn('Auto-login failed:', err.message);
-                        localStorage.removeItem('bkh_new_parent');
-                        authManager.initialize();
-                    });
-                // Don't initialize authManager yet - let signIn trigger onAuthStateChanged
-                return;
-            }
-        } catch(e) {
-            localStorage.removeItem('bkh_new_parent');
-        }
-    }
-
     authManager.initialize();
 
     window.addEventListener('beforeunload', () => {
@@ -5258,9 +5232,27 @@ window.saveFirstTimePassword = async function(uid) {
         // Update Firebase Auth password
         const user = auth.currentUser;
         if (!user) throw new Error('Not authenticated');
-        
+
+        // Re-authenticate silently using stored temp credentials before updating password
+        // This is required by Firebase for sensitive operations like password change
+        const storedData = localStorage.getItem('bkh_new_parent');
+        if (storedData) {
+            try {
+                const { email, tempPassword } = JSON.parse(storedData);
+                if (email && tempPassword) {
+                    const credential = firebase.auth.EmailAuthProvider.credential(email, tempPassword);
+                    await user.reauthenticateWithCredential(credential);
+                }
+            } catch (reAuthError) {
+                console.warn('Re-auth failed, trying password update anyway:', reAuthError.message);
+            }
+        }
+
         await user.updatePassword(pwd);
         
+        // Clear stored temp credentials now that password is set
+        localStorage.removeItem('bkh_new_parent');
+
         // Update Firestore record
         await db.collection('parent_users').doc(uid).update({
             passwordResetComplete: true,
@@ -5279,7 +5271,7 @@ window.saveFirstTimePassword = async function(uid) {
         console.error('Error saving password:', error);
         let msg = 'Failed to save password. Please try again.';
         if (error.code === 'auth/requires-recent-login') {
-            msg = 'Session expired. Please log out and log back in to set your password.';
+            msg = 'Session expired. Please refresh the page and try again.';
         }
         showMsg(msg, true);
         if (btn) btn.disabled = false;
