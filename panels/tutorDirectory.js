@@ -414,8 +414,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         
         // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
+            originalTutorEmail: student.tutorEmail || null,
+            originalTutorName: student.tutorName || null,
             tutorEmail: newTutor.email,
             tutorName: newTutor.name,
             isTransitioning: true,
@@ -1617,9 +1617,7 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        // Cache for handleEditStudent
-        window.__allStudents = allStudents;
-
+        window.__allStudents = allStudents; // cache for handleEditStudent
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -2424,6 +2422,7 @@ export function showAssignStudentModal() {
         const academicEmail = document.getElementById('am-tutor-academic-email').value;
         const academicName  = document.getElementById('am-tutor-academic-name').value;
         const academicSubj  = document.getElementById('am-tutor-academic-subject').value.trim();
+        const academicFee   = Number(document.getElementById('am-tutor-academic-fee')?.value) || 0;
 
         if (!studentName || !grade || !days || !startTime || !endTime || !subjectsRaw) {
             alert('Please fill in all required student fields.'); return;
@@ -2447,6 +2446,7 @@ export function showAssignStudentModal() {
             tutorEmail: academicEmail,
             tutorName: academicName,
             subject: academicSubj || subjects.join(', '),
+            tutorFee: academicFee,
             assignedDate: new Date().toISOString()
         }];
 
@@ -2454,6 +2454,7 @@ export function showAssignStudentModal() {
         const ecEmail   = document.getElementById('am-tutor-ec-email')?.value;
         const ecName    = document.getElementById('am-tutor-ec-name')?.value;
         const ecSubject = document.getElementById('am-tutor-ec-subject')?.value.trim();
+        const ecFee     = Number(document.getElementById('am-tutor-ec-fee')?.value) || 0;
         const ecVisible = !document.getElementById('am-ec-section')?.classList.contains('hidden');
         if (ecVisible && ecEmail) {
             subjectAssignments.push({
@@ -2461,6 +2462,7 @@ export function showAssignStudentModal() {
                 tutorEmail: ecEmail,
                 tutorName: ecName,
                 subject: ecSubject || 'Extra-Curricular',
+                tutorFee: ecFee,
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2469,6 +2471,7 @@ export function showAssignStudentModal() {
         const tpEmail   = document.getElementById('am-tutor-tp-email')?.value;
         const tpName    = document.getElementById('am-tutor-tp-name')?.value;
         const tpSubject = document.getElementById('am-tutor-tp-subject')?.value.trim();
+        const tpFee     = Number(document.getElementById('am-tutor-tp-fee')?.value) || 0;
         const tpVisible = !document.getElementById('am-tp-section')?.classList.contains('hidden');
         if (tpVisible && tpEmail) {
             subjectAssignments.push({
@@ -2476,6 +2479,7 @@ export function showAssignStudentModal() {
                 tutorEmail: tpEmail,
                 tutorName: tpName,
                 subject: tpSubject || 'Test Prep',
+                tutorFee: tpFee,
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2491,6 +2495,7 @@ export function showAssignStudentModal() {
             parentPhone,
             parentEmail,
             studentFee,
+            tutorFee: academicFee,
             // Primary academic tutor (legacy fields kept for backward compat)
             tutorEmail: academicEmail,
             tutorName: academicName,
@@ -2744,45 +2749,6 @@ export function showAssignStudentModal() {
 // ======================================================
 // GLOBAL EXPORTS
 // ======================================================
-
-// Edit student handler - opens reassign modal and pre-selects the student
-function handleEditStudent(studentId) {
-    const student = window.__allStudents?.find(s => s.id === studentId);
-    if (!student) {
-        alert('Student not found. Please refresh and try again.');
-        return;
-    }
-    if (!window.showEnhancedReassignStudentModal) {
-        alert('Edit functionality not available. Please refresh the page.');
-        return;
-    }
-    // Open the modal
-    window.showEnhancedReassignStudentModal();
-    // Pre-select the student after modal renders
-    setTimeout(() => {
-        const input = document.getElementById('reassign-student-input');
-        const hiddenInput = document.getElementById('reassign-student-hidden');
-        const infoDiv = document.getElementById('student-info');
-        const nameEl = document.getElementById('selected-student-name');
-        const detailsEl = document.getElementById('selected-student-details');
-        if (input) input.value = student.studentName || '';
-        if (hiddenInput) hiddenInput.value = student.id;
-        if (nameEl) nameEl.textContent = student.studentName || '';
-        if (detailsEl) detailsEl.textContent = `Grade: ${student.grade || 'N/A'} | Current Tutor: ${student.tutorName || 'Unassigned'}`;
-        if (infoDiv) infoDiv.classList.remove('hidden');
-    }, 200);
-}
-
-function handleDeleteStudent(studentId) {
-    if (!confirm('Are you sure you want to delete this student? This cannot be undone.')) return;
-    const studentRef = doc(db, 'students', studentId);
-    deleteDoc(studentRef)
-        .then(() => {
-            alert('Student deleted successfully.');
-            fetchAndRenderDirectory(true);
-        })
-        .catch(err => alert('Error deleting student: ' + err.message));
-}
 
 window.showTransitionStudentModal = showTransitionStudentModal;
 window.showCreateGroupClassModal = showCreateGroupClassModal;
