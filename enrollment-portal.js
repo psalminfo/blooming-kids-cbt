@@ -2652,36 +2652,34 @@ class EnrollmentApp {
 
             // Handle successful portal creation
             if (portalResult && portalResult.isNew) {
-                // FIX: Show a blocking modal so the parent MUST save their password before proceeding
-                this._showPasswordModal(portalResult);
-            } else if (portalResult && !portalResult.isNew) {
-                this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
-                // STEP 3: Fire-and-forget email notifications
-                setTimeout(() => {
-                    const invoiceElement = document.getElementById('invoice-content');
-                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
-                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-                }, 2000);
-                // Redirect existing user
-                this.showAlert("Redirecting you to the parent portal...", "success");
-                setTimeout(() => { window.open('parent.html', '_blank'); }, 2000);
-                btn.innerHTML = 'Enrollment Complete! Redirecting...';
+                // New parent - already signed in, sessionStorage set
+                // Show success, then open parent portal in new tab
+                this.showAlert("Enrollment complete! Your parent portal is opening in a new tab...", "success");
+                btn.innerHTML = 'Enrollment Complete!';
                 btn.disabled = true;
-            } else {
-                // STEP 2.5: ERROR RECOVERY - Enrollment saved, but portal failed.
-                this.showAlert("Enrollment successful, but we couldn't auto-login to your portal. Please contact support to link your account.", "warning");
-                btn.innerHTML = 'Enrollment Complete (Portal Setup Pending)';
-                btn.disabled = false;
-                return;
-            }
-
-            // STEP 3: Fire-and-forget email notifications (for new users, called after modal confirm)
-            if (portalResult && portalResult.isNew) {
                 setTimeout(() => {
                     const invoiceElement = document.getElementById('invoice-content');
                     const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
                     this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-                }, 2000);
+                }, 1000);
+                setTimeout(() => { window.open('parent.html', '_blank'); }, 2500);
+            } else if (portalResult && !portalResult.isNew) {
+                // Existing parent - linked successfully
+                this.showAlert('Your existing parent account has been linked. Opening your portal...', 'info');
+                btn.innerHTML = 'Enrollment Complete!';
+                btn.disabled = true;
+                setTimeout(() => {
+                    const invoiceElement = document.getElementById('invoice-content');
+                    const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+                    this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+                }, 1000);
+                setTimeout(() => { window.open('parent.html', '_blank'); }, 2500);
+            } else {
+                // Portal setup failed - enrollment still saved
+                this.showAlert("Enrollment saved! Please log into the parent portal to complete your account setup.", "warning");
+                btn.innerHTML = 'Enrollment Complete';
+                btn.disabled = true;
+                setTimeout(() => { window.open('parent.html', '_blank'); }, 3000);
             }
 
         } catch (error) {
@@ -2815,7 +2813,7 @@ class EnrollmentApp {
 
         // Redirect on confirm
         goBtn.addEventListener('click', () => {
-            window.open('parent.html', '_blank');
+            window.location.href = 'parent.html';
         });
     }
 
@@ -2955,7 +2953,7 @@ class EnrollmentApp {
                 }
 
                 // User is already signed in after createUserWithEmailAndPassword
-                // Store temp credentials in sessionStorage so parent.html can show the "set your password" prompt
+                // Store credentials in sessionStorage so parent.html can auto-login in new tab
                 sessionStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
