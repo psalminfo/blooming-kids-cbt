@@ -6,7 +6,9 @@
 
 import { auth, db } from './firebase.js';
 import { onAuthStateChanged, signOut } from './firebase.js';
-import { getDoc, doc } from './firebase.js';
+import {
+         doc, getDoc
+    } from './firebase.js';
 import { capitalize } from './utils.js';
 import { switchToTabCached } from './cache.js';
 import { initManagementNotifications } from '../notifications/bell.js';
@@ -29,6 +31,13 @@ import { renderMasterPortalPanel }        from '../panels/masterPortal.js';
 import { renderAcademicFollowUpPanel }    from '../panels/academicFollowUp.js';
 import { renderUserDirectoryPanel }       from '../panels/userDirectory.js';
 import { renderManagementMessagingPanel } from '../panels/messaging.js';
+import '../panels/tutorHistory.js';
+import '../panels/actionHandlers.js';
+import '../modals/assignStudent.js';
+import '../modals/quickActions.js';
+import '../modals/transitions.js';
+import '../modals/groupClass.js';
+import '../modals/reassign.js';
 
 const navigationGroups = {
     "dashboard": {
