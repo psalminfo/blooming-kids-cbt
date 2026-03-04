@@ -4,51 +4,32 @@ service cloud.firestore {
 
     // ============================================================
     //  BLOOMING KIDS HOUSE — FIRESTORE SECURITY RULES
-    //  Portals: Admin, Management, Tutor, Parent, Enrollment,
-    //           Assessment Test
-    //
-    //  ROLES (auto-stamped by Cloud Function on signup):
-    //    'admin'   → everything, everywhere
-    //    'staff'   → full operational access
-    //    'tutor'   → own reports, assigned students, schedules
-    //    'parent'  → own children's data only
-    //    (none)    → enrollment portal only (public)
-    // ============================================================
-
-
-    // ============================================================
-    //  HELPER FUNCTIONS
     // ============================================================
 
     function isSignedIn() {
       return request.auth != null;
     }
-
     function isAdmin() {
       return isSignedIn() && request.auth.token.role == 'admin';
     }
-
     function isStaff() {
       return isSignedIn() && (
         request.auth.token.role == 'staff' ||
         request.auth.token.role == 'admin'
       );
     }
-
     function isTutor() {
       return isSignedIn() && (
         request.auth.token.role == 'tutor' ||
         request.auth.token.role == 'admin'
       );
     }
-
     function isParent() {
       return isSignedIn() && (
         request.auth.token.role == 'parent' ||
         request.auth.token.role == 'admin'
       );
     }
-
     function isKnownUser() {
       return isSignedIn() && (
         request.auth.token.role == 'admin'  ||
@@ -57,24 +38,21 @@ service cloud.firestore {
         request.auth.token.role == 'parent'
       );
     }
-
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
     function isEmailOwner(email) {
       return isSignedIn() && request.auth.token.email == email;
     }
 
-
     // ============================================================
-    //  1. ENROLLMENT PORTAL  (public — no login needed)
+    //  1. ENROLLMENT PORTAL
     // ============================================================
 
     match /enrollments/{enrollmentId} {
-      allow create: if true;
-      allow read:   if true;
-      allow update: if true;
+      allow create: if true;           // public can submit enrollment
+      allow read:   if isStaff();      // FIXED: was public, now staff only
+      allow update: if isStaff();
       allow delete: if isStaff();
     }
 
@@ -92,9 +70,8 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-
     // ============================================================
-    //  2. STUDENT DATA  (Management + Tutor + Parent)
+    //  2. STUDENT DATA
     // ============================================================
 
     match /students/{studentId} {
@@ -121,7 +98,6 @@ service cloud.firestore {
       allow create, update: if isTutor() || isStaff();
       allow delete:         if isStaff();
     }
-
 
     // ============================================================
     //  3. TUTOR PORTAL
@@ -152,10 +128,10 @@ service cloud.firestore {
     }
 
     match /tutor_notifications/{docId} {
-      allow read:           if isStaff() || isTutor();
-      allow create:         if isStaff();
-      allow update:         if isTutor() || isStaff();
-      allow delete:         if isStaff();
+      allow read:   if isStaff() || isTutor();
+      allow create: if isStaff();
+      allow update: if isTutor() || isStaff();
+      allow delete: if isStaff();
     }
 
     match /tutorAssignments/{docId} {
@@ -213,7 +189,6 @@ service cloud.firestore {
       allow delete:         if isStaff();
     }
 
-
     // ============================================================
     //  4. PARENT PORTAL
     // ============================================================
@@ -244,7 +219,6 @@ service cloud.firestore {
       allow delete:         if isStaff();
     }
 
-
     // ============================================================
     //  5. ASSESSMENT TEST PORTAL
     // ============================================================
@@ -261,15 +235,15 @@ service cloud.firestore {
       allow delete:         if isStaff();
     }
 
-
     // ============================================================
     //  6. MANAGEMENT / ADMIN PORTAL
     // ============================================================
 
     match /staff/{staffId} {
-      allow read:           if isStaff();
-      allow create, update: if isAdmin();
-      allow delete:         if isAdmin();
+      allow create: if true;           // needed for signup flow (role: pending)
+      allow read:   if isStaff();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /users/{userId} {
@@ -290,12 +264,17 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
 
+    match /management_notifications/{docId} {
+      allow read:           if isStaff();
+      allow create:         if isKnownUser();
+      allow update, delete: if isStaff();
+    }
+
     match /system_logs/{docId} {
       allow read:           if isAdmin();
       allow create:         if isKnownUser();
       allow update, delete: if isAdmin();
     }
-
 
     // ============================================================
     //  7. COMMUNICATION
@@ -306,20 +285,16 @@ service cloud.firestore {
       allow delete:               if isStaff();
     }
 
-
     // ============================================================
-    //  8. FUTURE / NEW COLLECTIONS
-    //  Any collection not listed above:
-    //    Admin + Staff get full access automatically
-    //    Everyone else is denied until you add a rule above
+    //  8. CATCH-ALL — FIXED: admin only (not all staff)
     // ============================================================
 
     match /{newCollection}/{docId} {
-      allow read, write: if isStaff();
+      allow read, write: if isAdmin();
     }
 
     match /{newCollection}/{docId}/{subCollection}/{subDocId} {
-      allow read, write: if isStaff();
+      allow read, write: if isAdmin();
     }
 
   }
