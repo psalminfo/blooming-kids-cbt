@@ -23,4 +23,4 @@ jobs:
         run: cd functions && npm install
 
       - name: Deploy Functions and Firestore Rules
-        run: firebase deploy --only functions,firestore:rules --project bloomingkidsassessment --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive
+       run: firebase deploy --only functions,firestore:rules --project bloomingkidsassessment --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive --force
