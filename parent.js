@@ -4166,6 +4166,36 @@ function initializeParentPortalV2() {
     setupEventListeners();
     setupGlobalErrorHandler();
 
+    // AUTO-LOGIN: Check if coming from enrollment portal
+    // bkh_new_parent is set in localStorage by enrollment-portal.js after creating the account
+    const newParentData = localStorage.getItem('bkh_new_parent');
+    if (newParentData) {
+        try {
+            const { email, tempPassword } = JSON.parse(newParentData);
+            if (email && tempPassword) {
+                auth.signInWithEmailAndPassword(email, tempPassword)
+                    .then(() => {
+                        // Credentials still needed for re-auth when setting password
+                        // They will be cleared in saveFirstTimePassword after password is set
+                    })
+                    .catch((err) => {
+                        console.warn('Auto-login failed:', err.message);
+                        localStorage.removeItem('bkh_new_parent');
+                        authManager.initialize();
+                    });
+                // Return early - signIn will trigger onAuthStateChanged which loads dashboard
+                window.addEventListener('beforeunload', () => {
+                    authManager.cleanup();
+                    cleanupRealTimeListeners();
+                });
+                authManager.initialize();
+                return;
+            }
+        } catch(e) {
+            localStorage.removeItem('bkh_new_parent');
+        }
+    }
+
     authManager.initialize();
 
     window.addEventListener('beforeunload', () => {
@@ -5234,7 +5264,7 @@ window.saveFirstTimePassword = async function(uid) {
         if (!user) throw new Error('Not authenticated');
 
         // Re-authenticate silently using stored temp credentials before updating password
-        // This is required by Firebase for sensitive operations like password change
+        // Required by Firebase for sensitive operations like password change
         const storedData = localStorage.getItem('bkh_new_parent');
         if (storedData) {
             try {
@@ -5244,15 +5274,15 @@ window.saveFirstTimePassword = async function(uid) {
                     await user.reauthenticateWithCredential(credential);
                 }
             } catch (reAuthError) {
-                console.warn('Re-auth failed, trying password update anyway:', reAuthError.message);
+                console.warn('Re-auth failed, trying anyway:', reAuthError.message);
             }
         }
 
         await user.updatePassword(pwd);
-        
+
         // Clear stored temp credentials now that password is set
         localStorage.removeItem('bkh_new_parent');
-
+        
         // Update Firestore record
         await db.collection('parent_users').doc(uid).update({
             passwordResetComplete: true,
