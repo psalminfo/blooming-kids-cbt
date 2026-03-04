@@ -2650,19 +2650,18 @@ class EnrollmentApp {
             // STEP 2: Attempt Parent Portal Setup
             const portalResult = await this.setupParentPortal(result.enrollmentData);
 
-            // Send email notifications
+            // Send email notifications silently
             setTimeout(() => {
                 const invoiceElement = document.getElementById('invoice-content');
                 const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
                 this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
             }, 1000);
 
-            // Show invoice with a Go to Portal button - don't auto-redirect
             btn.innerHTML = 'Enrollment Complete!';
             btn.disabled = true;
 
-            // Show portal access button on the invoice
-            this._showPortalAccessButton(portalResult);
+            // Show simple OK popup - invoice stays visible behind it
+            this._showGoToPortalPopup();
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2717,127 +2716,41 @@ class EnrollmentApp {
     // PASSWORD MODAL — shown after successful enrollment
     // Blocks redirect until parent confirms they've saved their credentials
     // ==============================================
-    _showPortalAccessButton(portalResult) {
-        // Remove existing button if any
-        const existing = document.getElementById('bkh-portal-access-btn');
-        if (existing) existing.remove();
-
-        const isNew = portalResult && portalResult.isNew;
-
-        const wrapper = document.createElement('div');
-        wrapper.id = 'bkh-portal-access-btn';
-        wrapper.style.cssText = `
-            position:fixed; bottom:32px; left:50%; transform:translateX(-50%);
-            z-index:99999; text-align:center;
-        `;
-        wrapper.innerHTML = \`
-            <div style="background:#fff; border-radius:16px; padding:24px 32px;
-                        box-shadow:0 8px 40px rgba(0,0,0,0.18); max-width:420px;">
-                <div style="font-size:36px; margin-bottom:8px;">🎉</div>
-                <h3 style="margin:0 0 8px; color:#1a1a2e; font-size:18px; font-weight:800;">
-                    Enrollment Complete!
-                </h3>
-                <p style="margin:0 0 20px; color:#555; font-size:14px;">
-                    \${isNew
-                        ? 'Your parent portal account has been created. Click below to access your portal and set your password.'
-                        : 'Your account has been linked. Click below to access your parent portal.'}
-                </p>
-                <button id="bkh-go-portal-btn"
-                    style="background:linear-gradient(135deg,#4a7c59,#2f5240); color:#fff;
-                           border:none; border-radius:10px; padding:14px 28px;
-                           font-size:16px; font-weight:700; cursor:pointer; width:100%;">
-                    Go to My Parent Portal →
-                </button>
-            </div>
-        \`;
-
-        document.body.appendChild(wrapper);
-
-        document.getElementById('bkh-go-portal-btn').addEventListener('click', () => {
-            window.open('parent.html', '_blank');
-            wrapper.remove();
-        });
-    }
-
-    _showPasswordModal(portalResult) {
-        // Remove any existing modal
-        const existing = document.getElementById('bkh-password-modal');
+    _showGoToPortalPopup() {
+        const existing = document.getElementById('bkh-goto-portal-popup');
         if (existing) existing.remove();
 
         const modal = document.createElement('div');
-        modal.id = 'bkh-password-modal';
+        modal.id = 'bkh-goto-portal-popup';
         modal.style.cssText = `
-            position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.7);
+            position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);
             display:flex;align-items:center;justify-content:center;padding:16px;
         `;
         modal.innerHTML = `
-            <div style="background:#fff;border-radius:16px;padding:36px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
-                <div style="font-size:48px;margin-bottom:16px;">🎉</div>
-                <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;">Enrollment Complete!</h2>
-                <p style="color:#555;margin:0 0 24px;font-size:14px;">Your parent portal account has been created. Save the credentials below — you'll need them to log in.</p>
-                
-                <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:20px;text-align:left;">
-                    <p style="margin:0 0 8px;font-size:13px;color:#555;font-weight:600;">📧 LOGIN EMAIL</p>
-                    <p id="bkh-modal-email" style="margin:0 0 16px;font-size:15px;font-weight:700;color:#1a1a2e;word-break:break-all;">${this.escapeHtml(portalResult.email || '')}</p>
-                    
-                    <p style="margin:0 0 8px;font-size:13px;color:#555;font-weight:600;">🔑 TEMPORARY PASSWORD</p>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <code id="bkh-modal-password" style="flex:1;background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:16px;letter-spacing:2px;font-weight:700;color:#1a1a2e;">${this.escapeHtml(portalResult.password)}</code>
-                        <button id="bkh-copy-pw" style="background:#22c55e;color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">Copy</button>
-                    </div>
-
-                    ${portalResult.referralCode ? `
-                    <p style="margin:16px 0 8px;font-size:13px;color:#555;font-weight:600;">🎁 YOUR REFERRAL CODE</p>
-                    <p style="margin:0;font-size:15px;font-weight:700;color:#16a34a;letter-spacing:2px;">${this.escapeHtml(portalResult.referralCode)}</p>
-                    <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">Share with other parents to earn ₦5,000 per referral</p>
-                    ` : ''}
-                </div>
-
-                <div style="background:#fefce8;border:1px solid #fbbf24;border-radius:8px;padding:12px;margin-bottom:24px;font-size:13px;color:#92400e;">
-                    ⚠️ You will be asked to set a new password when you first log in. Please copy or screenshot your temporary password now.
-                </div>
-
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:20px;text-align:left;">
-                    <input type="checkbox" id="bkh-saved-confirm" style="width:18px;height:18px;cursor:pointer;">
-                    <span style="font-size:14px;color:#374151;">I have saved my email and temporary password</span>
-                </label>
-
-                <button id="bkh-goto-portal" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;opacity:0.4;pointer-events:none;transition:opacity 0.2s;">
-                    Go to My Parent Portal →
+            <div style="background:#fff;border-radius:16px;padding:36px;max-width:420px;
+                        width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+                <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+                <h2 style="margin:0 0 10px;color:#1a1a2e;font-size:22px;font-weight:800;">
+                    Enrollment Complete!
+                </h2>
+                <p style="color:#555;margin:0 0 28px;font-size:15px;line-height:1.6;">
+                    Your parent portal account is ready.<br>
+                    Click <strong>OK</strong> to open your portal in a new tab.
+                </p>
+                <button id="bkh-ok-btn"
+                    style="width:100%;background:linear-gradient(135deg,#4a7c59,#2f5240);
+                           color:#fff;border:none;border-radius:10px;padding:14px;
+                           font-size:17px;font-weight:700;cursor:pointer;">
+                    OK — Go to My Parent Portal
                 </button>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        // Wire up copy button
-        document.getElementById('bkh-copy-pw').addEventListener('click', () => {
-            navigator.clipboard?.writeText(portalResult.password).catch(() => {});
-            document.getElementById('bkh-copy-pw').textContent = '✓ Copied!';
-        });
-
-        // Fill email (available from sessionStorage payload)
-        try {
-            const stored = JSON.parse(sessionStorage.getItem('bkh_new_parent') || '{}');
-            if (stored.email) document.getElementById('bkh-modal-email').textContent = stored.email;
-        } catch(e) {}
-
-        // Unlock button only when checkbox is checked
-        const checkbox = document.getElementById('bkh-saved-confirm');
-        const goBtn = document.getElementById('bkh-goto-portal');
-        checkbox.addEventListener('change', () => {
-            if (checkbox.checked) {
-                goBtn.style.opacity = '1';
-                goBtn.style.pointerEvents = 'auto';
-            } else {
-                goBtn.style.opacity = '0.4';
-                goBtn.style.pointerEvents = 'none';
-            }
-        });
-
-        // Redirect on confirm
-        goBtn.addEventListener('click', () => {
-            window.location.href = 'parent.html';
+        document.getElementById('bkh-ok-btn').addEventListener('click', () => {
+            modal.remove();
+            window.open('parent.html', '_blank');
         });
     }
 
@@ -2976,8 +2889,8 @@ class EnrollmentApp {
                     });
                 }
 
-                // User already signed in after createUserWithEmailAndPassword
-                // Store credentials so parent.html can sign them in on load
+                // createUserWithEmailAndPassword already signs the user in automatically
+                // Store credentials in sessionStorage so parent.html can sign them in on load
                 sessionStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
