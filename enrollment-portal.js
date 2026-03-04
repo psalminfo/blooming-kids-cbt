@@ -2664,7 +2664,7 @@ class EnrollmentApp {
                 }, 2000);
                 // Redirect existing user
                 this.showAlert("Redirecting you to the parent portal...", "success");
-                setTimeout(() => { window.location.href = "parent.html"; }, 2000);
+                setTimeout(() => { window.open('parent.html', '_blank'); }, 2000);
                 btn.innerHTML = 'Enrollment Complete! Redirecting...';
                 btn.disabled = true;
             } else {
