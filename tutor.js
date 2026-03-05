@@ -5643,11 +5643,14 @@ async function renderStudentDatabase(container, tutor) {
                     ? student.createdAt.toDate()
                     : (student.createdAt ? new Date(student.createdAt) : null);
                 const _isNewEnough      = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
+                // Students approved from pending approvals bypass the date cutoff —
+                // management explicitly approved them so the tutor must always see the button.
+                const _fromPending      = student.fromPendingApproval === true;
                 const _hasResult        = studentsWithResults.has(student.id) ||
                     studentsWithResultNames.has((student.studentName || '').trim().toLowerCase());
                 const _gradeOk          = isPlacementTestEligible(student.grade);
                 const _notDone          = (student.placementTestStatus || '') !== 'completed';
-                const _showPlacementBtn = _isNewEnough && _gradeOk && !_hasResult && _notDone;
+                const _showPlacementBtn = (_isNewEnough || _fromPending) && _gradeOk && !_hasResult && _notDone;
 
                 // ── DEBUG — logs every grade 3–12 student so you can see exactly why
                 //            the button is/isn't showing. Check browser console.
@@ -7265,12 +7268,15 @@ async function renderPlacementTestsTab(container, tutor) {
             if (['archived','graduated','transferred'].includes(s.status)) return;
             if (s.summerBreak) return;
             const createdAt = s.createdAt?.toDate ? s.createdAt.toDate() : (s.createdAt ? new Date(s.createdAt) : null);
-            const isNewEnough = createdAt && createdAt >= PLACEMENT_CUTOFF;
-            const gradeOk     = isPlacementTestEligible(s.grade);
-            const hasResult   = studentsWithResults.has(s.id) ||
-                                studentsWithResultNames.has((s.studentName || '').trim().toLowerCase());
-            const notDone     = (s.placementTestStatus || '') !== 'completed';
-            if (isNewEnough && gradeOk && !hasResult && notDone) eligible.push(s);
+            const isNewEnough   = createdAt && createdAt >= PLACEMENT_CUTOFF;
+            // Students approved from pending approvals bypass the date cutoff —
+            // management explicitly approved them so the tutor must always see them here.
+            const fromPending   = s.fromPendingApproval === true;
+            const gradeOk       = isPlacementTestEligible(s.grade);
+            const hasResult     = studentsWithResults.has(s.id) ||
+                                  studentsWithResultNames.has((s.studentName || '').trim().toLowerCase());
+            const notDone       = (s.placementTestStatus || '') !== 'completed';
+            if ((isNewEnough || fromPending) && gradeOk && !hasResult && notDone) eligible.push(s);
         });
 
         if (eligible.length === 0) {
