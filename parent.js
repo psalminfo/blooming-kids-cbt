@@ -4172,24 +4172,19 @@ function initializeParentPortalV2() {
         try {
             const { email, tempPassword } = JSON.parse(newParentData);
             if (email && tempPassword) {
-                // Resolve auth at runtime — window.auth may not be set if using modular SDK
-                const _auth = window.auth || (typeof firebase !== 'undefined' ? firebase.auth() : null);
-                if (!_auth) {
-                    console.warn('❌ Auto-login: no auth instance found');
-                    localStorage.removeItem('bkh_new_parent');
-                    authManager.initialize();
-                    return;
-                }
-                console.log('🔄 Auto-login: signing in', email);
-                _auth.signInWithEmailAndPassword(email, tempPassword)
+                // CRITICAL: initialize authManager FIRST so its onAuthStateChanged
+                // listener is registered before signIn fires the auth state change
+                authManager.initialize();
+
+                auth.signInWithEmailAndPassword(email, tempPassword)
                     .then(() => {
-                        console.log('✅ Auto-login success — keeping credentials for re-auth during password setup');
-                        // Do NOT clear bkh_new_parent here — saveFirstTimePassword needs it to re-authenticate
+                        console.log('✅ Auto-login success — keeping credentials for re-auth');
+                        // Do NOT clear bkh_new_parent here —
+                        // saveFirstTimePassword() needs it to reauthenticate
                     })
                     .catch((err) => {
                         console.warn('❌ Auto-login failed:', err.code, err.message);
                         localStorage.removeItem('bkh_new_parent');
-                        authManager.initialize();
                     });
                 return;
             }
@@ -5262,14 +5257,11 @@ window.saveFirstTimePassword = async function(uid) {
     if (spinner) spinner.style.display = 'block';
     
     try {
-        // Get auth safely at runtime
-        const _auth = window.auth || (typeof firebase !== 'undefined' ? firebase.auth() : null);
-        if (!_auth) throw new Error('Firebase auth not available');
-        const user = _auth.currentUser;
+        const user = auth.currentUser;
         if (!user) throw new Error('Not authenticated — please refresh and try again');
 
         // Re-authenticate with temp credentials before updatePassword
-        // Firebase requires a recent login before allowing password changes
+        // Firebase requires recent login before allowing password changes
         const storedData = localStorage.getItem('bkh_new_parent');
         if (storedData) {
             try {
@@ -5286,7 +5278,7 @@ window.saveFirstTimePassword = async function(uid) {
 
         await user.updatePassword(pwd);
 
-        // Clear temp credentials now that password is set
+        // Clear temp credentials now that password is permanently set
         localStorage.removeItem('bkh_new_parent');
         console.log('✅ Temp credentials cleared');
 
