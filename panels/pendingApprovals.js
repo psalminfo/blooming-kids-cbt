@@ -537,12 +537,24 @@ export async function handleApproveStudent(studentId) {
         const now   = getNowDate();
         const batch = writeBatch(db);
 
+        const resolvedGrade = resolveGrade(student);
+
         const studentData = {
             ...student,
-            status:        'active',
-            grade:         resolveGrade(student),   // normalise grade on the way in
-            approvedAt:    Timestamp.fromDate(now),
-            approvedMonth: getCurrentMonthKeyLagos ? getCurrentMonthKeyLagos() : null,
+            status:             'active',
+            // Normalise grade from enrollment feed so isPlacementTestEligible()
+            // in tutor.js always has a valid value to parse.
+            grade:              resolvedGrade,
+            actualGrade:        resolvedGrade,
+            // Flag that this student came through pending approvals.
+            // tutor.js reads this to bypass the Feb-26-2026 date cutoff and
+            // always show the placement test button for eligible grades.
+            fromPendingApproval: true,
+            // Preserve placementTestStatus if management already requested it,
+            // otherwise leave it as-is (could be undefined / 'pending').
+            placementTestStatus: student.placementTestStatus || null,
+            approvedAt:         Timestamp.fromDate(now),
+            approvedMonth:      getCurrentMonthKeyLagos ? getCurrentMonthKeyLagos() : null,
         };
         delete studentData.id;
         delete studentData.enrollmentData; // don't copy the nested fetch artifact
