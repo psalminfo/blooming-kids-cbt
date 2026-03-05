@@ -4172,15 +4172,20 @@ function initializeParentPortalV2() {
         try {
             const { email, tempPassword } = JSON.parse(newParentData);
             if (email && tempPassword) {
-                // CRITICAL: initialize authManager FIRST so its onAuthStateChanged
-                // listener is registered before signIn fires the auth state change
+                // Initialize FIRST so onAuthStateChanged listener is registered
                 authManager.initialize();
+                // Reset debounce so the auth state change is never silently skipped
+                authManager.isProcessing = false;
+                authManager.lastProcessTime = 0;
 
                 auth.signInWithEmailAndPassword(email, tempPassword)
-                    .then(() => {
-                        console.log('✅ Auto-login success — keeping credentials for re-auth');
-                        // Do NOT clear bkh_new_parent here —
-                        // saveFirstTimePassword() needs it to reauthenticate
+                    .then((cred) => {
+                        console.log('✅ Auto-login success');
+                        // Reset again then manually call handleAuthChange
+                        // to guarantee dashboard loads regardless of debounce
+                        authManager.isProcessing = false;
+                        authManager.lastProcessTime = 0;
+                        authManager.handleAuthChange(cred.user);
                     })
                     .catch((err) => {
                         console.warn('❌ Auto-login failed:', err.code, err.message);
