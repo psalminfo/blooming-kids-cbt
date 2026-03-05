@@ -19,6 +19,10 @@ import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOption
 import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached } from '../core/cache.js';
 import { logManagementActivity } from '../notifications/activityLog.js';
 
+// Module-level state (mirrors management.js)
+let currentPayData = [];
+let payAdviceGifts = {};
+
 // SUBSECTION 4.1: Pay Advice Panel
 // ======================================================
 
