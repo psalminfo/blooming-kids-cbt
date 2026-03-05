@@ -177,3 +177,219 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
 }
 
 // ======================================================
+// HANDLER: Edit a pending student
+// ======================================================
+export async function handleEditPendingStudent(studentId) {
+    const student = (sessionCache.pendingStudents || []).find(s => s.id === studentId);
+    if (!student) { alert('Student not found.'); return; }
+
+    const tutors = sessionCache.tutors || [];
+    const tutorOptions = tutors.map(t =>
+        `<option value="${escapeHtml(t.email)}" ${student.tutorEmail === t.email ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.email)})</option>`
+    ).join('');
+
+    const gradeOptions = buildGradeOptions ? buildGradeOptions(student.actualGrade || student.grade) : '';
+
+    const modal = document.createElement('div');
+    modal.id = 'edit-pending-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-5 border-b">
+                <h3 class="text-lg font-bold text-gray-800">Edit Pending Student</h3>
+                <button id="close-edit-pending-modal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                    <input id="edit-student-name" type="text" value="${escapeHtml(student.studentName || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                    <input id="edit-parent-name" type="text" value="${escapeHtml(student.parentName || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
+                    <input id="edit-parent-phone" type="text" value="${escapeHtml(student.parentPhone || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                    <input id="edit-parent-email" type="email" value="${escapeHtml(student.parentEmail || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assigned Tutor <span class="text-red-500">*</span></label>
+                    <select id="edit-tutor-email" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                        <option value="">— Select tutor —</option>
+                        ${tutorOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                    ${gradeOptions
+                        ? `<select id="edit-grade" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">${gradeOptions}</select>`
+                        : `<input id="edit-grade" type="text" value="${escapeHtml(student.actualGrade || student.grade || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">`
+                    }
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Fee (₦)</label>
+                    <input id="edit-student-fee" type="number" min="0" value="${student.studentFee || 0}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Schedule (Days)</label>
+                    <input id="edit-academic-days" type="text" value="${escapeHtml(student.academicDays || student.days || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Schedule (Time)</label>
+                    <input id="edit-academic-time" type="text" value="${escapeHtml(student.academicTime || student.time || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </div>
+                <div id="edit-pending-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2"></div>
+            </div>
+            <div class="flex justify-end gap-3 p-5 border-t">
+                <button id="cancel-edit-pending-btn" class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button id="save-edit-pending-btn" class="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">Save Changes</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    document.getElementById('close-edit-pending-modal').addEventListener('click', closeModal);
+    document.getElementById('cancel-edit-pending-btn').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('save-edit-pending-btn').addEventListener('click', async () => {
+        const errorDiv = document.getElementById('edit-pending-error');
+        errorDiv.classList.add('hidden');
+
+        const tutorEmail = document.getElementById('edit-tutor-email').value.trim();
+        if (!tutorEmail) {
+            errorDiv.textContent = 'Please select an assigned tutor.';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        const updates = {
+            studentName:  sanitizeInput(document.getElementById('edit-student-name').value.trim()),
+            parentName:   sanitizeInput(document.getElementById('edit-parent-name').value.trim()),
+            parentPhone:  sanitizeInput(document.getElementById('edit-parent-phone').value.trim()),
+            parentEmail:  sanitizeInput(document.getElementById('edit-parent-email').value.trim()),
+            tutorEmail,
+            actualGrade:  sanitizeInput(document.getElementById('edit-grade').value.trim()),
+            studentFee:   parseFloat(document.getElementById('edit-student-fee').value) || 0,
+            academicDays: sanitizeInput(document.getElementById('edit-academic-days').value.trim()),
+            academicTime: sanitizeInput(document.getElementById('edit-academic-time').value.trim()),
+        };
+
+        const saveBtn = document.getElementById('save-edit-pending-btn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+
+        try {
+            await updateDoc(doc(db, 'pending_students', studentId), updates);
+
+            const idx = (sessionCache.pendingStudents || []).findIndex(s => s.id === studentId);
+            if (idx !== -1) {
+                sessionCache.pendingStudents[idx] = { ...sessionCache.pendingStudents[idx], ...updates };
+                saveToLocalStorage('pendingStudents', sessionCache.pendingStudents);
+            }
+
+            await logManagementActivity('edit_pending_student', { studentId, studentName: updates.studentName });
+            closeModal();
+            renderPendingApprovalsFromCache();
+        } catch (err) {
+            console.error('Error saving pending student edits:', err);
+            errorDiv.textContent = 'Failed to save changes. Please try again.';
+            errorDiv.classList.remove('hidden');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+        }
+    });
+}
+
+// ======================================================
+// HANDLER: Approve a pending student
+// ======================================================
+export async function handleApproveStudent(studentId) {
+    const student = (sessionCache.pendingStudents || []).find(s => s.id === studentId);
+    if (!student) { alert('Student not found.'); return; }
+
+    // Guard: tutor must be assigned before approving
+    if (!student.tutorEmail) {
+        alert('This student has no assigned tutor. Please edit the record and assign a tutor before approving.');
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `Approve "${student.studentName}" and move them to active students?\n\nTutor: ${student.tutorEmail}\nGrade: ${student.actualGrade || student.grade || 'N/A'}`
+    );
+    if (!confirmed) return;
+
+    try {
+        const now = getLagosDatetime ? getLagosDatetime() : new Date();
+        const batch = writeBatch(db);
+
+        const studentData = {
+            ...student,
+            status: 'active',
+            approvedAt: Timestamp.fromDate(now),
+            approvedMonth: getCurrentMonthKeyLagos ? getCurrentMonthKeyLagos() : null,
+        };
+        delete studentData.id;
+
+        const newStudentRef = doc(collection(db, 'students'));
+        batch.set(newStudentRef, studentData);
+        batch.delete(doc(db, 'pending_students', studentId));
+
+        await batch.commit();
+
+        if (sessionCache.pendingStudents) {
+            sessionCache.pendingStudents = sessionCache.pendingStudents.filter(s => s.id !== studentId);
+            saveToLocalStorage('pendingStudents', sessionCache.pendingStudents);
+        }
+        invalidateCache('students');
+
+        await logStudentEvent(newStudentRef.id, 'approved', { approvedBy: 'admin', studentName: student.studentName });
+        await logManagementActivity('approve_student', { studentId, newStudentId: newStudentRef.id, studentName: student.studentName });
+
+        renderPendingApprovalsFromCache();
+        alert(`✅ "${student.studentName}" has been approved and added to active students.`);
+    } catch (err) {
+        console.error('Error approving student:', err);
+        alert('Failed to approve student. Please try again.');
+    }
+}
+
+// ======================================================
+// HANDLER: Reject / delete a pending student
+// ======================================================
+export async function handleRejectStudent(studentId) {
+    const student = (sessionCache.pendingStudents || []).find(s => s.id === studentId);
+    if (!student) { alert('Student not found.'); return; }
+
+    const reason = window.prompt(
+        `Reject "${student.studentName}"?\n\nOptionally provide a reason (leave blank to skip):`,
+        ''
+    );
+    if (reason === null) return; // user cancelled
+
+    try {
+        await deleteDoc(doc(db, 'pending_students', studentId));
+
+        if (sessionCache.pendingStudents) {
+            sessionCache.pendingStudents = sessionCache.pendingStudents.filter(s => s.id !== studentId);
+            saveToLocalStorage('pendingStudents', sessionCache.pendingStudents);
+        }
+
+        await logManagementActivity('reject_pending_student', {
+            studentId,
+            studentName: student.studentName,
+            reason: reason || 'No reason provided',
+        });
+
+        renderPendingApprovalsFromCache();
+        alert(`❌ "${student.studentName}" has been rejected and removed from the pending list.`);
+    } catch (err) {
+        console.error('Error rejecting student:', err);
+        alert('Failed to reject student. Please try again.');
+    }
+}
