@@ -24,35 +24,38 @@ import { logManagementActivity } from '../notifications/activityLog.js';
 // ============================================================
 
 /**
- * Always returns a real JS Date for Timestamp.fromDate().
- * getLagosDatetime() returns a formatted string, NOT a Date —
- * passing it to Timestamp.fromDate() throws a TypeError.
- * Lagos offset is applied at display time via formatLagosDatetime().
+ * Resolve the best available grade for a student.
+ * Priority: enrollmentData.actualGrade → actualGrade → enrollmentData.grade → grade
+ */
+function resolveGrade(student) {
+    return student.enrollmentData?.actualGrade
+        || student.actualGrade
+        || student.enrollmentData?.grade
+        || student.grade
+        || 'N/A';
+}
+
+/**
+ * Returns true when the student is grade 3–12 and hasn't completed a placement test.
+ * Centralised so every caller (render + approve) stays in sync.
+ */
+function computeNeedsPlacementTest(student) {
+    const grade = resolveGrade(student);
+    const gradeNum = parseInt(String(grade).toLowerCase().replace('grade', '').trim(), 10);
+    return !isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12
+        && student.placementTestStatus !== 'completed';
+}
+
+/**
+ * getLagosDatetime() returns a formatted string, NOT a Date object.
+ * Timestamp.fromDate() requires a real Date — this wrapper ensures that.
  */
 function getNowDate() {
     return new Date();
 }
 
 /**
- * Returns true when the student is in grade 3-12 and has not yet
- * completed a placement test. Centralised so every caller stays in sync.
- */
-function computeNeedsPlacementTest(student) {
-    const gradeDisplay = student.actualGrade || student.grade || '';
-    const gradeNum = parseInt(
-        String(gradeDisplay).toLowerCase().replace('grade', '').trim(), 10
-    );
-    return (
-        !isNaN(gradeNum) &&
-        gradeNum >= 3 &&
-        gradeNum <= 12 &&
-        student.placementTestStatus !== 'completed'
-    );
-}
-
-/**
- * Guarantees sessionCache.tutors is populated before any modal that needs it.
- * Returns the tutors array (may be empty on Firestore error).
+ * Ensures sessionCache.tutors is populated before any modal that needs it.
  */
 async function ensureTutorsLoaded() {
     if (sessionCache.tutors && sessionCache.tutors.length > 0) return sessionCache.tutors;
@@ -111,6 +114,7 @@ export async function fetchAndRenderPendingApprovals(forceRefresh = false) {
             const snapshot = await getDocs(query(collection(db, 'pending_students')));
             const pendingStudents = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
+            // Fetch enrollment data to get actualGrade and other enrollment fields
             for (const student of pendingStudents.filter(s => s.enrollmentId)) {
                 try {
                     const enrollmentDoc = await getDoc(doc(db, 'enrollments', student.enrollmentId));
@@ -120,7 +124,8 @@ export async function fetchAndRenderPendingApprovals(forceRefresh = false) {
                 }
             }
 
-            // FIX: set sessionCache AND persist — previously only localStorage was set
+            // FIX: explicitly set sessionCache AND persist — previously only localStorage was set
+            // which meant sessionCache.pendingStudents stayed null and the list always rendered blank
             sessionCache.pendingStudents = pendingStudents;
             saveToLocalStorage('pendingStudents', pendingStudents);
         }
@@ -172,6 +177,7 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
     }
 
     listContainer.innerHTML = pendingStudents.map(student => {
+        // Resolve tutor display name
         let tutorName = student.tutorEmail || 'Not assigned';
         if (sessionCache.tutors) {
             const tutor = sessionCache.tutors.find(t => t.email === student.tutorEmail);
@@ -180,37 +186,50 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
 
         const daysDisplay     = student.academicDays || student.days || 'To be determined';
         const timeDisplay     = student.academicTime || student.time || '';
-        const scheduleDisplay = timeDisplay ? `${daysDisplay} — ${timeDisplay}` : daysDisplay;
-        const gradeDisplay    = student.actualGrade || student.grade || 'N/A';
-        const needsPlacement  = computeNeedsPlacementTest(student);
+        const scheduleDisplay = timeDisplay ? `${daysDisplay} \u2014 ${timeDisplay}` : daysDisplay;
 
-        // Placement status badge
+        // FIX: Grade pulled from enrollment feed first (actualGrade), then fallbacks
+        const gradeDisplay   = resolveGrade(student);
+        const needsPlacement = computeNeedsPlacementTest(student);
+
+        // Placement status badge (informational only for management)
         let placementBadge = '';
         if (student.placementTestStatus === 'completed') {
             const scoreStr = student.placementTestScore != null
-                ? ` — Score: ${student.placementTestScore}` : '';
+                ? ` \u2014 Score: ${student.placementTestScore}%` : '';
             placementBadge = `<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
-                ✅ Placement Done${escapeHtml(scoreStr)}</span>`;
+                \u2705 Placement Done${escapeHtml(scoreStr)}</span>`;
+        } else if (student.placementTestStatus === 'requested') {
+            placementBadge = `<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-semibold">
+                \u23F3 Awaiting Tutor Placement Test</span>`;
         } else if (needsPlacement) {
             placementBadge = `<span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-semibold">
-                📝 Needs Placement Test</span>`;
+                \uD83D\uDCDD Needs Placement Test</span>`;
         }
 
-        // Placement test button — shown for grades 3-12 only
-        const gradeNum = parseInt(
-            String(gradeDisplay).toLowerCase().replace('grade', '').trim(), 10);
+        // "Request Placement Test" button — for grades 3-12 that haven't been requested yet.
+        // Clicking this sets placementTestStatus = 'requested' in Firestore which triggers
+        // the placement test button to appear in the assigned tutor's dashboard.
+        const gradeNum = parseInt(String(gradeDisplay).toLowerCase().replace('grade', '').trim(), 10);
         const isEligibleGrade = !isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12;
-        const placementBtnLabel = student.placementTestStatus === 'completed'
-            ? 'View/Edit Test' : 'Placement Test';
-        const placementBtn = isEligibleGrade
-            ? `<button class="placement-test-btn bg-indigo-500 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-indigo-600 transition-colors" data-student-id="${student.id}">
-                   <i class="fas fa-clipboard-check mr-1"></i>${placementBtnLabel}
+        const alreadyRequested = student.placementTestStatus === 'requested' || student.placementTestStatus === 'completed';
+        const placementBtn = isEligibleGrade && !alreadyRequested
+            ? `<button class="request-placement-btn bg-indigo-500 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-indigo-600 transition-colors" data-student-id="${student.id}" title="Notify tutor to conduct placement test">
+                   <i class="fas fa-paper-plane mr-1"></i>Request Placement Test
                </button>` : '';
 
-        const approveDim   = needsPlacement ? 'opacity-60' : '';
         const approveTitle = needsPlacement
-            ? 'Placement test not yet completed — you can still approve'
+            ? 'Placement test not yet completed \u2014 you can still approve'
             : 'Approve student';
+        const approveDim = needsPlacement ? 'opacity-60' : '';
+
+        const subjectsDisplay = Array.isArray(student.subjects)
+            ? student.subjects.join(', ')
+            : (student.enrollmentData?.subjects
+                ? (Array.isArray(student.enrollmentData.subjects)
+                    ? student.enrollmentData.subjects.join(', ')
+                    : student.enrollmentData.subjects)
+                : student.subjects || 'N/A');
 
         return `
             <div class="border p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -233,7 +252,7 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
                                 <p><i class="fas fa-money-bill-wave mr-2 text-gray-400"></i><strong>Fee:</strong> &#x20A6;${(student.studentFee || 0).toLocaleString()}</p>
                             </div>
                             <div>
-                                <p><i class="fas fa-book mr-2 text-gray-400"></i><strong>Subjects:</strong> ${Array.isArray(student.subjects) ? escapeHtml(student.subjects.join(', ')) : escapeHtml(student.subjects || 'N/A')}</p>
+                                <p><i class="fas fa-book mr-2 text-gray-400"></i><strong>Subjects:</strong> ${escapeHtml(subjectsDisplay)}</p>
                                 <p><i class="fas fa-calendar mr-2 text-gray-400"></i><strong>Schedule:</strong> ${escapeHtml(scheduleDisplay)}</p>
                                 ${student.type ? `<p><i class="fas fa-tag mr-2 text-gray-400"></i><strong>Type:</strong> ${escapeHtml(student.type)}</p>` : ''}
                             </div>
@@ -258,15 +277,64 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
         `;
     }).join('');
 
-    // Attach listeners via container to avoid any global scope dependency
     listContainer.querySelectorAll('.edit-pending-btn').forEach(btn =>
         btn.addEventListener('click', () => handleEditPendingStudent(btn.dataset.studentId)));
-    listContainer.querySelectorAll('.placement-test-btn').forEach(btn =>
-        btn.addEventListener('click', () => handlePlacementTest(btn.dataset.studentId)));
+    listContainer.querySelectorAll('.request-placement-btn').forEach(btn =>
+        btn.addEventListener('click', () => handleRequestPlacementTest(btn.dataset.studentId)));
     listContainer.querySelectorAll('.approve-btn').forEach(btn =>
         btn.addEventListener('click', () => handleApproveStudent(btn.dataset.studentId)));
     listContainer.querySelectorAll('.reject-btn').forEach(btn =>
         btn.addEventListener('click', () => handleRejectStudent(btn.dataset.studentId)));
+}
+
+// ============================================================
+// HANDLER: Request Placement Test (notifies tutor dashboard)
+// Sets placementTestStatus = 'requested' in Firestore.
+// The tutor's dashboard reads this field and shows the
+// placement test button next to the student's name.
+// ============================================================
+
+export async function handleRequestPlacementTest(studentId) {
+    const student = (sessionCache.pendingStudents || []).find(s => s.id === studentId);
+    if (!student) { alert('Student not found.'); return; }
+
+    if (!student.tutorEmail) {
+        alert('No tutor is assigned to this student yet.\nPlease assign a tutor before requesting a placement test.');
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `Send a placement test request for "${student.studentName}" to tutor: ${student.tutorEmail}?\n\n` +
+        `A placement test button will appear in the tutor's dashboard for this student.`
+    );
+    if (!confirmed) return;
+
+    try {
+        const updates = {
+            placementTestStatus: 'requested',
+            placementTestRequestedAt: Timestamp.fromDate(getNowDate()),
+            placementTestRequestedBy: 'management',
+        };
+        await updateDoc(doc(db, 'pending_students', studentId), updates);
+
+        const idx = (sessionCache.pendingStudents || []).findIndex(s => s.id === studentId);
+        if (idx !== -1) {
+            sessionCache.pendingStudents[idx] = { ...sessionCache.pendingStudents[idx], ...updates };
+            saveToLocalStorage('pendingStudents', sessionCache.pendingStudents);
+        }
+
+        await logManagementActivity('placement_test_requested', {
+            studentId,
+            studentName: student.studentName,
+            tutorEmail: student.tutorEmail,
+        });
+
+        renderPendingApprovalsFromCache();
+        alert(`\u2705 Placement test requested. The assigned tutor will see it in their dashboard.`);
+    } catch (err) {
+        console.error('Error requesting placement test:', err);
+        alert('Failed to send request. Please try again.');
+    }
 }
 
 // ============================================================
@@ -277,7 +345,7 @@ export async function handleEditPendingStudent(studentId) {
     const student = (sessionCache.pendingStudents || []).find(s => s.id === studentId);
     if (!student) { alert('Student not found.'); return; }
 
-    // FIX: load tutors on demand so dropdown is never empty due to cache miss
+    // Always ensure tutors are loaded before opening modal
     const tutors = await ensureTutorsLoaded();
     const tutorOptions = tutors.map(t =>
         `<option value="${escapeHtml(t.email)}" ${student.tutorEmail === t.email ? 'selected' : ''}>
@@ -285,11 +353,19 @@ export async function handleEditPendingStudent(studentId) {
         </option>`
     ).join('');
 
-    // FIX: use buildGradeOptions consistently to prevent mixed grade formats
-    const gradeValue = student.actualGrade || student.grade || '';
-    const gradeField = typeof buildGradeOptions === 'function'
+    // Grade: resolved from enrollment feed first
+    const gradeValue = resolveGrade(student) === 'N/A' ? '' : resolveGrade(student);
+    const gradeField = typeof buildGradeOptions === 'function' && buildGradeOptions(gradeValue)
         ? `<select id="edit-grade" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">${buildGradeOptions(gradeValue)}</select>`
         : `<input id="edit-grade" type="text" value="${escapeHtml(gradeValue)}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">`;
+
+    // Subjects: pull from enrollment data if not directly on student
+    const subjectsValue = Array.isArray(student.subjects)
+        ? student.subjects.join(', ')
+        : student.subjects
+            || (Array.isArray(student.enrollmentData?.subjects)
+                ? student.enrollmentData.subjects.join(', ')
+                : student.enrollmentData?.subjects || '');
 
     const modal = document.createElement('div');
     modal.id = 'edit-pending-modal';
@@ -303,27 +379,31 @@ export async function handleEditPendingStudent(studentId) {
             <div class="p-5 space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-                    <input id="edit-student-name" type="text" value="${escapeHtml(student.studentName || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-student-name" type="text" value="${escapeHtml(student.studentName || '')}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
-                    <input id="edit-parent-name" type="text" value="${escapeHtml(student.parentName || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-parent-name" type="text" value="${escapeHtml(student.parentName || '')}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
-                    <input id="edit-parent-phone" type="text" value="${escapeHtml(student.parentPhone || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-parent-phone" type="text" value="${escapeHtml(student.parentPhone || '')}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
-                    <input id="edit-parent-email" type="email" value="${escapeHtml(student.parentEmail || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-parent-email" type="email" value="${escapeHtml(student.parentEmail || '')}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Assigned Tutor <span class="text-red-500">*</span>
-                        ${tutors.length === 0 ? '<span class="text-orange-500 text-xs ml-1">(No tutors loaded — refresh and try again)</span>' : ''}
+                        ${tutors.length === 0 ? '<span class="text-orange-500 text-xs ml-1">(No tutors loaded)</span>' : ''}
                     </label>
                     <select id="edit-tutor-email" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
-                        <option value="">— Select tutor —</option>
+                        <option value="">&#8212; Select tutor &#8212;</option>
                         ${tutorOptions}
                     </select>
                 </div>
@@ -332,16 +412,26 @@ export async function handleEditPendingStudent(studentId) {
                     ${gradeField}
                 </div>
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subjects</label>
+                    <input id="edit-subjects" type="text" value="${escapeHtml(subjectsValue)}"
+                        placeholder="e.g. Maths, English, Science"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <p class="text-xs text-gray-400 mt-1">Separate multiple subjects with commas</p>
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Fee (&#x20A6;)</label>
-                    <input id="edit-student-fee" type="number" min="0" value="${student.studentFee || 0}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-student-fee" type="number" min="0" value="${student.studentFee || 0}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Schedule (Days)</label>
-                    <input id="edit-academic-days" type="text" value="${escapeHtml(student.academicDays || student.days || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-academic-days" type="text" value="${escapeHtml(student.academicDays || student.days || '')}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Schedule (Time)</label>
-                    <input id="edit-academic-time" type="text" value="${escapeHtml(student.academicTime || student.time || '')}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                    <input id="edit-academic-time" type="text" value="${escapeHtml(student.academicTime || student.time || '')}"
+                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
                 <div id="edit-pending-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2"></div>
             </div>
@@ -369,6 +459,12 @@ export async function handleEditPendingStudent(studentId) {
             return;
         }
 
+        // Parse subjects into a clean array
+        const subjectsRaw = document.getElementById('edit-subjects').value.trim();
+        const subjectsArray = subjectsRaw
+            ? subjectsRaw.split(',').map(s => sanitizeInput(s.trim())).filter(Boolean)
+            : [];
+
         const updates = {
             studentName:  sanitizeInput(document.getElementById('edit-student-name').value.trim()),
             parentName:   sanitizeInput(document.getElementById('edit-parent-name').value.trim()),
@@ -376,6 +472,7 @@ export async function handleEditPendingStudent(studentId) {
             parentEmail:  sanitizeInput(document.getElementById('edit-parent-email').value.trim()),
             tutorEmail,
             actualGrade:  sanitizeInput(document.getElementById('edit-grade').value.trim()),
+            subjects:     subjectsArray,
             studentFee:   parseFloat(document.getElementById('edit-student-fee').value) || 0,
             academicDays: sanitizeInput(document.getElementById('edit-academic-days').value.trim()),
             academicTime: sanitizeInput(document.getElementById('edit-academic-time').value.trim()),
@@ -408,148 +505,6 @@ export async function handleEditPendingStudent(studentId) {
 }
 
 // ============================================================
-// HANDLER: Placement Test — record / view / update result
-// ============================================================
-
-export async function handlePlacementTest(studentId) {
-    const student = (sessionCache.pendingStudents || []).find(s => s.id === studentId);
-    if (!student) { alert('Student not found.'); return; }
-
-    const isCompleted   = student.placementTestStatus === 'completed';
-    const existingScore = student.placementTestScore ?? '';
-    const existingNotes = student.placementTestNotes || '';
-    const existingDate  = student.placementTestDate  || '';
-    const gradeDisplay  = student.actualGrade || student.grade || 'N/A';
-
-    const modal = document.createElement('div');
-    modal.id = 'placement-test-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div class="flex justify-between items-center p-5 border-b">
-                <h3 class="text-lg font-bold text-gray-800">
-                    <i class="fas fa-clipboard-check mr-2 text-indigo-600"></i>
-                    Placement Test &mdash; ${escapeHtml(student.studentName || '')}
-                </h3>
-                <button id="close-placement-modal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-            </div>
-            <div class="p-5 space-y-4">
-                ${isCompleted
-                    ? `<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
-                           &#x2705; Placement test already marked as completed. You can update the details below.
-                       </div>`
-                    : `<div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-800">
-                           &#x1F4DD; Record the placement test result for this student (Grade ${escapeHtml(gradeDisplay)}).
-                       </div>`
-                }
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Test Date <span class="text-red-500">*</span></label>
-                    <input id="placement-test-date" type="date" value="${escapeHtml(existingDate)}"
-                        max="${new Date().toISOString().split('T')[0]}"
-                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Score (0&ndash;100) <span class="text-red-500">*</span></label>
-                    <input id="placement-test-score" type="number" min="0" max="100"
-                        value="${escapeHtml(String(existingScore))}" placeholder="e.g. 75"
-                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes / Observations</label>
-                    <textarea id="placement-test-notes" rows="3"
-                        placeholder="Optional notes about the student's performance..."
-                        class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none resize-none">${escapeHtml(existingNotes)}</textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select id="placement-test-status" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
-                        <option value="pending"   ${!isCompleted ? 'selected' : ''}>Pending</option>
-                        <option value="completed" ${ isCompleted ? 'selected' : ''}>Completed</option>
-                    </select>
-                </div>
-                <div id="placement-test-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2"></div>
-            </div>
-            <div class="flex justify-end gap-3 p-5 border-t">
-                <button id="cancel-placement-btn" class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button id="save-placement-btn" class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Save Result</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    const closeModal = () => modal.remove();
-    document.getElementById('close-placement-modal').addEventListener('click', closeModal);
-    document.getElementById('cancel-placement-btn').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-
-    document.getElementById('save-placement-btn').addEventListener('click', async () => {
-        const errorDiv = document.getElementById('placement-test-error');
-        errorDiv.classList.add('hidden');
-
-        const testDate = document.getElementById('placement-test-date').value.trim();
-        const scoreRaw = document.getElementById('placement-test-score').value.trim();
-        const notes    = sanitizeInput(document.getElementById('placement-test-notes').value.trim());
-        const status   = document.getElementById('placement-test-status').value;
-
-        if (status === 'completed') {
-            if (!testDate) {
-                errorDiv.textContent = 'Please enter the test date.';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-            if (scoreRaw === '' || isNaN(Number(scoreRaw))) {
-                errorDiv.textContent = 'Please enter a valid score (0\u2013100).';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-            const score = Number(scoreRaw);
-            if (score < 0 || score > 100) {
-                errorDiv.textContent = 'Score must be between 0 and 100.';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-        }
-
-        const updates = {
-            placementTestStatus: status,
-            placementTestDate:   testDate  || null,
-            placementTestScore:  scoreRaw !== '' ? Number(scoreRaw) : null,
-            placementTestNotes:  notes     || null,
-        };
-
-        const saveBtn = document.getElementById('save-placement-btn');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving\u2026';
-
-        try {
-            await updateDoc(doc(db, 'pending_students', studentId), updates);
-
-            const idx = (sessionCache.pendingStudents || []).findIndex(s => s.id === studentId);
-            if (idx !== -1) {
-                sessionCache.pendingStudents[idx] = { ...sessionCache.pendingStudents[idx], ...updates };
-                saveToLocalStorage('pendingStudents', sessionCache.pendingStudents);
-            }
-
-            await logManagementActivity('placement_test_recorded', {
-                studentId,
-                studentName: student.studentName,
-                status,
-                score: updates.placementTestScore,
-            });
-
-            closeModal();
-            renderPendingApprovalsFromCache();
-        } catch (err) {
-            console.error('Error saving placement test result:', err);
-            errorDiv.textContent = 'Failed to save. Please try again.';
-            errorDiv.classList.remove('hidden');
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save Result';
-        }
-    });
-}
-
-// ============================================================
 // HANDLER: Approve a pending student
 // ============================================================
 
@@ -562,10 +517,11 @@ export async function handleApproveStudent(studentId) {
         return;
     }
 
+    // Warn if placement test not done — management can still override
     if (computeNeedsPlacementTest(student)) {
         const bypass = window.confirm(
             '\u26A0\uFE0F "' + student.studentName + '" has not completed their placement test yet.\n\n' +
-            'Press OK to approve anyway, or Cancel to record the test result first.'
+            'Press OK to approve anyway, or Cancel to request the placement test first.'
         );
         if (!bypass) return;
     }
@@ -573,23 +529,23 @@ export async function handleApproveStudent(studentId) {
     const confirmed = window.confirm(
         'Approve "' + student.studentName + '" and move them to active students?\n\n' +
         'Tutor: ' + student.tutorEmail + '\n' +
-        'Grade: ' + (student.actualGrade || student.grade || 'N/A')
+        'Grade: ' + resolveGrade(student)
     );
     if (!confirmed) return;
 
     try {
-        // FIX: getNowDate() always returns a real Date object.
-        // getLagosDatetime() returns a formatted string — Timestamp.fromDate() would throw.
         const now   = getNowDate();
         const batch = writeBatch(db);
 
         const studentData = {
             ...student,
             status:        'active',
+            grade:         resolveGrade(student),   // normalise grade on the way in
             approvedAt:    Timestamp.fromDate(now),
             approvedMonth: getCurrentMonthKeyLagos ? getCurrentMonthKeyLagos() : null,
         };
         delete studentData.id;
+        delete studentData.enrollmentData; // don't copy the nested fetch artifact
 
         const newStudentRef = doc(collection(db, 'students'));
         batch.set(newStudentRef, studentData);
@@ -627,7 +583,7 @@ export async function handleRejectStudent(studentId) {
         'Reject "' + student.studentName + '"?\n\nOptionally provide a reason (leave blank to skip):',
         ''
     );
-    if (reason === null) return;
+    if (reason === null) return; // user cancelled
 
     try {
         await deleteDoc(doc(db, 'pending_students', studentId));
