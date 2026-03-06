@@ -39,6 +39,7 @@ export function showTransitionStudentModal() {
                                 id: s.id, 
                                 studentName: s.studentName,
                                 grade: s.grade,
+                                tutorName: s.tutorName,
                                 currentTutor: s.tutorName
                             })), 
                             "Type student name...", 
