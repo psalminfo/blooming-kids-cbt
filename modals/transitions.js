@@ -40,6 +40,7 @@ export function showTransitionStudentModal() {
                                 studentName: s.studentName,
                                 grade: s.grade,
                                 tutorName: s.tutorName,
+                                tutorEmail: s.tutorEmail,
                                 currentTutor: s.tutorName
                             })), 
                             "Type student name...", 
@@ -249,8 +250,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         
         // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
+            originalTutorEmail: student.tutorEmail || '',
+            originalTutorName: student.tutorName || student.currentTutor || 'Unassigned',
             tutorEmail: newTutor.email,
             tutorName: newTutor.name,
             isTransitioning: true,
@@ -267,8 +268,8 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         const transitionRef = await addDoc(collection(db, "tutorTransitions"), {
             studentId: student.id,
             studentName: student.studentName,
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
+            originalTutorEmail: student.tutorEmail || '',
+            originalTutorName: student.tutorName || student.currentTutor || 'Unassigned',
             temporaryTutorEmail: newTutor.email,
             temporaryTutorName: newTutor.name,
             startDate: startDate,
