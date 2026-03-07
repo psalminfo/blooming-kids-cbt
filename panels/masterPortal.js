@@ -452,7 +452,10 @@ export function openGradeModal(type, dataset, grades, monthKey) {
 
     // Save
     if (!isReadOnly) {
-        modal.querySelector('#save-grade-modal').addEventListener('click', async () => {
+        // FIX: Declare btn outside try/catch so it's accessible in the catch block
+        const btn = modal.querySelector('#save-grade-modal');
+
+        btn.addEventListener('click', async () => {
             const breakdownData = {};
             areas.forEach(a => {
                 const val = parseInt(document.getElementById(`area-${a.id}`)?.value || 0) || 0;
@@ -471,7 +474,6 @@ export function openGradeModal(type, dataset, grades, monthKey) {
             };
 
             try {
-                const btn = modal.querySelector('#save-grade-modal');
                 btn.textContent = 'Saving…'; btn.disabled = true;
 
                 if (gradeId) {
@@ -487,8 +489,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     await addDoc(collection(db, 'tutor_grades'), newDoc);
                 }
 
-                // Update performanceScore on tutor doc for tutor.js to read
-                // ── Re-fetch the grade doc from Firestore to get the LATEST qa+qc data ──
+                // Re-fetch the grade doc from Firestore to get the LATEST qa+qc data
                 let freshGrade = {};
                 if (gradeId) {
                     const freshSnap = await getDoc(doc(db, 'tutor_grades', gradeId));
@@ -512,7 +513,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     }
                 }
 
-                // The just-saved section is already in sectionData; merge with freshGrade
+                // Merge just-saved section with freshGrade for the combined score
                 const freshQA = type === 'qa' ? sectionData : (freshGrade.qa || null);
                 const freshQC = type === 'qc' ? sectionData : (freshGrade.qc || null);
                 const qaScore = freshQA?.score ?? null;
@@ -523,15 +524,16 @@ export function openGradeModal(type, dataset, grades, monthKey) {
 
                 if (combined !== null) {
                     const tutorDocRef = doc(db, 'tutors', tutorId);
+                    // FIX: Use freshGrade instead of the undefined existingGradeForTutor
                     await updateDoc(tutorDocRef, {
                         performanceScore: combined,
                         qaScore: qaScore,
                         qcScore: qcScore,
                         performanceMonth: monthKey,
-                        qaAdvice: type === 'qa' ? notes : (existingGradeForTutor.qa?.notes || ''),
-                        qcAdvice: type === 'qc' ? notes : (existingGradeForTutor.qc?.notes || ''),
-                        qaGradedByName: type === 'qa' ? sectionData.gradedByName : (existingGradeForTutor.qa?.gradedByName || ''),
-                        qcGradedByName: type === 'qc' ? sectionData.gradedByName : (existingGradeForTutor.qc?.gradedByName || '')
+                        qaAdvice: type === 'qa' ? notes : (freshGrade.qa?.notes || ''),
+                        qcAdvice: type === 'qc' ? notes : (freshGrade.qc?.notes || ''),
+                        qaGradedByName: type === 'qa' ? sectionData.gradedByName : (freshGrade.qa?.gradedByName || ''),
+                        qcGradedByName: type === 'qc' ? sectionData.gradedByName : (freshGrade.qc?.gradedByName || '')
                     });
                 }
 
