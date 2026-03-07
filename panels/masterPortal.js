@@ -57,15 +57,44 @@ export async function renderMasterPortalPanel(container) {
             </div>
         </div>
 
-        <!-- Tutor of the Month Banner -->
-        <div id="totm-banner" class="hidden bg-gradient-to-r from-yellow-400 to-amber-500 rounded-2xl p-4 text-white shadow flex items-center gap-4">
-            <div class="text-4xl">🏆</div>
-            <div>
-                <div class="font-black text-lg" id="totm-name">Tutor of the Month</div>
-                <div class="text-sm opacity-90" id="totm-score"></div>
+        <!-- Top 3 Leaderboard -->
+        <div id="totm-banner" class="hidden bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="bg-gradient-to-r from-yellow-400 to-amber-500 px-5 py-3 flex items-center justify-between">
+                <span class="font-black text-white text-sm tracking-wide uppercase">🏆 Leaderboard — ${monthLabel}</span>
             </div>
-            <div class="ml-auto text-right">
-                <div class="text-xs opacity-80">${monthLabel}</div>
+            <div class="grid grid-cols-3 divide-x divide-gray-100 p-2 gap-1">
+                <!-- 1st place -->
+                <div id="rank-1" class="flex flex-col items-center p-3 bg-yellow-50 rounded-xl">
+                    <div class="text-2xl mb-1">🥇</div>
+                    <div id="rank-1-name" class="font-black text-gray-800 text-sm text-center leading-tight"></div>
+                    <div id="rank-1-score" class="text-2xl font-black text-yellow-600 mt-1"></div>
+                    <div class="text-xs text-gray-400">1st place</div>
+                </div>
+                <!-- 2nd place -->
+                <div id="rank-2" class="flex flex-col items-center p-3 bg-gray-50 rounded-xl">
+                    <div class="text-2xl mb-1">🥈</div>
+                    <div id="rank-2-name" class="font-black text-gray-800 text-sm text-center leading-tight"></div>
+                    <div id="rank-2-score" class="text-2xl font-black text-gray-500 mt-1"></div>
+                    <div class="text-xs text-gray-400">2nd place</div>
+                </div>
+                <!-- 3rd place -->
+                <div id="rank-3" class="flex flex-col items-center p-3 bg-orange-50 rounded-xl">
+                    <div class="text-2xl mb-1">🥉</div>
+                    <div id="rank-3-name" class="font-black text-gray-800 text-sm text-center leading-tight"></div>
+                    <div id="rank-3-score" class="text-2xl font-black text-orange-500 mt-1"></div>
+                    <div class="text-xs text-gray-400">3rd place</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom 5 Card (collapsible) -->
+        <div id="bottom5-banner" class="hidden bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+            <button id="bottom5-toggle" class="w-full flex items-center justify-between px-5 py-3 bg-red-50 hover:bg-red-100 transition-colors">
+                <span class="font-bold text-red-700 text-sm tracking-wide uppercase">⚠️ Needs Improvement — Bottom 5</span>
+                <i id="bottom5-arrow" class="fas fa-chevron-down text-red-400 transition-transform"></i>
+            </button>
+            <div id="bottom5-body" class="hidden">
+                <div id="bottom5-list" class="divide-y divide-red-50"></div>
             </div>
         </div>
 
@@ -127,22 +156,69 @@ export async function renderMasterPortalPanel(container) {
             studentsByTutor[key].push(s);
         });
 
-        // Determine leading tutor
-        let leadingTutor = null, leadingScore = -1;
-        tutors.forEach(t => {
-            const g = grades[t.id] || grades[t.email] || {};
-            const qaScore = g.qa?.score ?? 0;
-            const qcScore = g.qc?.score ?? 0;
-            const total = Math.round((qaScore + qcScore) / 2);
-            if (total > leadingScore) { leadingScore = total; leadingTutor = { ...t, total }; }
-        });
+        // Rank all tutors who have at least one score
+        const rankedTutors = tutors
+            .map(t => {
+                const g = grades[t.id] || grades[t.email] || {};
+                const qa = g.qa?.score ?? null;
+                const qc = g.qc?.score ?? null;
+                const total = (qa !== null && qc !== null)
+                    ? Math.round((qa + qc) / 2)
+                    : (qa !== null ? qa : (qc !== null ? qc : null));
+                return { ...t, total };
+            })
+            .filter(t => t.total !== null)
+            .sort((a, b) => b.total - a.total);
 
-        // Handle tutor of month banner
+        const leadingTutor = rankedTutors[0] || null;
+        const leadingScore = leadingTutor?.total ?? -1;
+        const top3 = rankedTutors.slice(0, 3);
+        const bottom5 = rankedTutors.length > 3 ? rankedTutors.slice(-5).reverse() : [];
+
+        // Populate Top 3 podium
         const totmBanner = document.getElementById('totm-banner');
-        if (leadingTutor && leadingScore > 0) {
-            document.getElementById('totm-name').textContent = `👑 ${leadingTutor.name}`;
-            document.getElementById('totm-score').textContent = `Leading score: ${leadingScore}% this month`;
+        if (top3.length > 0) {
+            const medals = ['rank-1', 'rank-2', 'rank-3'];
+            top3.forEach((t, i) => {
+                const nameEl = document.getElementById(`${medals[i]}-name`);
+                const scoreEl = document.getElementById(`${medals[i]}-score`);
+                if (nameEl) nameEl.textContent = t.name;
+                if (scoreEl) scoreEl.textContent = `${t.total}%`;
+                // Hide unused slots
+                const slotEl = document.getElementById(medals[i]);
+                if (slotEl) slotEl.classList.remove('hidden');
+            });
+            // Hide slots with no data
+            for (let i = top3.length; i < 3; i++) {
+                const slotEl = document.getElementById(medals[i]);
+                if (slotEl) slotEl.classList.add('hidden');
+            }
             totmBanner.classList.remove('hidden');
+        }
+
+        // Populate Bottom 5
+        const bottom5Banner = document.getElementById('bottom5-banner');
+        const bottom5List = document.getElementById('bottom5-list');
+        if (bottom5.length > 0 && bottom5List) {
+            bottom5List.innerHTML = bottom5.map((t, i) => `
+                <div class="flex items-center justify-between px-5 py-2.5 hover:bg-red-50 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold text-red-300 w-4">${rankedTutors.length - i}</span>
+                        <span class="text-sm font-semibold text-gray-700">${escapeHtml(t.name)}</span>
+                    </div>
+                    <span class="text-sm font-black text-red-500">${t.total}%</span>
+                </div>
+            `).join('');
+            bottom5Banner.classList.remove('hidden');
+
+            // Toggle collapse
+            document.getElementById('bottom5-toggle').addEventListener('click', () => {
+                const body = document.getElementById('bottom5-body');
+                const arrow = document.getElementById('bottom5-arrow');
+                const isOpen = !body.classList.contains('hidden');
+                body.classList.toggle('hidden', isOpen);
+                arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+            });
         }
 
         // Render accordion list
@@ -357,7 +433,6 @@ export function openGradeModal(type, dataset, grades, monthKey) {
     const themeColor = isQA ? 'purple' : 'amber';
     const title = isQA ? '📋 QA — Session Observation Rating' : '📐 QC — Lesson Plan Quality Control';
 
-    // QA has 7 areas, QC has 10 areas
     const areas = isQA ? [
         { id: 'preparation',    label: 'Lesson Preparation & Resources', max: 15 },
         { id: 'delivery',       label: 'Teaching Delivery & Clarity',    max: 15 },
@@ -452,7 +527,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
 
     // Save
     if (!isReadOnly) {
-        // FIX: Declare btn outside try/catch so it's accessible in the catch block
+        // FIX 1: btn declared here — outside try/catch — so catch block can reference it
         const btn = modal.querySelector('#save-grade-modal');
 
         btn.addEventListener('click', async () => {
@@ -479,7 +554,6 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                 if (gradeId) {
                     await updateDoc(doc(db, 'tutor_grades', gradeId), { [type]: sectionData });
                 } else {
-                    // Create new doc
                     const newDoc = {
                         tutorId,
                         tutorEmail,
@@ -489,13 +563,12 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     await addDoc(collection(db, 'tutor_grades'), newDoc);
                 }
 
-                // Re-fetch the grade doc from Firestore to get the LATEST qa+qc data
+                // Re-fetch the grade doc to get latest qa+qc data
                 let freshGrade = {};
                 if (gradeId) {
                     const freshSnap = await getDoc(doc(db, 'tutor_grades', gradeId));
                     if (freshSnap.exists()) freshGrade = freshSnap.data();
                 } else {
-                    // Newly created — find it by tutorId + month
                     const freshQuery = await getDocs(
                         query(collection(db, 'tutor_grades'),
                               where('tutorId', '==', tutorId),
@@ -503,7 +576,6 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     );
                     if (!freshQuery.empty) freshGrade = freshQuery.docs[0].data();
                     else {
-                        // fallback: by email
                         const freshQuery2 = await getDocs(
                             query(collection(db, 'tutor_grades'),
                                   where('tutorEmail', '==', tutorEmail),
@@ -513,7 +585,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     }
                 }
 
-                // Merge just-saved section with freshGrade for the combined score
+                // Merge just-saved section with freshGrade for combined score
                 const freshQA = type === 'qa' ? sectionData : (freshGrade.qa || null);
                 const freshQC = type === 'qc' ? sectionData : (freshGrade.qc || null);
                 const qaScore = freshQA?.score ?? null;
@@ -524,7 +596,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
 
                 if (combined !== null) {
                     const tutorDocRef = doc(db, 'tutors', tutorId);
-                    // FIX: Use freshGrade instead of the undefined existingGradeForTutor
+
                     await updateDoc(tutorDocRef, {
                         performanceScore: combined,
                         qaScore: qaScore,
@@ -538,7 +610,6 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                 }
 
                 modal.remove();
-                // Refresh portal
                 renderMasterPortalPanel(document.getElementById('main-content'));
             } catch (e) {
                 console.error('Grade save error:', e);
