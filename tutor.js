@@ -7945,11 +7945,14 @@ function _renderHomeworkInbox(container, snapshot) {
         studentMap[sid].assignments.push(data);
     });
 
-    // Bug #5 fix: apply the cutoff — per the comment "inbox auto-clears on the 4th
-    // of the month", filter out assignments from before getHomeworkCutoffDate().
+    // Cutoff filter: hide old assignments that are already graded or still just
+    // 'assigned' (not yet submitted). NEVER hide ungraded submitted work —
+    // those must always show until the tutor grades them.
     const _hwCutoff = getHomeworkCutoffDate();
     Object.values(studentMap).forEach(s => {
         s.assignments = s.assignments.filter(a => {
+            // Always keep anything the student has submitted but tutor hasn't graded yet
+            if (a.status === 'submitted') return true;
             const raw = a.assignedDate || a.createdAt;
             const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
             return !isNaN(d.getTime()) && d >= _hwCutoff;
