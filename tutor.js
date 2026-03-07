@@ -3174,6 +3174,47 @@ async function loadTutorNotifications(modal) {
                     return;
                 }
 
+                // ═══ HOMEWORK SUBMITTED: Navigate to Academic tab inbox ═══
+                // Handles notifications where a student has submitted an assignment.
+                // Covers any notification that carries a homeworkId, or whose type
+                // contains "homework" or "submitted" — so it works regardless of
+                // the exact type string written by the student-side app.
+                const isHwNotif =
+                    notif.homeworkId ||
+                    (notif.type && (
+                        notif.type.includes('homework') ||
+                        notif.type.includes('submitted') ||
+                        notif.type === 'hw_submitted' ||
+                        notif.type === 'assignment_submitted'
+                    ));
+                if (isHwNotif) {
+                    // 1. Close the floating inbox modal
+                    const floatingModal = document.getElementById('bk-inbox-modal') ||
+                                          document.querySelector('[id*="inbox-modal"]');
+                    if (floatingModal) floatingModal.remove();
+
+                    // 2. Navigate to the Academic tab so the homework inbox is visible
+                    const mainContent = document.getElementById('mainContent');
+                    if (mainContent && window.tutorData) {
+                        renderAcademic(mainContent, window.tutorData);
+                    } else {
+                        // Fallback: click the nav link directly
+                        const navBtn = document.getElementById('navAcademic');
+                        if (navBtn) navBtn.click();
+                    }
+
+                    // 3. If we have the specific homework ID, open the grading modal
+                    //    after a short delay so the inbox has time to render.
+                    if (notif.homeworkId) {
+                        setTimeout(() => {
+                            if (typeof openGradingModal === 'function') {
+                                openGradingModal(notif.homeworkId);
+                            }
+                        }, 800);
+                    }
+                    return;
+                }
+
                 // ═══ OTHER NOTIFICATIONS: Show static content ═══
                 modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.title || notif.subject || 'Notification'}`;
                 modal.querySelector('#chat-inputs').style.display = 'none';
