@@ -7888,7 +7888,9 @@ async function loadHomeworkInbox(tutorEmail, containerId) {
     cleanupListeners('inbox');
 
     try {
-        // Set up real-time listener by tutor name first, then email fallback
+        // Always run BOTH queries and merge — some assignments are stored by
+        // tutorName, others (especially student submissions) by tutorEmail only.
+        // Using one as a fallback means submissions get silently missed.
         const q1 = query(
             collection(db, "homework_assignments"),
             where("tutorName", "==", window.tutorData.name)
@@ -7898,25 +7900,39 @@ async function loadHomeworkInbox(tutorEmail, containerId) {
             where("tutorEmail", "==", tutorEmail)
         );
 
-        let useFallback = false;
+        let snap1Docs = null;
+        let snap2Docs = null;
 
-        // Primary listener by tutorName
+        function mergeAndRender() {
+            if (snap1Docs === null || snap2Docs === null) return; // wait for both
+            // Merge by doc ID to deduplicate
+            const merged = new Map();
+            snap1Docs.forEach(d => merged.set(d.id, d));
+            snap2Docs.forEach(d => merged.set(d.id, d));
+            // Build a synthetic snapshot-like object _renderHomeworkInbox can use
+            const fakeSnapshot = {
+                empty: merged.size === 0,
+                forEach: (fn) => merged.forEach(fn)
+            };
+            _renderHomeworkInbox(container, fakeSnapshot);
+        }
+
         registerListener('inbox', onSnapshot(q1, (snapshot) => {
-            if (snapshot.empty && !useFallback) {
-                // Try email fallback — set up second listener
-                useFallback = true;
-                registerListener('inbox', onSnapshot(q2, (snap2) => {
-                    _renderHomeworkInbox(container, snap2);
-                }, err => {
-                    console.error("Inbox fallback listener error:", err);
-                    container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
-                }));
-            } else if (!useFallback) {
-                _renderHomeworkInbox(container, snapshot);
-            }
+            snap1Docs = snapshot.docs || [];
+            mergeAndRender();
         }, err => {
-            console.error("Inbox listener error:", err);
-            container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
+            console.error("Inbox q1 listener error:", err);
+            snap1Docs = [];
+            mergeAndRender();
+        }));
+
+        registerListener('inbox', onSnapshot(q2, (snapshot) => {
+            snap2Docs = snapshot.docs || [];
+            mergeAndRender();
+        }, err => {
+            console.error("Inbox q2 listener error:", err);
+            snap2Docs = [];
+            mergeAndRender();
         }));
 
     } catch (error) {
