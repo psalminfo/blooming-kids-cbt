@@ -1541,6 +1541,41 @@ class EnrollmentApp {
         return isValid;
     }
     
+    // Rebuild the "To" dropdown so it only contains hours strictly after the chosen "From" hour.
+    // This makes it physically impossible to pick an invalid end time,
+    // eliminating the "End time must be after start time" error entirely.
+    filterEndHour(startSelect, endSelect) {
+        if (!startSelect || !endSelect) return;
+        const startVal = parseInt(startSelect.value);
+        const previousEnd = endSelect.value;
+
+        endSelect.innerHTML = '<option value="">Hour</option>';
+        for (let h = 0; h < 24; h++) {
+            if (isNaN(startVal) || h > startVal) {
+                const padded = h.toString().padStart(2, '0');
+                const opt = document.createElement('option');
+                opt.value = padded;
+                opt.textContent = `${padded}:00`;
+                endSelect.appendChild(opt);
+            }
+        }
+
+        // Always add 00:00 (midnight) as an overnight end option when a start is chosen,
+        // so ranges like 23:00 -> 00:00 are selectable.
+        if (!isNaN(startVal)) {
+            const midnightOpt = document.createElement('option');
+            midnightOpt.value = '00';
+            midnightOpt.textContent = '00:00 (midnight / next day)';
+            endSelect.appendChild(midnightOpt);
+        }
+
+        // Restore previous end selection if it is still in the list
+        if (previousEnd) {
+            const stillExists = Array.from(endSelect.options).some(o => o.value === previousEnd);
+            if (stillExists) endSelect.value = previousEnd;
+        }
+    }
+
     validateTimeSelection(section, studentId, itemId = null) {
         let isValid = true;
         
@@ -1558,7 +1593,7 @@ class EnrollmentApp {
                 const startTime = parseInt(startHour);
                 const endTime = parseInt(endHour);
                 
-                if (endTime <= startTime) {
+                if (endTime <= startTime && endTime !== 0) { // 0 = 00:00 midnight, valid overnight end
                     isValid = false;
                     if (errorElement) {
                         errorElement.textContent = 'End time must be after start time';
@@ -1588,7 +1623,7 @@ class EnrollmentApp {
                     const startTime = parseInt(startHour);
                     const endTime = parseInt(endHour);
                     
-                    if (endTime <= startTime) {
+                    if (endTime <= startTime && endTime !== 0) { // 0 = 00:00 midnight, valid overnight end
                         isValid = false;
                         if (errorElement) {
                             errorElement.textContent = 'End time must be after start time';
@@ -1621,7 +1656,7 @@ class EnrollmentApp {
                     const startTime = parseInt(startHour);
                     const endTime = parseInt(endHour);
                     
-                    if (endTime <= startTime) {
+                    if (endTime <= startTime && endTime !== 0) { // 0 = 00:00 midnight, valid overnight end
                         isValid = false;
                         if (errorElement) {
                             errorElement.textContent = 'End time must be after start time';
