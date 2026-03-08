@@ -492,50 +492,7 @@ function findSpecializedSubject(subjects) {
     return null;
 }
 
-// Get tutor pay scheme based on employment date
-function getTutorPayScheme(tutor) {
-    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
-    
-    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
-    
-    const employmentDate = new Date(tutor.employmentDate + '-01');
-    const currentDate = new Date();
-    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + 
-                      (currentDate.getMonth() - employmentDate.getMonth());
-    
-    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
-}
-
-// Calculate suggested fee based on student and pay scheme
-function calculateSuggestedFee(student, payScheme) {
-    const grade = student.grade;
-    const days = parseInt(student.days) || 0;
-    const subjects = student.subjects || [];
-    
-    const specializedSubject = findSpecializedSubject(subjects);
-    if (specializedSubject) {
-        const isGroupClass = student.groupClass || false;
-        const feeType = isGroupClass ? 'group' : 'individual';
-        return payScheme.specialized[feeType][specializedSubject.category] || 0;
-    }
-    
-    let gradeCategory = "Grade 3-8";
-    
-    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
-        gradeCategory = "Preschool-Grade 2";
-    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
-        return 0;
-    }
-    
-    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && 
-                            parseInt(grade.replace('Grade ', '')) >= 5;
-    
-    if (isSubjectTeacher) {
-        return payScheme.academic["Subject Teachers"][days] || 0;
-    } else {
-        return payScheme.academic[gradeCategory][days] || 0;
-    }
-}
+// Fee is entered by management — calculateSuggestedFee and getTutorPayScheme removed.
 
 // Show custom alert
 function showCustomAlert(message) {
@@ -736,6 +693,125 @@ async function fetchStudentsForTutor(tutor, col) {
 }
 
 /*******************************************************************************
+ * SESSION STUDENT CACHE + LIVE LISTENER
+ * Single onSnapshot per session keeps all tabs in sync with Firestore.
+ * localStorage provides a 30-day cold-start cache so the screen is never
+ * blank on login, even on a slow connection.
+ ******************************************************************************/
+const STUDENT_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+const _studentStore = {
+    students: [],   // live in-memory array — single source of truth for the session
+    loaded:   false,// true once the first snapshot (or cache hit) has resolved
+    unsub:    null, // cleanup fn for the active onSnapshot
+};
+
+function _studentCacheKey(tutorEmail) { return `bkh_students_${tutorEmail}`; }
+
+function _loadStudentCache(tutorEmail) {
+    try {
+        const raw = localStorage.getItem(_studentCacheKey(tutorEmail));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed.cachedAt || Date.now() - parsed.cachedAt > STUDENT_CACHE_TTL_MS) {
+            localStorage.removeItem(_studentCacheKey(tutorEmail));
+            return null;
+        }
+        return parsed.students || null;
+    } catch(e) { return null; }
+}
+
+function _saveStudentCache(tutorEmail, students) {
+    try {
+        localStorage.setItem(_studentCacheKey(tutorEmail), JSON.stringify({
+            students,
+            cachedAt: Date.now()
+        }));
+    } catch(e) { /* storage full — non-critical */ }
+}
+
+/**
+ * Start the global student listener. Call ONCE on login.
+ * Stays alive for the whole session — tab switches read from _studentStore,
+ * costing zero extra Firestore reads.
+ * Any edit by the tutor OR by management immediately updates _studentStore,
+ * refreshes the localStorage cache, and re-renders whichever tab is open.
+ */
+function initStudentListener(tutor) {
+    // Stop any previous listener
+    if (_studentStore.unsub) { try { _studentStore.unsub(); } catch(e) {} _studentStore.unsub = null; }
+
+    // Warm up from cache — zero reads, instant display on cold start
+    const cached = _loadStudentCache(tutor.email);
+    if (cached) { _studentStore.students = cached; _studentStore.loaded = true; }
+
+    const q1 = query(collection(db, 'students'), where('tutorEmail', '==', tutor.email));
+    const q2 = tutor.id
+        ? query(collection(db, 'students'), where('tutorId', '==', tutor.id))
+        : null;
+
+    let snap1 = null, snap2 = null;
+
+    function mergeAndPersist() {
+        if (!snap1) return; // wait for at least the email-based snapshot
+        const seen = new Set();
+        const merged = [];
+        [...snap1.docs, ...(snap2 ? snap2.docs : [])].forEach(d => {
+            if (!seen.has(d.id)) {
+                seen.add(d.id);
+                merged.push({ id: d.id, collection: 'students', ...d.data() });
+            }
+        });
+        _studentStore.students = merged;
+        _studentStore.loaded   = true;
+        _saveStudentCache(tutor.email, merged);
+
+        // Notify any open modal/tab that student data has changed
+        if (typeof window._onStudentsUpdated === 'function') {
+            try { window._onStudentsUpdated(merged); } catch(e) {}
+        }
+        // Re-render student database tab if it is currently visible
+        const main = document.getElementById('mainContent');
+        if (main && main.querySelector('#student-list-view')) {
+            renderStudentDatabase(main, tutor);
+        }
+    }
+
+    const unsub1 = onSnapshot(q1,
+        s => { snap1 = s; mergeAndPersist(); },
+        err => console.error('Student listener (email) error:', err)
+    );
+
+    let unsub2 = () => {};
+    if (q2) {
+        unsub2 = onSnapshot(q2,
+            s => { snap2 = s; mergeAndPersist(); },
+            err => console.error('Student listener (id) error:', err)
+        );
+    }
+
+    _studentStore.unsub = () => { unsub1(); unsub2(); };
+    registerListener('students', _studentStore.unsub);
+}
+
+/**
+ * Get students from the in-memory store (synchronous-ish).
+ * Falls back through: in-memory → localStorage cache → fresh Firestore read.
+ * All tab renders call this instead of getDocs/fetchStudentsForTutor.
+ */
+async function getStudents(tutor) {
+    if (_studentStore.loaded) return _studentStore.students;
+    const cached = _loadStudentCache(tutor.email);
+    if (cached) { _studentStore.students = cached; _studentStore.loaded = true; return cached; }
+    // Last resort: direct read (only happens if listener hasn't fired yet)
+    const fresh = await fetchStudentsForTutor(tutor, 'students');
+    _studentStore.students = fresh;
+    _studentStore.loaded   = true;
+    _saveStudentCache(tutor.email, fresh);
+    return fresh;
+}
+
+/*******************************************************************************
  * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
  ******************************************************************************/
 
@@ -927,9 +1003,8 @@ class ScheduleManager {
 
     async loadStudents() {
         try {
-            const { query, collection, where, getDocs } = this.methods;
-            // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-            const fetchedStudents = await fetchStudentsForTutor(this.tutor, "students");
+            // Use in-memory cache (populated by initStudentListener) — zero extra reads
+            const fetchedStudents = await getStudents(this.tutor);
             
             this.students = [];
             this.scheduledStudentIds.clear();
@@ -2155,39 +2230,44 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-    const tutorId = window.tutorData.messagingId || window.tutorData.id;
+    const tutorId    = window.tutorData.messagingId || window.tutorData.id;
     const tutorEmail = window.tutorData.email;
     if (unsubUnreadListener) unsubUnreadListener();
 
-    const q = query(
-        collection(db, "conversations"),
-        where("participants", "array-contains", tutorId)
+    // Two separate counts combined into one badge.
+    // Using two onSnapshot listeners instead of a getDocs inside a callback
+    // eliminates 1 extra Firestore read per message received.
+    let convCount  = 0;
+    let notifCount = 0;
+    function updateTotal() { msgSectionUnreadCount = convCount + notifCount; updateFloatingBadges(); }
+
+    // Listener 1: unread conversation messages
+    const convUnsub = onSnapshot(
+        query(collection(db, "conversations"), where("participants", "array-contains", tutorId)),
+        snapshot => {
+            convCount = 0;
+            snapshot.forEach(d => {
+                const data = d.data();
+                if (data.unreadCount > 0 && data.lastSenderId !== tutorId) convCount += data.unreadCount;
+            });
+            updateTotal();
+        },
+        err => console.warn('Unread conv listener error:', err)
     );
 
-    unsubUnreadListener = onSnapshot(q, async (snapshot) => {
-        let count = 0;
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
-                count += data.unreadCount;
-            }
-        });
-        
-        // Also count unread tutor_notifications
-        if (tutorEmail) {
-            try {
-                const nSnap = await getDocs(query(
-                    collection(db, "tutor_notifications"),
-                    where("tutorEmail", "==", tutorEmail),
-                    where("read", "==", false)
-                ));
-                count += nSnap.size;
-            } catch(e) { /* ignore */ }
-        }
-        
-        msgSectionUnreadCount = count;
-        updateFloatingBadges();
-    });
+    // Listener 2: unread tutor_notifications (replaces getDocs-per-event)
+    let notifUnsub = () => {};
+    if (tutorEmail) {
+        notifUnsub = onSnapshot(
+            query(collection(db, "tutor_notifications"),
+                  where("tutorEmail", "==", tutorEmail),
+                  where("read", "==", false)),
+            snapshot => { notifCount = snapshot.size; updateTotal(); },
+            err => console.warn('Unread notif listener error:', err)
+        );
+    }
+
+    unsubUnreadListener = () => { convUnsub(); notifUnsub(); };
 }
 
 // Compatibility Alias
@@ -2373,16 +2453,26 @@ function showEnhancedMessagingModal() {
                 }));
             } catch(e) {}
 
-            // 3. Other tutors
+// Session-level tutor list cache (populated on first messaging modal open, reused after)
+let _tutorListCache = null;
+async function getTutorList() {
+    if (_tutorListCache) return _tutorListCache;
+    const snap = await getDocs(query(collection(db, 'tutors'), where('status', '!=', 'inactive')));
+    _tutorListCache = [];
+    snap.forEach(d => {
+        const t = d.data();
+        _tutorListCache.push({ id: t.tutorUid || d.id, docId: d.id, name: t.name || t.email || 'Tutor', email: t.email || '', ...t });
+    });
+    return _tutorListCache;
+}
+
+            // 3. Other tutors — use session cache to avoid full collection scan per modal open
             try {
-                const tutorSnap = await getDocs(collection(db, 'tutors'));
+                const allTutors = await getTutorList();
                 const myId = tutor.messagingId || tutor.id;
-                tutorSnap.forEach(d => {
-                    if (d.id === tutor.id) return;
-                    const t = d.data();
-                    const tid = t.messagingId || t.tutorUid || d.id;
-                    if (tid === myId) return;
-                    allContacts.push({ id: tid, name: t.name || 'Tutor', role: 'tutor', extra: t.email || '' });
+                allTutors.forEach(t => {
+                    if (t.docId === tutor.id || t.id === myId) return;
+                    allContacts.push({ id: t.id, name: t.name || 'Tutor', role: 'tutor', extra: t.email || '' });
                 });
             } catch(e) {}
 
@@ -2679,18 +2769,11 @@ async function msgLoadRecipientsByStudentId(type, container) {
                 container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load parents: ${escapeHtml(e.message)}</div>`;
             }
         } else if (type === 'tutor') {
-            // Load other tutors for tutor-to-tutor messaging (with search)
+            // Load other tutors — use session cache, zero reads after first open
             try {
-                const tutorSnap = await getDocs(collection(db, 'tutors'));
                 const myId = window.tutorData?.messagingId || window.tutorData?.id;
-                const tutors = [];
-                tutorSnap.forEach(d => {
-                    const t = d.data();
-                    const tMsgId = t.tutorUid || d.id;
-                    if (tMsgId !== myId && t.status !== 'inactive') {
-                        tutors.push({ id: tMsgId, docId: d.id, name: t.name || t.email || 'Tutor', email: t.email || '' });
-                    }
-                });
+                const allTutors = await getTutorList();
+                const tutors = allTutors.filter(t => t.id !== myId && t.docId !== window.tutorData?.id);
                 container.innerHTML = `
                     <div style="position:relative;margin-bottom:6px;">
                         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -3317,9 +3400,11 @@ function msgStartInboxListener(modal) {
     };
 
     // ═══ AUTO-ENSURE MANAGEMENT CONVERSATION ═══
-    // If there are management_message or management_reply notifications, ensure
-    // a conversation doc exists so it appears in the Chats tab (not just Alerts).
-    (async () => {
+    // Only runs once per session (sessionStorage gate) to avoid firing on every inbox open.
+    const _mgmtSeedKey = `mgmtConvSeeded_${tutorEmail}`;
+    if (!sessionStorage.getItem(_mgmtSeedKey)) {
+      sessionStorage.setItem(_mgmtSeedKey, '1');
+      (async () => {
         try {
             const mgmtNotifQ = query(
                 collection(db, "tutor_notifications"),
@@ -3382,7 +3467,8 @@ function msgStartInboxListener(modal) {
                 }
             }
         } catch(e) { console.warn('Auto-ensure management conversation error:', e); }
-    })();
+      })();
+    } // end session gate
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
@@ -3631,7 +3717,7 @@ function showScheduleCalendarModal() {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    function closeCalModal() { overlay.remove(); document.body.style.overflow = ''; }
+    function closeCalModal() { overlay.remove(); document.body.style.overflow = ''; window._onStudentsUpdated = null; }
 
     overlay.querySelector('#cal-close-btn').addEventListener('click', closeCalModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeCalModal(); });
@@ -3646,99 +3732,94 @@ function showScheduleCalendarModal() {
         w.document.close(); w.print();
     });
 
-    // Async data load
-    (async () => {
-        try {
-            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', window.tutorData.email)));
-            const students = [];
-            snap.forEach(d => {
-                const s = { id: d.id, ...d.data() };
-                if (!['archived','graduated','transferred'].includes(s.status) && s.schedule?.length > 0) students.push(s);
+    // Register live-update callback so any schedule edit (tutor or management)
+    // instantly refreshes the calendar without reopening the modal.
+    // Cleared when the modal closes.
+    window._onStudentsUpdated = (updatedStudents) => {
+        const calView = overlay.querySelector('#calendar-view');
+        const loadingEl = overlay.querySelector('#calendar-loading');
+        if (!calView || !calView.style || calView.style.display === 'none') return;
+        renderCalendarContent(updatedStudents.filter(
+            s => !['archived','graduated','transferred'].includes(s.status) && s.schedule?.length > 0
+        ), calView);
+    };
+
+    // ── Shared calendar render helper ──────────────────────────────────────────
+    // Used both for initial load and live updates from the student onSnapshot.
+    function renderCalendarContent(students, calView) {
+        if (students.length === 0) {
+            calView.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+                <div style="font-size:3rem;margin-bottom:16px;">📅</div>
+                <h4 style="font-weight:800;color:#374151;font-size:1.1rem;margin-bottom:8px;">No Schedules Yet</h4>
+                <p style="color:#9ca3af;margin-bottom:20px;">No active students have schedules set up.</p>
+                <button id="setup-cal-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:700;cursor:pointer;">⚙️ Set Up Schedules</button>
+            </div>`;
+            const setupBtn = calView.querySelector('#setup-cal-btn');
+            if (setupBtn) setupBtn.addEventListener('click', () => {
+                closeCalModal();
+                if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
             });
-
-            overlay.querySelector('#calendar-loading').style.display = 'none';
-            const calView = overlay.querySelector('#calendar-view');
-            calView.style.display = 'block';
-
-            if (students.length === 0) {
-                calView.innerHTML = `<div style="text-align:center;padding:60px 20px;">
-                    <div style="font-size:3rem;margin-bottom:16px;">📅</div>
-                    <h4 style="font-weight:800;color:#374151;font-size:1.1rem;margin-bottom:8px;">No Schedules Yet</h4>
-                    <p style="color:#9ca3af;margin-bottom:20px;">No active students have schedules set up.</p>
-                    <button id="setup-cal-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:700;cursor:pointer;">⚙️ Set Up Schedules</button>
-                </div>`;
-                calView.querySelector('#setup-cal-btn').addEventListener('click', () => {
-                    closeCalModal();
-                    if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
-                });
-                return;
-            }
-
-            const ALL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-            const byDay = {};
-            ALL_DAYS.forEach(d => byDay[d] = []);
-            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-
-            students.forEach(s => {
-                (s.schedule || []).forEach(slot => {
-                    if (!byDay[slot.day]) return;
-                    byDay[slot.day].push({
-                        student: s.studentName || 'Unknown',
-                        grade:   s.grade || '',
-                        subjects:(s.subjects || []).join(', '),
-                        start:   slot.start, end: slot.end,
-                        time:    formatScheduleTime(slot.start) + ' – ' + formatScheduleTime(slot.end),
-                        studentId: s.id,
-                        isOvernight: slot.isOvernight || false,
-                        color: ACOLORS[(s.studentName||'').charCodeAt(0) % ACOLORS.length],
-                    });
+            return;
+        }
+        const ALL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        const byDay = {};
+        ALL_DAYS.forEach(d => byDay[d] = []);
+        const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+        students.forEach(s => {
+            (s.schedule || []).forEach(slot => {
+                if (!byDay[slot.day]) return;
+                byDay[slot.day].push({
+                    student: s.studentName || 'Unknown', grade: s.grade || '',
+                    subjects: (s.subjects || []).join(', '),
+                    start: slot.start, end: slot.end,
+                    time: formatScheduleTime(slot.start) + ' – ' + formatScheduleTime(slot.end),
+                    studentId: s.id, isOvernight: slot.isOvernight || false,
+                    color: ACOLORS[(s.studentName||'').charCodeAt(0) % ACOLORS.length],
                 });
             });
-            ALL_DAYS.forEach(d => byDay[d].sort((a,b) => a.start.localeCompare(b.start)));
-
-            const todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
-
-            let grid = `<div style="display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;min-width:1050px;">`;
-            ALL_DAYS.forEach(day => {
-                const pal = DAY_PAL[day] || { bg:'#f9fafb', hdr:'#374151', light:'#f3f4f6', dot:'#6b7280', text:'#374151' };
-                const isToday = day === todayName;
-                const events  = byDay[day];
-                grid += `
-                <div style="border-radius:14px;overflow:hidden;border:2px solid ${isToday?pal.dot:pal.light};${isToday?'box-shadow:0 0 0 3px '+pal.dot+'33;':''}">
-                    <div style="background:${isToday?pal.hdr:pal.light};padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
-                        <span style="font-weight:800;font-size:.85rem;color:${isToday?'#fff':pal.text};">${day}</span>
-                        ${isToday
-                            ? '<span style="background:rgba(255,255,255,.3);color:#fff;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:999px;">TODAY</span>'
-                            : `<span style="color:${pal.text};font-size:.72rem;opacity:.7;font-weight:600;">${events.length} class${events.length!==1?'es':''}</span>`}
-                    </div>
-                    <div style="background:${pal.bg};padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px;">
-                        ${events.length===0
-                            ? `<div style="text-align:center;padding:20px 4px;color:${pal.dot};opacity:.4;font-size:.78rem;">No classes</div>`
-                            : events.map(ev=>`
-                            <div class="cal-event-card" data-student-id="${escapeHtml(ev.studentId)}"
-                                style="background:#fff;border-radius:10px;padding:8px 10px;border-left:3px solid ${pal.dot};box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;"
-                                onmouseover="this.style.boxShadow='0 3px 10px rgba(0,0,0,.13)'"
-                                onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.07)'">
-                                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                                    <div style="width:20px;height:20px;border-radius:6px;background:${ev.color};color:#fff;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                        ${escapeHtml((ev.student||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}
-                                    </div>
-                                    <span style="font-weight:700;font-size:.78rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ev.student)}</span>
+        });
+        ALL_DAYS.forEach(d => byDay[d].sort((a,b) => a.start.localeCompare(b.start)));
+        const todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+        let grid = `<div style="display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;min-width:1050px;">`;
+        ALL_DAYS.forEach(day => {
+            const pal = DAY_PAL[day] || { bg:'#f9fafb', hdr:'#374151', light:'#f3f4f6', dot:'#6b7280', text:'#374151' };
+            const isToday = day === todayName;
+            const events  = byDay[day];
+            grid += `
+            <div style="border-radius:14px;overflow:hidden;border:2px solid ${isToday?pal.dot:pal.light};${isToday?'box-shadow:0 0 0 3px '+pal.dot+'33;':''}">
+                <div style="background:${isToday?pal.hdr:pal.light};padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-weight:800;font-size:.85rem;color:${isToday?'#fff':pal.text};">${day}</span>
+                    ${isToday
+                        ? '<span style="background:rgba(255,255,255,.3);color:#fff;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:999px;">TODAY</span>'
+                        : `<span style="color:${pal.text};font-size:.72rem;opacity:.7;font-weight:600;">${events.length} class${events.length!==1?'es':''}</span>`}
+                </div>
+                <div style="background:${pal.bg};padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px;">
+                    ${events.length===0
+                        ? `<div style="text-align:center;padding:20px 4px;color:${pal.dot};opacity:.4;font-size:.78rem;">No classes</div>`
+                        : events.map(ev=>`
+                        <div class="cal-event-card" data-student-id="${escapeHtml(ev.studentId)}"
+                            style="background:#fff;border-radius:10px;padding:8px 10px;border-left:3px solid ${pal.dot};box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;"
+                            onmouseover="this.style.boxShadow='0 3px 10px rgba(0,0,0,.13)'"
+                            onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.07)'">
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                                <div style="width:20px;height:20px;border-radius:6px;background:${ev.color};color:#fff;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    ${escapeHtml((ev.student||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}
                                 </div>
-                                <div style="font-size:.72rem;font-weight:700;color:${pal.text};">⏰ ${escapeHtml(ev.time)}${ev.isOvernight?' 🌙':''}</div>
-                                ${ev.grade?`<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${escapeHtml(ev.grade)}${ev.subjects?' · '+escapeHtml(ev.subjects):''}</div>`:''}
-                            </div>`).join('')
-                        }
-                    </div>
-                </div>`;
-            });
-            grid += `</div>`;
-            calView.innerHTML = grid;
-
-            // Stats footer
-            const totalClasses = ALL_DAYS.reduce((s,d)=>s+byDay[d].length,0);
-            const busiest = ALL_DAYS.reduce((a,b)=>byDay[a].length>=byDay[b].length?a:b);
-            const statsEl = overlay.querySelector('#cal-stats');
+                                <span style="font-weight:700;font-size:.78rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ev.student)}</span>
+                            </div>
+                            <div style="font-size:.72rem;font-weight:700;color:${pal.text};">⏰ ${escapeHtml(ev.time)}${ev.isOvernight?' 🌙':''}</div>
+                            ${ev.grade?`<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${escapeHtml(ev.grade)}${ev.subjects?' · '+escapeHtml(ev.subjects):''}</div>`:''}
+                        </div>`).join('')
+                    }
+                </div>
+            </div>`;
+        });
+        grid += `</div>`;
+        calView.innerHTML = grid;
+        const totalClasses = ALL_DAYS.reduce((s,d) => s + byDay[d].length, 0);
+        const busiest = ALL_DAYS.reduce((a,b) => byDay[a].length >= byDay[b].length ? a : b);
+        const statsEl = overlay.querySelector('#cal-stats');
+        if (statsEl) {
             statsEl.style.display = 'flex';
             statsEl.innerHTML = `
                 <span><b style="color:#1e293b;">${students.length}</b> students scheduled</span>
@@ -3746,16 +3827,27 @@ function showScheduleCalendarModal() {
                 <span>Busiest day: <b style="color:#1e293b;">${escapeHtml(busiest)}</b></span>
                 <span>Earliest: <b style="color:#1e293b;">${escapeHtml(getEarliestClass(byDay))}</b></span>
             `;
-
-            // Click-to-edit
-            calView.querySelectorAll('.cal-event-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const sid = card.getAttribute('data-student-id');
-                    const student = students.find(s => s.id === sid);
-                    if (student) { closeCalModal(); showEditScheduleModal(student); }
-                });
+        }
+        calView.querySelectorAll('.cal-event-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const sid = card.getAttribute('data-student-id');
+                const student = students.find(s => s.id === sid);
+                if (student) { closeCalModal(); showEditScheduleModal(student); }
             });
+        });
+    }
 
+    // Async data load — uses cache, zero extra reads on re-open
+    (async () => {
+        try {
+            const allStudents = await getStudents(window.tutorData);
+            const students = allStudents.filter(s =>
+                !['archived','graduated','transferred'].includes(s.status) && s.schedule?.length > 0
+            );
+            overlay.querySelector('#calendar-loading').style.display = 'none';
+            const calView = overlay.querySelector('#calendar-view');
+            calView.style.display = 'block';
+            renderCalendarContent(students, calView);
         } catch (err) {
             console.error('Calendar load error:', err);
             overlay.querySelector('#calendar-loading').style.display = 'none';
@@ -4662,16 +4754,15 @@ function renderTutorDashboard(container, tutor) {
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
             const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            const [stuSnap, topicSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'),            where('tutorEmail', '==', te))),
+            const [allStudentsRaw, topicSnap, hwSnap] = await Promise.all([
+                getStudents(window.tutorData),  // from cache — zero reads
                 getDocs(query(collection(db, 'daily_topics'),        where('tutorEmail', '==', te))),
                 getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', te)))
             ]);
 
-            const activeStudents = stuSnap.docs.filter(d => {
-                const s = d.data();
-                return !s.summerBreak && !['archived','graduated','transferred'].includes(s.status);
-            }).length;
+            const activeStudents = allStudentsRaw.filter(s =>
+                !s.summerBreak && !['archived','graduated','transferred'].includes(s.status)
+            ).length;
 
             let topicsThisMonth = 0;
             topicSnap.forEach(d => {
@@ -5474,7 +5565,7 @@ async function renderStudentDatabase(container, tutor) {
     const allResultsQuery     = query(collection(db, "student_results"),   where("tutorEmail", "==", tutor.email));
 
     const [allStudentDocs, allSubmissionsSnapshot, allResultsSnapshot] = await Promise.all([
-        fetchStudentsForTutor(tutor, "students"),
+        getStudents(tutor),  // reads from in-memory cache — zero Firestore reads on tab switch
         getDocs(allSubmissionsQuery),
         getDocs(allResultsQuery)
     ]);
@@ -5499,7 +5590,9 @@ async function renderStudentDatabase(container, tutor) {
     const submittedStudentIds = new Set();
     allSubmissionsSnapshot.forEach(doc => {
         const subData = doc.data();
-        const subDate = subData.submittedAt.toDate();
+        // Guard: submittedAt can be missing on manually-created or legacy docs
+        const subDate = subData.submittedAt?.toDate?.();
+        if (!subDate) return;
         if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
             submittedStudentIds.add(subData.studentId);
         }
@@ -5508,13 +5601,17 @@ async function renderStudentDatabase(container, tutor) {
     // FIX: ONLY approved students - NO pending students
     let students = [...approvedStudents];  // Tutors only see approved students
 
-    // Deduplicate
+    // Deduplicate by Firestore document ID (the only truly unique key).
+    // Previously used studentName+tutorEmail which could silently delete a real student
+    // if two siblings shared the same first name under the same tutor.
     const seenStudents = new Set();
     const duplicatesToDelete = [];
     students = students.filter(student => {
-        const id = `${student.studentName}-${student.tutorEmail}`;
-        if (seenStudents.has(id)) { duplicatesToDelete.push({ id: student.id, collection: student.collection }); return false; }
-        seenStudents.add(id);
+        if (seenStudents.has(student.id)) {
+            duplicatesToDelete.push({ id: student.id, collection: student.collection });
+            return false;
+        }
+        seenStudents.add(student.id);
         return true;
     });
     if (duplicatesToDelete.length > 0) {
@@ -6078,9 +6175,7 @@ async function renderStudentDatabase(container, tutor) {
                     return;
                 }
                 
-                const payScheme = getTutorPayScheme(tutor);
-                const suggestedFee = calculateSuggestedFee({ grade: studentGrade, days: studentDays, subjects: selectedSubjects, groupClass: groupClass }, payScheme);
-                const studentData = { parentName, parentPhone, studentName, grade: studentGrade, subjects: selectedSubjects, days: studentDays, studentFee: suggestedFee > 0 ? suggestedFee : studentFee, tutorEmail: tutor.email, tutorName: tutor.name };
+                const studentData = { parentName, parentPhone, studentName, grade: studentGrade, subjects: selectedSubjects, days: studentDays, studentFee, tutorEmail: tutor.email, tutorName: tutor.name };
                 
                 if (document.getElementById('group-class-container') && !document.getElementById('group-class-container').classList.contains('hidden')) {
                     studentData.groupClass = groupClass;
@@ -6223,11 +6318,9 @@ async function renderStudentDatabase(container, tutor) {
                 return;
             }
 
-            const payScheme = getTutorPayScheme(tutor);
-            const suggestedFee = calculateSuggestedFee({ grade: studentGrade, days: studentDays, subjects: selectedSubjects, groupClass: groupClass }, payScheme);
             const studentData = {
                 parentName: parentName, parentPhone: parentPhone, studentName: studentName, grade: studentGrade,
-                subjects: selectedSubjects, days: studentDays, studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+                subjects: selectedSubjects, days: studentDays, studentFee,
                 tutorEmail: tutor.email, tutorName: tutor.name,
                 isTransitioning: true
             };
@@ -6570,53 +6663,33 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
-        const tutorRef = doc(db, "tutors", tutorId);
+        const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
+        const tutorEmail = window.tutorData?.email || '';
 
-        // ── Primary: live listener on tutor doc (written by management after grading) ──
-        onSnapshot(tutorRef, async (docSnap) => {
-            if (!docSnap.exists()) return;
-            const data = docSnap.data();
+        // Two independent onSnapshot listeners share a render function.
+        // Previously, tutor_grades was read via getDocs INSIDE the tutor doc listener,
+        // meaning every change to the tutor doc triggered an extra Firestore read.
+        // Now each collection has its own listener — changes in either fire a re-render,
+        // but neither causes a read in the other.
+        let tutorDocData = null;
+        let gradesDocData = null;
 
-            // ── Authoritative: also query tutor_grades for current month directly ──
-            const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-            const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
-            const tutorEmail = data.email || (window.tutorData && window.tutorData.email) || '';
+        function renderGamification() {
+            if (!tutorDocData) return;
+            const data = tutorDocData;
+            let qaScore, qcScore, qaAdvice, qcAdvice, qaGradedByName, qcGradedByName, perfMonth;
 
-            let qaScore = null, qcScore = null;
-            let qaAdvice = '', qcAdvice = '';
-            let qaGradedByName = '', qcGradedByName = '';
-            let perfMonth = monthKey;
-
-            try {
-                const gradesSnap = await getDocs(
-                    query(collection(db, 'tutor_grades'),
-                        where('tutorEmail', '==', tutorEmail),
-                        where('month', '==', monthKey))
-                );
-
-                if (!gradesSnap.empty) {
-                    // Use tutor_grades as source-of-truth
-                    const g = gradesSnap.docs[0].data();
-                    qaScore        = (g.qa && g.qa.score != null)  ? g.qa.score  : null;
-                    qcScore        = (g.qc && g.qc.score != null)  ? g.qc.score  : null;
-                    qaAdvice       = (g.qa && g.qa.notes)          ? g.qa.notes  : '';
-                    qcAdvice       = (g.qc && g.qc.notes)          ? g.qc.notes  : '';
-                    qaGradedByName = (g.qa && g.qa.gradedByName)   ? g.qa.gradedByName : '';
-                    qcGradedByName = (g.qc && g.qc.gradedByName)   ? g.qc.gradedByName : '';
-                    perfMonth      = g.month || monthKey;
-                } else {
-                    // Fallback: use cached values from tutor doc
-                    qaScore        = data.qaScore        ?? null;
-                    qcScore        = data.qcScore        ?? null;
-                    qaAdvice       = data.qaAdvice       || '';
-                    qcAdvice       = data.qcAdvice       || '';
-                    qaGradedByName = data.qaGradedByName || '';
-                    qcGradedByName = data.qcGradedByName || '';
-                    perfMonth      = data.performanceMonth || '';
-                }
-            } catch (gradeErr) {
-                // Index not ready or permission issue – fall back to tutor doc
-                console.warn('tutor_grades query failed, using tutor doc cache:', gradeErr.message);
+            if (gradesDocData) {
+                const g = gradesDocData;
+                qaScore        = g.qa?.score  ?? null;
+                qcScore        = g.qc?.score  ?? null;
+                qaAdvice       = g.qa?.notes  || '';
+                qcAdvice       = g.qc?.notes  || '';
+                qaGradedByName = g.qa?.gradedByName || '';
+                qcGradedByName = g.qc?.gradedByName || '';
+                perfMonth      = g.month || monthKey;
+            } else {
                 qaScore        = data.qaScore        ?? null;
                 qcScore        = data.qcScore        ?? null;
                 qaAdvice       = data.qaAdvice       || '';
@@ -6626,15 +6699,11 @@ async function initGamification(tutorId) {
                 perfMonth      = data.performanceMonth || '';
             }
 
-            // Merge into window.tutorData
             if (window.tutorData) {
-                window.tutorData.qaScore          = qaScore;
-                window.tutorData.qcScore          = qcScore;
-                window.tutorData.qaAdvice         = qaAdvice;
-                window.tutorData.qcAdvice         = qcAdvice;
-                window.tutorData.qaGradedByName   = qaGradedByName;
-                window.tutorData.qcGradedByName   = qcGradedByName;
-                window.tutorData.performanceMonth = perfMonth;
+                Object.assign(window.tutorData, {
+                    qaScore, qcScore, qaAdvice, qcAdvice,
+                    qaGradedByName, qcGradedByName, performanceMonth: perfMonth
+                });
             }
 
             let combined = 0;
@@ -6645,20 +6714,36 @@ async function initGamification(tutorId) {
             currentTutorScore = combined;
             updateScoreDisplay(combined, {
                 qaScore, qcScore, qaAdvice, qcAdvice,
-                qaGradedByName, qcGradedByName,
-                performanceMonth: perfMonth
+                qaGradedByName, qcGradedByName, performanceMonth: perfMonth
             });
 
-            // 🎉 Trigger confetti the first time grades appear this session
             if (combined > 0 && (qaScore !== null || qcScore !== null)) {
                 const gradeKey = `confetti_grades_${monthKey}_${tutorId}`;
                 if (!sessionStorage.getItem(gradeKey)) {
                     sessionStorage.setItem(gradeKey, 'true');
-                    // Slight delay so the widget renders first
                     setTimeout(() => triggerConfetti(), 600);
                 }
             }
+        }
+
+        // Listener 1: tutor document
+        onSnapshot(doc(db, "tutors", tutorId), docSnap => {
+            if (!docSnap.exists()) return;
+            tutorDocData = docSnap.data();
+            renderGamification();
         });
+
+        // Listener 2: tutor_grades for this month (replaces getDocs-per-tutor-doc-change)
+        onSnapshot(
+            query(collection(db, 'tutor_grades'),
+                  where('tutorEmail', '==', tutorEmail),
+                  where('month', '==', monthKey)),
+            snap => {
+                gradesDocData = snap.empty ? null : snap.docs[0].data();
+                renderGamification();
+            },
+            err => console.warn('tutor_grades listener failed, using tutor doc cache:', err.message)
+        );
 
         checkWinnerStatus(tutorId);
 
@@ -7426,16 +7511,11 @@ async function initTutorApp() {
                 // Use tutorUid as the primary messaging ID (falls back to Firestore doc ID)
                 tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 
-                // Ensure every tutor has a stable UID for messaging (generates one if missing)
-                if (!tutorData.tutorUid) {
-                    const generatedUid = 'tutor_' + tutorDoc.id + '_' + Date.now();
-                    try {
-                        await updateDoc(doc(db, 'tutors', tutorDoc.id), { tutorUid: generatedUid });
-                        tutorData.tutorUid = generatedUid;
-                    } catch(e) { tutorData.tutorUid = tutorDoc.id; }
-                }
-                tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 window.tutorData = tutorData;
+
+                // Start the global student cache + live listener (once per session).
+                // All tab renders read from _studentStore instead of calling getDocs.
+                initStudentListener(tutorData);
                 
                 // ✅ Auth verified — remove the full-page guard overlay
                 clearTimeout(window._authGuardTimeout);
