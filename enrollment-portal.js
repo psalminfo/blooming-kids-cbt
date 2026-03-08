@@ -532,9 +532,7 @@ class EnrollmentApp {
     generateCourseSelectionHTML(id) {
         // Generate hour options for select dropdowns (hour only, no minutes)
         const hourOptions = CONFIG.HOURS.map(hour => {
-            const hour12 = hour % 12 || 12;
-            const ampm = hour < 12 ? 'AM' : 'PM';
-            return `<option value="${hour.toString().padStart(2, '0')}">${hour12} ${ampm}</option>`;
+            return `<option value="${hour.toString().padStart(2, '0')}">${hour.toString().padStart(2, '0')}:00</option>`;
         }).join('');
 
         // 1. Academic HTML with Sessions, Days & Time
@@ -578,7 +576,7 @@ class EnrollmentApp {
                         </div>
                         <div class="error-message available-days-error-${id}"></div>
                         
-                        <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
+                        <h5><i class="far fa-clock"></i> Your Country Preferred Time (00:00 - 23:00) <span class="required">*</span></h5>
                         <div class="time-selection">
                             <div class="time-input-group">
                                 <label>From:</label>
@@ -641,7 +639,7 @@ class EnrollmentApp {
                     </div>
                     <div class="error-message extracurricular-days-error-${id}-${activity.id}" style="display: none;"></div>
                     
-                    <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
+                    <h5><i class="far fa-clock"></i> Your Country Preferred Time (00:00 - 23:00) <span class="required">*</span></h5>
                     <div class="time-selection">
                         <div class="time-input-group">
                             <label>From:</label>
@@ -697,7 +695,7 @@ class EnrollmentApp {
                     </div>
                     <div class="error-message test-prep-days-error-${id}-${test.id}" style="display: none;"></div>
                     
-                    <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
+                    <h5><i class="far fa-clock"></i> Your Country Preferred Time (00:00 - 23:00) <span class="required">*</span></h5>
                     <div class="time-selection">
                         <div class="time-input-group">
                             <label>From:</label>
@@ -2102,8 +2100,8 @@ class EnrollmentApp {
             const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
             
             if (startHour && endHour) {
-                const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-                const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
+                const startTime = `${startHour}:00`;
+                const endTime = `${endHour}:00`;
                 studentData.academicTime = `${startHour}:${endHour}`;
                 studentData.academicSchedule = `${academicDays.join(', ')} from ${startTime} to ${endTime}`;
             }
@@ -2129,8 +2127,8 @@ class EnrollmentApp {
                 const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityData.id}`)?.value || '';
                 
                 if (startHour && endHour) {
-                    const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-                    const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
+                    const startTime = `${startHour}:00`;
+                    const endTime = `${endHour}:00`;
                     activityData.time = `${startHour}:${endHour}`;
                     activityData.schedule = `${activityData.days.join(', ')} from ${startTime} to ${endTime}`;
                 }
@@ -2160,8 +2158,8 @@ class EnrollmentApp {
                     const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testData.id}`)?.value || '';
                     
                     if (startHour && endHour) {
-                        const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
+                        const startTime = `${startHour}:00`;
+                        const endTime = `${endHour}:00`;
                         testData.time = `${startHour}:${endHour}`;
                         testData.schedule = `${testData.days.join(', ')} from ${startTime} to ${endTime}`;
                     }
@@ -2401,8 +2399,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
                 const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
                 
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${startHour}:00` : '';
+                const endTime = endHour ? `${endHour}:00` : '';
                 
                 // Get tutor preference
                 const selectedTutor = entry.querySelector('.tutor-option.selected');
@@ -2433,8 +2431,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityId}`)?.value || '';
                 const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityId}`)?.value || '';
                 
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${startHour}:00` : '';
+                const endTime = endHour ? `${endHour}:00` : '';
                 
                 const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activityId);
                 const description = `${studentName}: ${activityName} (${selectedDays.join(', ')}, ${startTime}-${endTime})`;
@@ -2472,8 +2470,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testId}`)?.value || '';
                 const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testId}`)?.value || '';
                 
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${startHour}:00` : '';
+                const endTime = endHour ? `${endHour}:00` : '';
                 
                 const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
                 
@@ -2540,8 +2538,8 @@ class EnrollmentApp {
             const endHour = document.getElementById(`academic-end-hour-${studentId}`)?.value || '';
             
             if (selectedSubjects.length > 0) {
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${startHour}:00` : '';
+                const endTime = endHour ? `${endHour}:00` : '';
                 
                 detailsHTML += `
                     <div class="student-schedule">
@@ -2563,8 +2561,8 @@ class EnrollmentApp {
                     const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${activityId}`)?.value || '';
                     const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${activityId}`)?.value || '';
                     
-                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
+                    const startTime = startHour ? `${startHour}:00` : '';
+                    const endTime = endHour ? `${endHour}:00` : '';
                     
                     detailsHTML += `${activityName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime}<br>`;
                 });
@@ -2585,8 +2583,8 @@ class EnrollmentApp {
                     const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${testId}`)?.value || '';
                     const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${testId}`)?.value || '';
                     
-                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
+                    const startTime = startHour ? `${startHour}:00` : '';
+                    const endTime = endHour ? `${endHour}:00` : '';
                     
                     detailsHTML += `${testName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime} (${hours}hrs/session)<br>`;
                 });
