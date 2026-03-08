@@ -206,13 +206,12 @@ for (let hour = 0; hour < 24; hour++) {
         let label;
         
         if (hour === 0 && minute === 0) {
-            label = "12:00 AM (Midnight)";
+            label = "00:00 [AM] (Midnight)";
         } else if (hour === 12 && minute === 0) {
-            label = "12:00 PM (Noon)";
+            label = "12:00 [PM] (Noon)";
         } else {
             const period = hour >= 12 ? 'PM' : 'AM';
-            const displayHour = hour % 12 || 12;
-            label = `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+            label = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} [${period}]`;
         }
         
         TIME_SLOTS.push({ value: timeValue, label: label });
@@ -221,7 +220,7 @@ for (let hour = 0; hour < 24; hour++) {
 
 // Add an extra slot for 23:30 if not already included
 if (!TIME_SLOTS.find(slot => slot.value === "23:30")) {
-    TIME_SLOTS.push({value: "23:30", label: "11:30 PM"});
+    TIME_SLOTS.push({value: "23:30", label: "23:30 [PM]"});
 }
 
 // Sort time slots in chronological order
@@ -408,14 +407,13 @@ function formatFileSize(bytes) {
 // Format schedule time for display
 function formatScheduleTime(timeString) {
     const [hour, minute] = timeString.split(':').map(Number);
-    
+
     if (hour === 0 && minute === 0) {
-        return "12:00 AM (Midnight)";
+        return "00:00 [AM] (Midnight)";
     }
-    
+
     const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} [${period}]`;
 }
 
 // Format time for chat display
@@ -425,7 +423,7 @@ function formatTime(date) {
     
     if (diff < 24 * 60 * 60 * 1000) {
         // Today
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     } else if (diff < 7 * 24 * 60 * 60 * 1000) {
         // This week
         return date.toLocaleDateString([], { weekday: 'short' });
@@ -612,7 +610,7 @@ function startPersistentClock() {
         return new Intl.DateTimeFormat('en-NG', {
             weekday:'short', day:'numeric', month:'short', year:'numeric',
             hour:'2-digit', minute:'2-digit', second:'2-digit',
-            hour12: true, timeZone:'Africa/Lagos'
+            hour12: false, timeZone:'Africa/Lagos'
         }).format(new Date()) + ' (WAT)';
     }
 
@@ -964,9 +962,7 @@ class ScheduleManager {
             
             // Format Label
             const ampm = h >= 12 ? 'PM' : 'AM';
-            let labelH = h % 12;
-            labelH = labelH === 0 ? 12 : labelH;
-            const label = `${labelH}:${minStr} ${ampm}`;
+            const label = `${hourStr}:${minStr} [${ampm}]`;
             
             slots.push({ value, label });
         }
@@ -3174,47 +3170,6 @@ async function loadTutorNotifications(modal) {
                     return;
                 }
 
-                // ═══ HOMEWORK SUBMITTED: Navigate to Academic tab inbox ═══
-                // Handles notifications where a student has submitted an assignment.
-                // Covers any notification that carries a homeworkId, or whose type
-                // contains "homework" or "submitted" — so it works regardless of
-                // the exact type string written by the student-side app.
-                const isHwNotif =
-                    notif.homeworkId ||
-                    (notif.type && (
-                        notif.type.includes('homework') ||
-                        notif.type.includes('submitted') ||
-                        notif.type === 'hw_submitted' ||
-                        notif.type === 'assignment_submitted'
-                    ));
-                if (isHwNotif) {
-                    // 1. Close the floating inbox modal
-                    const floatingModal = document.getElementById('bk-inbox-modal') ||
-                                          document.querySelector('[id*="inbox-modal"]');
-                    if (floatingModal) floatingModal.remove();
-
-                    // 2. Navigate to the Academic tab so the homework inbox is visible
-                    const mainContent = document.getElementById('mainContent');
-                    if (mainContent && window.tutorData) {
-                        renderAcademic(mainContent, window.tutorData);
-                    } else {
-                        // Fallback: click the nav link directly
-                        const navBtn = document.getElementById('navAcademic');
-                        if (navBtn) navBtn.click();
-                    }
-
-                    // 3. If we have the specific homework ID, open the grading modal
-                    //    after a short delay so the inbox has time to render.
-                    if (notif.homeworkId) {
-                        setTimeout(() => {
-                            if (typeof openGradingModal === 'function') {
-                                openGradingModal(notif.homeworkId);
-                            }
-                        }, 800);
-                    }
-                    return;
-                }
-
                 // ═══ OTHER NOTIFICATIONS: Show static content ═══
                 modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.title || notif.subject || 'Notification'}`;
                 modal.querySelector('#chat-inputs').style.display = 'none';
@@ -4677,7 +4632,7 @@ function renderTutorDashboard(container, tutor) {
         }
         function formatLagosDT() {
             const opts = { weekday:'short', day:'numeric', month:'short', year:'numeric',
-                           hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone:'Africa/Lagos' };
+                           hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, timeZone:'Africa/Lagos' };
             return new Intl.DateTimeFormat('en-NG', opts).format(new Date());
         }
         const clockEl = document.getElementById('tutor-lagos-clock');
@@ -7888,9 +7843,7 @@ async function loadHomeworkInbox(tutorEmail, containerId) {
     cleanupListeners('inbox');
 
     try {
-        // Always run BOTH queries and merge — some assignments are stored by
-        // tutorName, others (especially student submissions) by tutorEmail only.
-        // Using one as a fallback means submissions get silently missed.
+        // Set up real-time listener by tutor name first, then email fallback
         const q1 = query(
             collection(db, "homework_assignments"),
             where("tutorName", "==", window.tutorData.name)
@@ -7900,39 +7853,25 @@ async function loadHomeworkInbox(tutorEmail, containerId) {
             where("tutorEmail", "==", tutorEmail)
         );
 
-        let snap1Docs = null;
-        let snap2Docs = null;
+        let useFallback = false;
 
-        function mergeAndRender() {
-            if (snap1Docs === null || snap2Docs === null) return; // wait for both
-            // Merge by doc ID to deduplicate
-            const merged = new Map();
-            snap1Docs.forEach(d => merged.set(d.id, d));
-            snap2Docs.forEach(d => merged.set(d.id, d));
-            // Build a synthetic snapshot-like object _renderHomeworkInbox can use
-            const fakeSnapshot = {
-                empty: merged.size === 0,
-                forEach: (fn) => merged.forEach(fn)
-            };
-            _renderHomeworkInbox(container, fakeSnapshot);
-        }
-
+        // Primary listener by tutorName
         registerListener('inbox', onSnapshot(q1, (snapshot) => {
-            snap1Docs = snapshot.docs || [];
-            mergeAndRender();
+            if (snapshot.empty && !useFallback) {
+                // Try email fallback — set up second listener
+                useFallback = true;
+                registerListener('inbox', onSnapshot(q2, (snap2) => {
+                    _renderHomeworkInbox(container, snap2);
+                }, err => {
+                    console.error("Inbox fallback listener error:", err);
+                    container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
+                }));
+            } else if (!useFallback) {
+                _renderHomeworkInbox(container, snapshot);
+            }
         }, err => {
-            console.error("Inbox q1 listener error:", err);
-            snap1Docs = [];
-            mergeAndRender();
-        }));
-
-        registerListener('inbox', onSnapshot(q2, (snapshot) => {
-            snap2Docs = snapshot.docs || [];
-            mergeAndRender();
-        }, err => {
-            console.error("Inbox q2 listener error:", err);
-            snap2Docs = [];
-            mergeAndRender();
+            console.error("Inbox listener error:", err);
+            container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
         }));
 
     } catch (error) {
@@ -7961,14 +7900,11 @@ function _renderHomeworkInbox(container, snapshot) {
         studentMap[sid].assignments.push(data);
     });
 
-    // Cutoff filter: hide old assignments that are already graded or still just
-    // 'assigned' (not yet submitted). NEVER hide ungraded submitted work —
-    // those must always show until the tutor grades them.
+    // Bug #5 fix: apply the cutoff — per the comment "inbox auto-clears on the 4th
+    // of the month", filter out assignments from before getHomeworkCutoffDate().
     const _hwCutoff = getHomeworkCutoffDate();
     Object.values(studentMap).forEach(s => {
         s.assignments = s.assignments.filter(a => {
-            // Always keep anything the student has submitted but tutor hasn't graded yet
-            if (a.status === 'submitted') return true;
             const raw = a.assignedDate || a.createdAt;
             const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
             return !isNaN(d.getTime()) && d >= _hwCutoff;
