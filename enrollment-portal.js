@@ -1166,8 +1166,15 @@ class EnrollmentApp {
         }
         
         try {
-            const start = new Date(startDate);
-            const dayOfMonth = start.getDate();
+            // FIX (Bug 2): Parse date parts manually to avoid UTC/local timezone shift.
+            // new Date('YYYY-MM-DD') parses as UTC midnight, so getDate() returns the wrong
+            // day for users in negative UTC-offset timezones (e.g. UTC-1 shifts the day back
+            // by 1, turning the 7th into the 6th — which hits the "full fee" threshold instead
+            // of triggering proration).
+            const parts = startDate.split('-');
+            const year = parseInt(parts[0], 10);
+            const monthIndex = parseInt(parts[1], 10) - 1; // 0-indexed for Date constructor
+            const dayOfMonth = parseInt(parts[2], 10);
             
             // FIXED: 1st of ANY month = ALWAYS full fee
             if (dayOfMonth === 1) {
@@ -1190,9 +1197,7 @@ class EnrollmentApp {
             }
             
             // Starting from 7th onward: Calculate proration
-            const year = start.getFullYear();
-            const month = start.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
             
             // Calculate days remaining from start date to end of month (inclusive)
             const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
@@ -1282,8 +1287,10 @@ class EnrollmentApp {
         let extracurricularTotal = 0;
         let testPrepTotal = 0;
         let hasAcademicSelection = false;
-        let earliestStartDate = null;
         let totalActualAcademicFee = 0;
+        let proratedAcademicTotal = 0;  // FIX (Bug 1): sum of per-student prorated academic fees
+        let prorationDeduction = 0;     // FIX (Bug 1): accumulated per-student deductions
+        let prorationExplanations = []; // FIX (Bug 1): per-student proration explanation strings
         
         const studentEntries = document.querySelectorAll('.student-entry');
         const breakdownContainer = document.getElementById('fee-details');
@@ -1311,13 +1318,6 @@ class EnrollmentApp {
             // Get selected academic days for this student
             const selectedAcademicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
             
-            // Track earliest start date for proration
-            if (startDate) {
-                if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
-                    earliestStartDate = startDate;
-                }
-            }
-            
             // 1. Academic Calculation - WITH PRORATION
             const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected'));
             
@@ -1325,16 +1325,31 @@ class EnrollmentApp {
                 hasAcademicSelection = true;
                 const baseFee = CONFIG.ACADEMIC_FEES[grade][sessions];
                 academicBaseTotal += baseFee;
-                studentSubtotal += baseFee;
                 studentActualAcademicFee += baseFee;
                 
                 const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
                 const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
                 additionalSubjectsTotal += extraFee;
-                studentSubtotal += extraFee;
                 studentActualAcademicFee += extraFee;
                 
                 totalActualAcademicFee += studentActualAcademicFee;
+                
+                // FIX (Bug 1 & 3): Prorate this student's academic fee using their own start date.
+                // Previously, one "earliest start date" was used for the combined total of all students,
+                // so if Student A starts the 1st and Student B starts the 15th, Student B was never
+                // prorated. Now each student is handled independently, matching the same pattern
+                // already used correctly for extracurricular and test prep fees.
+                const studentAcademicProration = this.calculateProratedMonthlyFee(studentActualAcademicFee, startDate);
+                proratedAcademicTotal += studentAcademicProration.toPay;
+                prorationDeduction += studentAcademicProration.deduction;
+                if (studentAcademicProration.deduction > 0 && studentAcademicProration.explanation) {
+                    prorationExplanations.push(studentAcademicProration.explanation);
+                }
+                
+                // FIX (Bug 3): Add the prorated amount to the student subtotal (not the full fee),
+                // so the per-student breakdown card shows what the student actually pays,
+                // and the per-student subtotals add up correctly to the displayed total.
+                studentSubtotal += studentAcademicProration.toPay;
             }
             
             // 2. Extracurricular - UPDATED WITH PRORATION (FIXED)
@@ -1403,30 +1418,17 @@ class EnrollmentApp {
             discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
         }
         
-        let proratedAmountToPay = totalAcademicFee;
-        let prorationDeduction = 0;
-        let prorationExplanation = '';
+        // FIX (Bug 1): prorationDeduction and proratedAcademicTotal are already accumulated
+        // per student inside the loop above. Join per-student explanations for display.
+        const prorationExplanation = prorationExplanations.join(' | ');
         
-        // Apply proration to academic fees if applicable
-        if (hasAcademicSelection && earliestStartDate && totalActualAcademicFee > 0) {
-            const prorationResult = this.calculateProratedMonthlyFee(
-                totalActualAcademicFee, 
-                earliestStartDate
-            );
-            
-            proratedAmountToPay = prorationResult.toPay || 0;
-            prorationDeduction = prorationResult.deduction || 0;
-            
-            if (prorationResult.explanation) {
-                prorationExplanation = prorationResult.explanation;
-            }
-        }
-        
-        // CORRECTED: Total payable calculation (proration already applied to individual fees)
-        const totalPayable = Math.max(0, 
-            proratedAmountToPay + // Use prorated amount for academic
-            extracurricularTotal + // Already prorated
-            testPrepTotal - // Already prorated
+        // FIX (Bug 1 & 3): Use the per-student prorated academic total.
+        // Extracurricular and test prep fees are already prorated per student in their own
+        // calculation functions (calculateExtracurricularFee / calculateTestPrepFee), unchanged.
+        const totalPayable = Math.max(0,
+            proratedAcademicTotal +  // Prorated per student, summed
+            extracurricularTotal +   // Already prorated per student
+            testPrepTotal -          // Already prorated per student
             discount
         );
         
