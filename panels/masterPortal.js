@@ -579,9 +579,8 @@ export async function renderGradingActivityTab(container) {
         const tutorNameById = {};
         tutorsSnap.docs.forEach(d => { tutorNameById[d.id] = d.data().name || d.data().email || d.id; });
 
-        // Collect all QA and QC entries that fall within this week
-        // Structure: { graderName: [ { tutorName, tutorEmail, score, notes, gradedAt } ] }
-        const qaByGrader = {};   // graderName → []
+        // Group entries by grader for QA and QC separately
+        const qaByGrader = {};
         const qcByGrader = {};
 
         gradesSnap.docs.forEach(d => {
@@ -597,8 +596,8 @@ export async function renderGradingActivityTab(container) {
                     qaByGrader[grader].push({
                         tutorName,
                         tutorEmail: g.tutorEmail || '',
-                        score:     g.qa.score ?? '—',
-                        notes:     g.qa.notes || '',
+                        score:    g.qa.score ?? '—',
+                        notes:    g.qa.notes || '',
                         gradedAt
                     });
                 }
@@ -613,8 +612,8 @@ export async function renderGradingActivityTab(container) {
                     qcByGrader[grader].push({
                         tutorName,
                         tutorEmail: g.tutorEmail || '',
-                        score:     g.qc.score ?? '—',
-                        notes:     g.qc.notes || '',
+                        score:    g.qc.score ?? '—',
+                        notes:    g.qc.notes || '',
                         gradedAt
                     });
                 }
@@ -634,9 +633,35 @@ export async function renderGradingActivityTab(container) {
             return;
         }
 
-        // Helper: render a single grader table
-        function buildGraderTable(graderName, entries, typeColor, typeLabel) {
+        // ── Build the accordion cards ────────────────────────────────
+        // One card per grader per type. Clicking the header expands the table inline.
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'space-y-4';
+
+        // Section divider helper
+        function appendDivider(parent, label, color) {
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-3';
+            div.innerHTML = `
+                <div class="h-px flex-1 bg-${color}-100"></div>
+                <span class="text-xs font-bold text-${color}-500 uppercase tracking-widest px-2">${label}</span>
+                <div class="h-px flex-1 bg-${color}-100"></div>`;
+            parent.appendChild(div);
+        }
+
+        // Build one accordion card per grader
+        function appendGraderCard(parent, graderName, entries, typeColor, typeLabel, typeBadge) {
             const sorted = [...entries].sort((a, b) => b.gradedAt - a.gradedAt);
+
+            // Average score for the header summary
+            const scores = sorted.map(e => e.score).filter(s => typeof s === 'number');
+            const avgScore = scores.length > 0
+                ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+                : null;
+            const avgColor = avgScore !== null ? getScoreColor(avgScore) : 'text-gray-400';
+
+            // Rows for the expanded table
             const rows = sorted.map(e => {
                 const scoreNum = typeof e.score === 'number' ? e.score : null;
                 const scoreColor = scoreNum !== null ? getScoreColor(scoreNum) : 'text-gray-400';
@@ -657,72 +682,93 @@ export async function renderGradingActivityTab(container) {
                         <span class="text-xl font-black ${scoreColor}">${scoreNum !== null ? scoreNum + '%' : '—'}</span>
                     </td>
                     <td class="py-3 px-4 text-xs text-gray-600 max-w-xs">
-                        ${e.notes ? `<span class="italic text-gray-500">"${escapeHtml(e.notes)}"</span>` : '<span class="text-gray-300">—</span>'}
+                        ${e.notes
+                            ? `<span class="italic text-gray-500">"${escapeHtml(e.notes)}"</span>`
+                            : '<span class="text-gray-300">—</span>'}
                     </td>
                     <td class="py-3 px-4 text-xs text-gray-400 whitespace-nowrap">${escapeHtml(dateStr)}</td>
                 </tr>`;
             }).join('');
 
-            return `
-            <div class="bg-white rounded-2xl border border-${typeColor}-100 shadow-sm overflow-hidden">
-                <div class="flex items-center justify-between px-5 py-3 bg-${typeColor}-50 border-b border-${typeColor}-100">
-                    <div>
-                        <span class="font-bold text-${typeColor}-800 text-sm">${typeLabel}</span>
-                        <span class="ml-2 text-xs text-${typeColor}-500 font-semibold">by ${escapeHtml(graderName)}</span>
-                    </div>
-                    <span class="text-xs bg-${typeColor}-100 text-${typeColor}-700 px-2.5 py-1 rounded-full font-bold">
-                        ${entries.length} graded this week
-                    </span>
+            // Card element
+            const card = document.createElement('div');
+            card.className = `bg-white rounded-2xl border border-${typeColor}-100 shadow-sm overflow-hidden`;
+
+            card.innerHTML = `
+            <!-- Accordion header — clickable -->
+            <button class="ga-accordion-btn w-full text-left p-4 flex items-center gap-4 hover:bg-${typeColor}-50 transition-colors">
+                <!-- Type badge -->
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-${typeColor}-100 flex items-center justify-center text-lg">
+                    ${typeBadge}
                 </div>
+                <!-- Name + count -->
+                <div class="flex-1 min-w-0">
+                    <div class="font-bold text-gray-800">${escapeHtml(graderName)}</div>
+                    <div class="text-xs text-${typeColor}-500 font-semibold mt-0.5">
+                        ${typeLabel} · ${entries.length} tutor${entries.length !== 1 ? 's' : ''} graded this week
+                    </div>
+                </div>
+                <!-- Avg score pill -->
+                ${avgScore !== null ? `
+                <div class="flex-shrink-0 text-center px-3 py-1.5 rounded-xl bg-${typeColor}-50 border border-${typeColor}-100">
+                    <div class="text-lg font-black ${avgColor}">${avgScore}%</div>
+                    <div class="text-xs text-gray-400">avg</div>
+                </div>` : ''}
+                <!-- Chevron -->
+                <i class="ga-chevron fas fa-chevron-down text-gray-400 transition-transform flex-shrink-0"></i>
+            </button>
+
+            <!-- Accordion body — hidden by default -->
+            <div class="ga-accordion-body hidden border-t border-${typeColor}-100">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
-                            <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                            <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide bg-gray-50">
                                 <th class="text-left py-2.5 px-4 font-semibold">Tutor</th>
                                 <th class="text-center py-2.5 px-4 font-semibold">Score</th>
                                 <th class="text-left py-2.5 px-4 font-semibold">Notes</th>
-                                <th class="text-left py-2.5 px-4 font-semibold">Graded At</th>
+                                <th class="text-left py-2.5 px-4 font-semibold">Graded At (Lagos)</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
             </div>`;
+
+            // Wire up the accordion toggle
+            card.querySelector('.ga-accordion-btn').addEventListener('click', () => {
+                const body    = card.querySelector('.ga-accordion-body');
+                const chevron = card.querySelector('.ga-chevron');
+                const isOpen  = !body.classList.contains('hidden');
+                body.classList.toggle('hidden', isOpen);
+                chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+            });
+
+            parent.appendChild(card);
         }
 
-        let html = '';
-
-        // ── QA section ──────────────────────────────────────────────
+        // ── QA cards ────────────────────────────────────────────────
         if (hasQA) {
-            html += `
-            <div class="flex items-center gap-3 mt-1">
-                <div class="h-px flex-1 bg-purple-100"></div>
-                <span class="text-xs font-bold text-purple-500 uppercase tracking-widest px-2">QA — Session Observation</span>
-                <div class="h-px flex-1 bg-purple-100"></div>
-            </div>`;
+            appendDivider(wrapper, 'QA — Session Observation', 'purple');
             Object.entries(qaByGrader)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .forEach(([grader, entries]) => {
-                    html += buildGraderTable(grader, entries, 'purple', '📋 QA');
+                    appendGraderCard(wrapper, grader, entries, 'purple', 'QA', '📋');
                 });
         }
 
-        // ── QC section ──────────────────────────────────────────────
+        // ── QC cards ────────────────────────────────────────────────
         if (hasQC) {
-            html += `
-            <div class="flex items-center gap-3 mt-2">
-                <div class="h-px flex-1 bg-amber-100"></div>
-                <span class="text-xs font-bold text-amber-500 uppercase tracking-widest px-2">QC — Lesson Plan</span>
-                <div class="h-px flex-1 bg-amber-100"></div>
-            </div>`;
+            appendDivider(wrapper, 'QC — Lesson Plan', 'amber');
             Object.entries(qcByGrader)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .forEach(([grader, entries]) => {
-                    html += buildGraderTable(grader, entries, 'amber', '📐 QC');
+                    appendGraderCard(wrapper, grader, entries, 'amber', 'QC', '📐');
                 });
         }
 
-        contentEl.innerHTML = `<div class="space-y-4">${html}</div>`;
+        contentEl.innerHTML = '';
+        contentEl.appendChild(wrapper);
 
     } catch (err) {
         console.error('Grading Activity tab error:', err);
