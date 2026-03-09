@@ -698,7 +698,7 @@ async function fetchStudentsForTutor(tutor, col) {
  * localStorage provides a 30-day cold-start cache so the screen is never
  * blank on login, even on a slow connection.
  ******************************************************************************/
-const STUDENT_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const STUDENT_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes — short TTL so management edits are never stale
 
 const _studentStore = {
     students: [],   // live in-memory array — single source of truth for the session
@@ -771,14 +771,15 @@ function initStudentListener(tutor) {
             try { window._onStudentsUpdated(merged); } catch(e) {}
         }
         // Re-render student database tab if it is currently visible.
-        // This fires for BOTH tutor edits and management edits so changes
-        // appear immediately without the tutor needing to refresh the page.
+        // setTimeout(0) ensures this runs AFTER the initial paint from the warm
+        // cache, so management edits always appear without a manual refresh.
         const main = document.getElementById('mainContent');
         if (main) {
-            const listView = main.querySelector('#student-list-view');
-            if (listView) {
-                renderStudentDatabase(main, tutor);
-            }
+            setTimeout(() => {
+                if (main.querySelector('#student-list-view')) {
+                    renderStudentDatabase(main, tutor);
+                }
+            }, 0);
         }
     }
 
@@ -5528,7 +5529,6 @@ function showEditStudentModal(student) {
             if (document.getElementById('edit-student-group-class')) { studentData.groupClass = groupClass; }
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
-
             // Immediately patch _studentStore so the re-render below sees the
             // updated data without waiting for the onSnapshot to fire.
             const storeIdx = _studentStore.students.findIndex(s => s.id === studentId);
@@ -5536,7 +5536,6 @@ function showEditStudentModal(student) {
                 _studentStore.students[storeIdx] = { ..._studentStore.students[storeIdx], ...studentData };
                 _saveStudentCache(window.tutorData.email, _studentStore.students);
             }
-
             editModal.remove();
             showCustomAlert('Student details updated successfully!');
             const mainContent = document.getElementById('mainContent');
