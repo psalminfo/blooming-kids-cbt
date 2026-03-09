@@ -698,7 +698,7 @@ async function fetchStudentsForTutor(tutor, col) {
  * localStorage provides a 30-day cold-start cache so the screen is never
  * blank on login, even on a slow connection.
  ******************************************************************************/
-const STUDENT_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes — short TTL so management edits are never stale
+const STUDENT_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 const _studentStore = {
     students: [],   // live in-memory array — single source of truth for the session
@@ -743,7 +743,10 @@ function initStudentListener(tutor) {
 
     // Warm up from cache — zero reads, instant display on cold start
     const cached = _loadStudentCache(tutor.email);
-    if (cached) { _studentStore.students = cached; _studentStore.loaded = true; }
+    // Pre-fill with cache for instant display but do NOT mark as loaded —
+    // that way getStudents() still returns cache fast, but mergeAndPersist
+    // will always re-render once the live snapshot arrives.
+    if (cached) { _studentStore.students = cached; }
 
     const q1 = query(collection(db, 'students'), where('tutorEmail', '==', tutor.email));
     const q2 = tutor.id
@@ -770,16 +773,15 @@ function initStudentListener(tutor) {
         if (typeof window._onStudentsUpdated === 'function') {
             try { window._onStudentsUpdated(merged); } catch(e) {}
         }
-        // Re-render student database tab if it is currently visible.
-        // setTimeout(0) ensures this runs AFTER the initial paint from the warm
-        // cache, so management edits always appear without a manual refresh.
+        // Always re-render when fresh Firestore data arrives — no DOM gate.
+        // This is what makes management edits appear on the tutor screen
+        // immediately without any reload or cache clearing needed.
         const main = document.getElementById('mainContent');
         if (main) {
-            setTimeout(() => {
-                if (main.querySelector('#student-list-view')) {
-                    renderStudentDatabase(main, tutor);
-                }
-            }, 0);
+            const listView = main.querySelector('#student-list-view');
+            if (listView) {
+                renderStudentDatabase(main, tutor);
+            }
         }
     }
 
@@ -5529,11 +5531,11 @@ function showEditStudentModal(student) {
             if (document.getElementById('edit-student-group-class')) { studentData.groupClass = groupClass; }
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
-            // Immediately patch _studentStore so the re-render below sees the
-            // updated data without waiting for the onSnapshot to fire.
-            const storeIdx = _studentStore.students.findIndex(s => s.id === studentId);
-            if (storeIdx !== -1) {
-                _studentStore.students[storeIdx] = { ..._studentStore.students[storeIdx], ...studentData };
+            // Immediately patch _studentStore so the re-render sees fresh data
+            // without waiting for the onSnapshot round-trip.
+            const idx = _studentStore.students.findIndex(s => s.id === studentId);
+            if (idx !== -1) {
+                _studentStore.students[idx] = { ..._studentStore.students[idx], ...studentData };
                 _saveStudentCache(window.tutorData.email, _studentStore.students);
             }
             editModal.remove();
