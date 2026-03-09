@@ -1651,9 +1651,12 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents);
         saveToLocalStorage('groupClasses', groupClasses);
+        sessionCache.tutors = activeTutors;
+        sessionCache.students = nonArchivedStudents;
         sessionCache.tutorAssignments = tutorAssignments;
         sessionCache.tutorTransitions = activeTransitions;
         sessionCache._lastUpdate = Date.now();
+        window.__allStudents = nonArchivedStudents;
         
         // Update all 7 counters
         if (document.getElementById('tutor-count-badge')) {
@@ -2817,12 +2820,16 @@ function handleEditStudent(studentId) {
                 parentPhone: document.getElementById('edit-parentPhone').value.trim(),
                 parentEmail: document.getElementById('edit-parentEmail').value.trim(),
                 tutorFee:    Number(document.getElementById('edit-tutorFee').value) || 0,
+                studentFee:  Number(document.getElementById('edit-tutorFee').value) || 0,
                 updatedAt:   new Date().toISOString(),
                 updatedBy:   window.userData?.name || window.userData?.email || 'management'
             };
             const startTime = document.getElementById('edit-start-time').value;
             const endTime   = document.getElementById('edit-end-time').value;
-            if (startTime && endTime) updates.academicTime = formatTimeTo12h(startTime) + ' - ' + formatTimeTo12h(endTime);
+            if (startTime && endTime) {
+                updates.academicTime = formatTimeTo12h(startTime) + ' - ' + formatTimeTo12h(endTime);
+                updates.schedule = [{ start: startTime, end: endTime }];
+            }
             if (!updates.studentName) { alert('Student name is required.'); btn.disabled=false; btn.textContent='Save Changes'; return; }
             await updateDoc(doc(db, 'students', studentId), updates);
             alert('"' + updates.studentName + '" updated successfully!');
