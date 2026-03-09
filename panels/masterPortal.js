@@ -57,6 +57,21 @@ export async function renderMasterPortalPanel(container) {
             </div>
         </div>
 
+        <!-- ── Tab Navigation ───────────────────────────────────── -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-1 flex gap-1">
+            <button id="mp-tab-btn-tutors"
+                class="flex-1 py-2 px-4 rounded-xl text-sm font-semibold bg-blue-600 text-white transition-colors">
+                👥 Tutors
+            </button>
+            <button id="mp-tab-btn-grading"
+                class="flex-1 py-2 px-4 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
+                📊 Grading Activity
+            </button>
+        </div>
+
+        <!-- ── Tutors Panel (existing content) ──────────────────── -->
+        <div id="mp-panel-tutors" class="space-y-4">
+
         <!-- Top 3 Leaderboard -->
         <div id="totm-banner" class="hidden bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div class="bg-gradient-to-r from-yellow-400 to-amber-500 px-5 py-3 flex items-center justify-between">
@@ -123,6 +138,17 @@ export async function renderMasterPortalPanel(container) {
 
         <!-- Tutors accordion list -->
         <div id="master-portal-list" class="space-y-3 hidden"></div>
+
+        </div><!-- /mp-panel-tutors -->
+
+        <!-- ── Grading Activity Panel (new) ─────────────────────── -->
+        <div id="mp-panel-grading" class="hidden space-y-4">
+            <div class="text-center py-12">
+                <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p class="text-gray-500">Loading grading activity…</p>
+            </div>
+        </div>
+
     </div>
     `;
 
@@ -133,6 +159,31 @@ export async function renderMasterPortalPanel(container) {
     const clockInterval = setInterval(tickClock, 1000);
     // Cleanup on tab change
     window._masterPortalClockInterval = clockInterval;
+
+    // ── Tab switching logic ─────────────────────────────────────────
+    const _mpPanelTutors  = document.getElementById('mp-panel-tutors');
+    const _mpPanelGrading = document.getElementById('mp-panel-grading');
+    const _mpBtnTutors    = document.getElementById('mp-tab-btn-tutors');
+    const _mpBtnGrading   = document.getElementById('mp-tab-btn-grading');
+    let   _gradingTabLoaded = false;
+
+    function _mpActivateTab(tab) {
+        const isTutors = tab === 'tutors';
+        _mpPanelTutors.classList.toggle('hidden', !isTutors);
+        _mpPanelGrading.classList.toggle('hidden', isTutors);
+        _mpBtnTutors.classList.toggle('bg-blue-600',  isTutors);
+        _mpBtnTutors.classList.toggle('text-white',   isTutors);
+        _mpBtnTutors.classList.toggle('text-gray-600',!isTutors);
+        _mpBtnGrading.classList.toggle('bg-blue-600',  !isTutors);
+        _mpBtnGrading.classList.toggle('text-white',   !isTutors);
+        _mpBtnGrading.classList.toggle('text-gray-600', isTutors);
+        if (!isTutors && !_gradingTabLoaded) {
+            _gradingTabLoaded = true;
+            renderGradingActivityTab(_mpPanelGrading);
+        }
+    }
+    _mpBtnTutors.addEventListener('click',  () => _mpActivateTab('tutors'));
+    _mpBtnGrading.addEventListener('click', () => _mpActivateTab('grading'));
 
     try {
         // Load all data in parallel
@@ -415,6 +466,270 @@ export async function renderMasterPortalPanel(container) {
         console.error('Master Portal error:', err);
         document.getElementById('master-portal-loading').innerHTML =
             `<p class="text-red-500">❌ Failed to load: ${err.message}</p>`;
+    }
+}
+
+
+// ============================================================
+// GRADING ACTIVITY TAB
+// Shows this week's QA and QC grading, one table per grader.
+// "This week" = Monday–Sunday in Lagos time.
+// If Monday falls in a previous month, the window starts on the
+// 1st of the current month instead (monthly reset).
+// ============================================================
+
+/**
+ * Returns { weekStart, weekEnd, label } for the current Lagos week,
+ * capped to the start of the current month.
+ */
+function getLagosWeekRange() {
+    // Current date/time in Lagos
+    const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+
+    const year  = lagosNow.getFullYear();
+    const month = lagosNow.getMonth();      // 0-based
+    const day   = lagosNow.getDate();
+    const dow   = lagosNow.getDay();        // 0=Sun … 6=Sat
+
+    // Days since Monday (Mon=0)
+    const sinceMonday = dow === 0 ? 6 : dow - 1;
+
+    // Monday 00:00 Lagos
+    const monday = new Date(year, month, day - sinceMonday, 0, 0, 0, 0);
+    // Sunday 23:59:59 Lagos
+    const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+    // First day of current month 00:00 Lagos
+    const monthStart = new Date(year, month, 1, 0, 0, 0, 0);
+
+    // Cap week start to month start so we never show last month's grades
+    const weekStart = monday < monthStart ? monthStart : monday;
+
+    // Build a readable label e.g. "Mon 2 Jun – Sun 8 Jun 2025"
+    const fmt = (d) => d.toLocaleDateString('en-GB', {
+        weekday: 'short', day: 'numeric', month: 'short',
+        timeZone: 'Africa/Lagos'
+    });
+    const yearLabel = sunday.toLocaleDateString('en-GB', { year: 'numeric', timeZone: 'Africa/Lagos' });
+    const label = `${fmt(weekStart)} – ${fmt(sunday)} ${yearLabel}`;
+
+    return { weekStart, weekEnd: sunday, label, isCappedToMonth: monday < monthStart };
+}
+
+/**
+ * Converts a Firestore Timestamp or JS Date to a plain JS Date.
+ */
+function toDate(val) {
+    if (!val) return null;
+    if (typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') return new Date(val);
+    return null;
+}
+
+/**
+ * Render the Grading Activity tab into the given container element.
+ * Fetches all tutor_grades for the current month, filters to this week,
+ * groups by grader, and renders one table per grader for QA and QC.
+ */
+export async function renderGradingActivityTab(container) {
+    const monthKey   = getCurrentMonthKeyLagos();
+    const monthLabel = getCurrentMonthLabelLagos();
+    const { weekStart, weekEnd, label: weekLabel, isCappedToMonth } = getLagosWeekRange();
+
+    container.innerHTML = `
+    <div class="space-y-4">
+        <!-- Week header -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <h3 class="text-base font-bold text-gray-800">📊 Grading Activity</h3>
+                    <p class="text-sm text-gray-500 mt-0.5">
+                        <span class="font-semibold text-blue-700">${weekLabel}</span>
+                        ${isCappedToMonth
+                            ? '<span class="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">New month — week reset</span>'
+                            : ''}
+                    </p>
+                </div>
+                <div class="text-xs text-gray-400 text-right">
+                    Month: <span class="font-semibold text-gray-600">${monthLabel}</span><br>
+                    Resets each new month
+                </div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div id="grading-activity-content">
+            <div class="text-center py-12">
+                <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p class="text-gray-500">Fetching grades…</p>
+            </div>
+        </div>
+    </div>`;
+
+    const contentEl = container.querySelector('#grading-activity-content');
+
+    try {
+        // Fetch all grades for this month + tutor names
+        const [gradesSnap, tutorsSnap] = await Promise.all([
+            getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey))),
+            getDocs(query(collection(db, 'tutors'), orderBy('name')))
+        ]);
+
+        // Build tutorId → name map for display
+        const tutorNameById = {};
+        tutorsSnap.docs.forEach(d => { tutorNameById[d.id] = d.data().name || d.data().email || d.id; });
+
+        // Collect all QA and QC entries that fall within this week
+        // Structure: { graderName: [ { tutorName, tutorEmail, score, notes, gradedAt } ] }
+        const qaByGrader = {};   // graderName → []
+        const qcByGrader = {};
+
+        gradesSnap.docs.forEach(d => {
+            const g = d.data();
+            const tutorName = tutorNameById[g.tutorId] || g.tutorEmail || g.tutorId || '—';
+
+            // ── QA ──
+            if (g.qa && g.qa.gradedBy) {
+                const gradedAt = toDate(g.qa.gradedAt);
+                if (gradedAt && gradedAt >= weekStart && gradedAt <= weekEnd) {
+                    const grader = g.qa.gradedByName || g.qa.gradedBy;
+                    if (!qaByGrader[grader]) qaByGrader[grader] = [];
+                    qaByGrader[grader].push({
+                        tutorName,
+                        tutorEmail: g.tutorEmail || '',
+                        score:     g.qa.score ?? '—',
+                        notes:     g.qa.notes || '',
+                        gradedAt
+                    });
+                }
+            }
+
+            // ── QC ──
+            if (g.qc && g.qc.gradedBy) {
+                const gradedAt = toDate(g.qc.gradedAt);
+                if (gradedAt && gradedAt >= weekStart && gradedAt <= weekEnd) {
+                    const grader = g.qc.gradedByName || g.qc.gradedBy;
+                    if (!qcByGrader[grader]) qcByGrader[grader] = [];
+                    qcByGrader[grader].push({
+                        tutorName,
+                        tutorEmail: g.tutorEmail || '',
+                        score:     g.qc.score ?? '—',
+                        notes:     g.qc.notes || '',
+                        gradedAt
+                    });
+                }
+            }
+        });
+
+        const hasQA = Object.keys(qaByGrader).length > 0;
+        const hasQC = Object.keys(qcByGrader).length > 0;
+
+        if (!hasQA && !hasQC) {
+            contentEl.innerHTML = `
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center">
+                <div class="text-4xl mb-3">📭</div>
+                <p class="text-gray-500 font-semibold">No grades recorded this week yet.</p>
+                <p class="text-xs text-gray-400 mt-1">Grades will appear here as staff grade tutors.</p>
+            </div>`;
+            return;
+        }
+
+        // Helper: render a single grader table
+        function buildGraderTable(graderName, entries, typeColor, typeLabel) {
+            const sorted = [...entries].sort((a, b) => b.gradedAt - a.gradedAt);
+            const rows = sorted.map(e => {
+                const scoreNum = typeof e.score === 'number' ? e.score : null;
+                const scoreColor = scoreNum !== null ? getScoreColor(scoreNum) : 'text-gray-400';
+                const dateStr = e.gradedAt
+                    ? e.gradedAt.toLocaleDateString('en-GB', {
+                        weekday: 'short', day: 'numeric', month: 'short',
+                        hour: '2-digit', minute: '2-digit',
+                        timeZone: 'Africa/Lagos'
+                      })
+                    : '—';
+                return \`
+                <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td class="py-3 px-4">
+                        <div class="font-semibold text-gray-800 text-sm">\${escapeHtml(e.tutorName)}</div>
+                        <div class="text-xs text-gray-400">\${escapeHtml(e.tutorEmail)}</div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="text-xl font-black \${scoreColor}">\${scoreNum !== null ? scoreNum + '%' : '—'}</span>
+                    </td>
+                    <td class="py-3 px-4 text-xs text-gray-600 max-w-xs">
+                        \${e.notes ? \`<span class="italic text-gray-500">"\${escapeHtml(e.notes)}"</span>\` : '<span class="text-gray-300">—</span>'}
+                    </td>
+                    <td class="py-3 px-4 text-xs text-gray-400 whitespace-nowrap">\${escapeHtml(dateStr)}</td>
+                </tr>\`;
+            }).join('');
+
+            return \`
+            <div class="bg-white rounded-2xl border border-\${typeColor}-100 shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-3 bg-\${typeColor}-50 border-b border-\${typeColor}-100">
+                    <div>
+                        <span class="font-bold text-\${typeColor}-800 text-sm">\${typeLabel}</span>
+                        <span class="ml-2 text-xs text-\${typeColor}-500 font-semibold">by \${escapeHtml(graderName)}</span>
+                    </div>
+                    <span class="text-xs bg-\${typeColor}-100 text-\${typeColor}-700 px-2.5 py-1 rounded-full font-bold">
+                        \${entries.length} graded this week
+                    </span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                                <th class="text-left py-2.5 px-4 font-semibold">Tutor</th>
+                                <th class="text-center py-2.5 px-4 font-semibold">Score</th>
+                                <th class="text-left py-2.5 px-4 font-semibold">Notes</th>
+                                <th class="text-left py-2.5 px-4 font-semibold">Graded At</th>
+                            </tr>
+                        </thead>
+                        <tbody>\${rows}</tbody>
+                    </table>
+                </div>
+            </div>\`;
+        }
+
+        let html = '';
+
+        // ── QA section ──────────────────────────────────────────────
+        if (hasQA) {
+            html += \`
+            <div class="flex items-center gap-3 mt-1">
+                <div class="h-px flex-1 bg-purple-100"></div>
+                <span class="text-xs font-bold text-purple-500 uppercase tracking-widest px-2">QA — Session Observation</span>
+                <div class="h-px flex-1 bg-purple-100"></div>
+            </div>\`;
+            Object.entries(qaByGrader)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .forEach(([grader, entries]) => {
+                    html += buildGraderTable(grader, entries, 'purple', '📋 QA');
+                });
+        }
+
+        // ── QC section ──────────────────────────────────────────────
+        if (hasQC) {
+            html += \`
+            <div class="flex items-center gap-3 mt-2">
+                <div class="h-px flex-1 bg-amber-100"></div>
+                <span class="text-xs font-bold text-amber-500 uppercase tracking-widest px-2">QC — Lesson Plan</span>
+                <div class="h-px flex-1 bg-amber-100"></div>
+            </div>\`;
+            Object.entries(qcByGrader)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .forEach(([grader, entries]) => {
+                    html += buildGraderTable(grader, entries, 'amber', '📐 QC');
+                });
+        }
+
+        contentEl.innerHTML = \`<div class="space-y-4">\${html}</div>\`;
+
+    } catch (err) {
+        console.error('Grading Activity tab error:', err);
+        contentEl.innerHTML = \`
+        <div class="bg-white rounded-2xl border border-red-200 shadow-sm p-6 text-center">
+            <p class="text-red-500 font-semibold">❌ Failed to load: \${escapeHtml(err.message)}</p>
+        </div>\`;
     }
 }
 
