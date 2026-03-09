@@ -770,10 +770,15 @@ function initStudentListener(tutor) {
         if (typeof window._onStudentsUpdated === 'function') {
             try { window._onStudentsUpdated(merged); } catch(e) {}
         }
-        // Re-render student database tab if it is currently visible
+        // Re-render student database tab if it is currently visible.
+        // This fires for BOTH tutor edits and management edits so changes
+        // appear immediately without the tutor needing to refresh the page.
         const main = document.getElementById('mainContent');
-        if (main && main.querySelector('#student-list-view')) {
-            renderStudentDatabase(main, tutor);
+        if (main) {
+            const listView = main.querySelector('#student-list-view');
+            if (listView) {
+                renderStudentDatabase(main, tutor);
+            }
         }
     }
 
@@ -5523,6 +5528,15 @@ function showEditStudentModal(student) {
             if (document.getElementById('edit-student-group-class')) { studentData.groupClass = groupClass; }
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
+
+            // Immediately patch _studentStore so the re-render below sees the
+            // updated data without waiting for the onSnapshot to fire.
+            const storeIdx = _studentStore.students.findIndex(s => s.id === studentId);
+            if (storeIdx !== -1) {
+                _studentStore.students[storeIdx] = { ..._studentStore.students[storeIdx], ...studentData };
+                _saveStudentCache(window.tutorData.email, _studentStore.students);
+            }
+
             editModal.remove();
             showCustomAlert('Student details updated successfully!');
             const mainContent = document.getElementById('mainContent');
