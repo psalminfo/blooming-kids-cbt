@@ -32,7 +32,9 @@ function cleanupListeners(group) {
 
 /** Cleanup listeners for all tab-specific groups (keeps global ones like 'unread') */
 function cleanupTabListeners() {
-    const tabGroups = ['dashboard', 'inbox', 'archive', 'students', 'schedule', 'courses', 'reports'];
+    // ✅ FIX 1: 'global_students' intentionally excluded so the persistent
+    // onSnapshot listener survives ALL tab switches without interruption.
+    const tabGroups = ['dashboard', 'inbox', 'archive', 'schedule', 'courses', 'reports'];
     tabGroups.forEach(g => cleanupListeners(g));
 }
 
@@ -698,7 +700,9 @@ async function fetchStudentsForTutor(tutor, col) {
  * localStorage provides a 30-day cold-start cache so the screen is never
  * blank on login, even on a slow connection.
  ******************************************************************************/
-const STUDENT_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+// ✅ FIX 2: No TTL — cache is warm-start only, onSnapshot is always authoritative.
+// Removed 30-day expiry that caused stale data to block fresh Firestore reads.
+const STUDENT_CACHE_TTL_MS = 0; // Disabled — onSnapshot always provides live truth
 
 const _studentStore = {
     students: [],   // live in-memory array — single source of truth for the session
@@ -713,10 +717,8 @@ function _loadStudentCache(tutorEmail) {
         const raw = localStorage.getItem(_studentCacheKey(tutorEmail));
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        if (!parsed.cachedAt || Date.now() - parsed.cachedAt > STUDENT_CACHE_TTL_MS) {
-            localStorage.removeItem(_studentCacheKey(tutorEmail));
-            return null;
-        }
+        // ✅ FIX 3: With TTL disabled, always return cached data for warm-start.
+        // onSnapshot fires immediately after and overwrites with live Firestore data.
         return parsed.students || null;
     } catch(e) { return null; }
 }
@@ -741,12 +743,11 @@ function initStudentListener(tutor) {
     // Stop any previous listener
     if (_studentStore.unsub) { try { _studentStore.unsub(); } catch(e) {} _studentStore.unsub = null; }
 
-    // Warm up from cache — zero reads, instant display on cold start
+    // ✅ FIX 4a: Warm-start from cache for instant display, but do NOT set
+    // loaded=true — that way onSnapshot always fires a full re-render with
+    // live data, even when a warm cache exists.
     const cached = _loadStudentCache(tutor.email);
-    // Pre-fill with cache for instant display but do NOT mark as loaded —
-    // that way getStudents() still returns cache fast, but mergeAndPersist
-    // will always re-render once the live snapshot arrives.
-    if (cached) { _studentStore.students = cached; }
+    if (cached) { _studentStore.students = cached; /* loaded stays false */ }
 
     const q1 = query(collection(db, 'students'), where('tutorEmail', '==', tutor.email));
     const q2 = tutor.id
@@ -754,6 +755,31 @@ function initStudentListener(tutor) {
         : null;
 
     let snap1 = null, snap2 = null;
+
+    // ✅ FIX 5: forceGlobalReRender — called every time Firestore delivers new
+    // student data. Re-renders whichever tab/view is currently on screen and
+    // broadcasts a CustomEvent so modals/calendars can self-update.
+    function forceGlobalReRender(students) {
+        const main = document.getElementById('mainContent');
+        if (!main) return;
+
+        // Broadcast on the global event bus — any listener anywhere can react
+        document.dispatchEvent(new CustomEvent('studentsUpdated', { detail: { students } }));
+
+        // Also call legacy callback for backward compatibility (calendar modal uses this)
+        if (typeof window._onStudentsUpdated === 'function') {
+            try { window._onStudentsUpdated(students); } catch(e) {}
+        }
+
+        // Re-render whichever tab is currently visible
+        if (main.querySelector('#student-list-view')) {
+            renderStudentDatabase(main, tutor);
+        } else if (main.querySelector('#schedule-management-view')) {
+            renderScheduleManagement(main, tutor);
+        } else if (main.querySelector('#dashboard-view')) {
+            renderTutorDashboard(main, tutor);
+        }
+    }
 
     function mergeAndPersist() {
         if (!snap1) return; // wait for at least the email-based snapshot
@@ -769,20 +795,8 @@ function initStudentListener(tutor) {
         _studentStore.loaded   = true;
         _saveStudentCache(tutor.email, merged);
 
-        // Notify any open modal/tab that student data has changed
-        if (typeof window._onStudentsUpdated === 'function') {
-            try { window._onStudentsUpdated(merged); } catch(e) {}
-        }
-        // Always re-render when fresh Firestore data arrives — no DOM gate.
-        // This is what makes management edits appear on the tutor screen
-        // immediately without any reload or cache clearing needed.
-        const main = document.getElementById('mainContent');
-        if (main) {
-            const listView = main.querySelector('#student-list-view');
-            if (listView) {
-                renderStudentDatabase(main, tutor);
-            }
-        }
+        // ✅ Always fire re-render — no DOM gate, no race condition
+        forceGlobalReRender(merged);
     }
 
     const unsub1 = onSnapshot(q1,
@@ -799,7 +813,9 @@ function initStudentListener(tutor) {
     }
 
     _studentStore.unsub = () => { unsub1(); unsub2(); };
-    registerListener('students', _studentStore.unsub);
+    // ✅ FIX 4b: Register under 'global_students' so cleanupTabListeners()
+    // NEVER kills this listener. It lives for the entire session.
+    registerListener('global_students', _studentStore.unsub);
 }
 
 /**
@@ -807,11 +823,19 @@ function initStudentListener(tutor) {
  * Falls back through: in-memory → localStorage cache → fresh Firestore read.
  * All tab renders call this instead of getDocs/fetchStudentsForTutor.
  */
+// ✅ FIX 6: getStudents always returns live data. If onSnapshot has fired,
+// _studentStore.students is authoritative. If not yet (cold start), return
+// cache immediately — onSnapshot will call forceGlobalReRender() when ready.
 async function getStudents(tutor) {
-    if (_studentStore.loaded) return _studentStore.students;
+    // Prefer live in-memory store
+    if (_studentStore.loaded && _studentStore.students.length > 0) return _studentStore.students;
+    // Warm-start: cache gives instant render, onSnapshot will re-render after
     const cached = _loadStudentCache(tutor.email);
-    if (cached) { _studentStore.students = cached; _studentStore.loaded = true; return cached; }
-    // Last resort: direct read (only happens if listener hasn't fired yet)
+    if (cached && cached.length > 0) {
+        if (!_studentStore.loaded) _studentStore.students = cached; // prefill but keep loaded=false
+        return cached;
+    }
+    // Cold start: direct read (only happens before listener fires on first ever login)
     const fresh = await fetchStudentsForTutor(tutor, 'students');
     _studentStore.students = fresh;
     _studentStore.loaded   = true;
@@ -3725,7 +3749,13 @@ function showScheduleCalendarModal() {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    function closeCalModal() { overlay.remove(); document.body.style.overflow = ''; window._onStudentsUpdated = null; }
+    // ✅ FIX 9b: closeCalModal also removes the global event bus listener to prevent memory leaks
+    function closeCalModal() {
+        overlay.remove();
+        document.body.style.overflow = '';
+        window._onStudentsUpdated = null;
+        document.removeEventListener('studentsUpdated', onStudentsUpdatedEvent);
+    }
 
     overlay.querySelector('#cal-close-btn').addEventListener('click', closeCalModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeCalModal(); });
@@ -3740,17 +3770,25 @@ function showScheduleCalendarModal() {
         w.document.close(); w.print();
     });
 
-    // Register live-update callback so any schedule edit (tutor or management)
-    // instantly refreshes the calendar without reopening the modal.
-    // Cleared when the modal closes.
-    window._onStudentsUpdated = (updatedStudents) => {
+    // ✅ FIX 9: Calendar subscribes to BOTH the CustomEvent bus AND the legacy
+    // window._onStudentsUpdated callback so it always stays in sync.
+    function handleCalendarStudentUpdate(updatedStudents) {
         const calView = overlay.querySelector('#calendar-view');
-        const loadingEl = overlay.querySelector('#calendar-loading');
-        if (!calView || !calView.style || calView.style.display === 'none') return;
+        if (!calView || calView.style.display === 'none') return;
         renderCalendarContent(updatedStudents.filter(
             s => !['archived','graduated','transferred'].includes(s.status) && s.schedule?.length > 0
         ), calView);
-    };
+    }
+
+    // Legacy callback (for backward compat)
+    window._onStudentsUpdated = (updatedStudents) => handleCalendarStudentUpdate(updatedStudents);
+
+    // Modern event bus listener — works even when _onStudentsUpdated is overwritten
+    function onStudentsUpdatedEvent(e) { handleCalendarStudentUpdate(e.detail.students); }
+    document.addEventListener('studentsUpdated', onStudentsUpdatedEvent);
+
+    // Clean up both when modal closes
+    const _origCloseCalModal = closeCalModal;
 
     // ── Shared calendar render helper ──────────────────────────────────────────
     // Used both for initial load and live updates from the student onSnapshot.
@@ -5531,13 +5569,20 @@ function showEditStudentModal(student) {
             if (document.getElementById('edit-student-group-class')) { studentData.groupClass = groupClass; }
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
-            // Immediately patch _studentStore so the re-render sees fresh data
-            // without waiting for the onSnapshot round-trip.
+
+            // ✅ FIX 7: Immediately patch _studentStore so the re-render below
+            // shows the new data without waiting for the onSnapshot round-trip.
+            // Also saves updated cache so a reload still shows correct data.
             const idx = _studentStore.students.findIndex(s => s.id === studentId);
             if (idx !== -1) {
                 _studentStore.students[idx] = { ..._studentStore.students[idx], ...studentData };
                 _saveStudentCache(window.tutorData.email, _studentStore.students);
             }
+            // Broadcast so any open modal/calendar also refreshes instantly
+            document.dispatchEvent(new CustomEvent('studentsUpdated', {
+                detail: { students: _studentStore.students }
+            }));
+
             editModal.remove();
             showCustomAlert('Student details updated successfully!');
             const mainContent = document.getElementById('mainContent');
@@ -7022,10 +7067,16 @@ onSnapshot(settingsDocRef, (docSnap) => {
         // NOTE: Admin flags must NOT be logged to console — tutors can see DevTools.
         // console.log removed intentionally for security.
 
-        // Re‑render student database if it's currently visible
+        // ✅ FIX 8: Dispatch settings-changed event so any visible tab re-renders
+        // immediately when an admin toggle changes (e.g. showEditDeleteButtons).
+        document.dispatchEvent(new CustomEvent('adminSettingsUpdated'));
         const mainContent = document.getElementById('mainContent');
-        if (mainContent && mainContent.querySelector('#student-list-view')) {
-            renderStudentDatabase(mainContent, window.tutorData);
+        if (mainContent && window.tutorData) {
+            if (mainContent.querySelector('#student-list-view')) {
+                renderStudentDatabase(mainContent, window.tutorData);
+            } else if (mainContent.querySelector('#dashboard-view')) {
+                renderTutorDashboard(mainContent, window.tutorData);
+            }
         }
     } else {
         /* global_settings not found, using defaults */
