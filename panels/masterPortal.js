@@ -647,31 +647,31 @@ export async function renderGradingActivityTab(container) {
                         timeZone: 'Africa/Lagos'
                       })
                     : '—';
-                return \`
+                return `
                 <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td class="py-3 px-4">
-                        <div class="font-semibold text-gray-800 text-sm">\${escapeHtml(e.tutorName)}</div>
-                        <div class="text-xs text-gray-400">\${escapeHtml(e.tutorEmail)}</div>
+                        <div class="font-semibold text-gray-800 text-sm">${escapeHtml(e.tutorName)}</div>
+                        <div class="text-xs text-gray-400">${escapeHtml(e.tutorEmail)}</div>
                     </td>
                     <td class="py-3 px-4 text-center">
-                        <span class="text-xl font-black \${scoreColor}">\${scoreNum !== null ? scoreNum + '%' : '—'}</span>
+                        <span class="text-xl font-black ${scoreColor}">${scoreNum !== null ? scoreNum + '%' : '—'}</span>
                     </td>
                     <td class="py-3 px-4 text-xs text-gray-600 max-w-xs">
-                        \${e.notes ? \`<span class="italic text-gray-500">"\${escapeHtml(e.notes)}"</span>\` : '<span class="text-gray-300">—</span>'}
+                        ${e.notes ? `<span class="italic text-gray-500">"${escapeHtml(e.notes)}"</span>` : '<span class="text-gray-300">—</span>'}
                     </td>
-                    <td class="py-3 px-4 text-xs text-gray-400 whitespace-nowrap">\${escapeHtml(dateStr)}</td>
-                </tr>\`;
+                    <td class="py-3 px-4 text-xs text-gray-400 whitespace-nowrap">${escapeHtml(dateStr)}</td>
+                </tr>`;
             }).join('');
 
-            return \`
-            <div class="bg-white rounded-2xl border border-\${typeColor}-100 shadow-sm overflow-hidden">
-                <div class="flex items-center justify-between px-5 py-3 bg-\${typeColor}-50 border-b border-\${typeColor}-100">
+            return `
+            <div class="bg-white rounded-2xl border border-${typeColor}-100 shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-3 bg-${typeColor}-50 border-b border-${typeColor}-100">
                     <div>
-                        <span class="font-bold text-\${typeColor}-800 text-sm">\${typeLabel}</span>
-                        <span class="ml-2 text-xs text-\${typeColor}-500 font-semibold">by \${escapeHtml(graderName)}</span>
+                        <span class="font-bold text-${typeColor}-800 text-sm">${typeLabel}</span>
+                        <span class="ml-2 text-xs text-${typeColor}-500 font-semibold">by ${escapeHtml(graderName)}</span>
                     </div>
-                    <span class="text-xs bg-\${typeColor}-100 text-\${typeColor}-700 px-2.5 py-1 rounded-full font-bold">
-                        \${entries.length} graded this week
+                    <span class="text-xs bg-${typeColor}-100 text-${typeColor}-700 px-2.5 py-1 rounded-full font-bold">
+                        ${entries.length} graded this week
                     </span>
                 </div>
                 <div class="overflow-x-auto">
@@ -684,22 +684,22 @@ export async function renderGradingActivityTab(container) {
                                 <th class="text-left py-2.5 px-4 font-semibold">Graded At</th>
                             </tr>
                         </thead>
-                        <tbody>\${rows}</tbody>
+                        <tbody>${rows}</tbody>
                     </table>
                 </div>
-            </div>\`;
+            </div>`;
         }
 
         let html = '';
 
         // ── QA section ──────────────────────────────────────────────
         if (hasQA) {
-            html += \`
+            html += `
             <div class="flex items-center gap-3 mt-1">
                 <div class="h-px flex-1 bg-purple-100"></div>
                 <span class="text-xs font-bold text-purple-500 uppercase tracking-widest px-2">QA — Session Observation</span>
                 <div class="h-px flex-1 bg-purple-100"></div>
-            </div>\`;
+            </div>`;
             Object.entries(qaByGrader)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .forEach(([grader, entries]) => {
@@ -709,12 +709,12 @@ export async function renderGradingActivityTab(container) {
 
         // ── QC section ──────────────────────────────────────────────
         if (hasQC) {
-            html += \`
+            html += `
             <div class="flex items-center gap-3 mt-2">
                 <div class="h-px flex-1 bg-amber-100"></div>
                 <span class="text-xs font-bold text-amber-500 uppercase tracking-widest px-2">QC — Lesson Plan</span>
                 <div class="h-px flex-1 bg-amber-100"></div>
-            </div>\`;
+            </div>`;
             Object.entries(qcByGrader)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .forEach(([grader, entries]) => {
@@ -722,14 +722,14 @@ export async function renderGradingActivityTab(container) {
                 });
         }
 
-        contentEl.innerHTML = \`<div class="space-y-4">\${html}</div>\`;
+        contentEl.innerHTML = `<div class="space-y-4">${html}</div>`;
 
     } catch (err) {
         console.error('Grading Activity tab error:', err);
-        contentEl.innerHTML = \`
+        contentEl.innerHTML = `
         <div class="bg-white rounded-2xl border border-red-200 shadow-sm p-6 text-center">
-            <p class="text-red-500 font-semibold">❌ Failed to load: \${escapeHtml(err.message)}</p>
-        </div>\`;
+            <p class="text-red-500 font-semibold">❌ Failed to load: ${escapeHtml(err.message)}</p>
+        </div>`;
     }
 }
 
