@@ -519,7 +519,72 @@ export async function renderMasterPortalPanel(container) {
         const listEl = document.getElementById('master-portal-list');
         const currentStaff = window.userData;
 
-        tutors.forEach((tutor, idx) => {
+        // ── QA assignment filter ────────────────────────────────────
+        // If the logged-in staff has canQA AND is not in the excluded
+        // list, only show them the tutors assigned to them this week
+        // (current week + any carryover ungraded from earlier weeks).
+        // Everyone else sees all tutors.
+        let visibleTutorIds = null; // null = show all
+
+        const isQaGrader = currentStaff?.permissions?.tabs?.canQA
+                        && !QA_ROTATION_EXCLUDED.includes(currentStaff?.email);
+
+        if (isQaGrader) {
+            try {
+                const planSnap = await getDoc(doc(db, 'qa_assignments', monthKey));
+                if (planSnap.exists()) {
+                    const plan = planSnap.data();
+
+                    // Which week are we in?
+                    const lagosNow = new Date(
+                        new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' })
+                    );
+                    let curWeekIdx = (plan.weeks || []).findIndex(w => {
+                        const mon = new Date(w.mondayISO + 'T00:00:00');
+                        const sun = new Date(w.sundayISO + 'T23:59:59');
+                        return lagosNow >= mon && lagosNow <= sun;
+                    });
+                    if (curWeekIdx === -1) curWeekIdx = (plan.weeks || []).length - 1;
+
+                    // Collect all tutors assigned to this staff in
+                    // weeks 0..curWeekIdx that haven't been graded yet
+                    // (their current week's list + carryover)
+                    const myAssigned = new Set();
+                    for (let wi = 0; wi <= curWeekIdx; wi++) {
+                        const ids = ((plan.weeks[wi] || {}).assignments || {})[currentStaff.email] || [];
+                        ids.forEach(id => myAssigned.add(id));
+                    }
+
+                    // Remove already-graded tutors (only show what still needs doing)
+                    gradesSnap.docs.forEach(d => {
+                        const g = d.data();
+                        const tid = g.tutorId || d.id;
+                        const alreadyGraded = (g.qa_grades || []).some(e => e.gradedBy === currentStaff.email)
+                                           || (!g.qa_grades?.length && g.qa?.gradedBy === currentStaff.email);
+                        if (alreadyGraded) myAssigned.delete(tid);
+                    });
+
+                    visibleTutorIds = myAssigned; // Set of tutorIds to show
+                }
+            } catch(e) { /* plan not available yet — fall through to show all */ }
+        }
+
+        // Apply filter: if visibleTutorIds is a Set, only render matching tutors
+        const tutorsToRender = visibleTutorIds !== null
+            ? tutors.filter(t => visibleTutorIds.has(t.id))
+            : tutors;
+
+        // Show a contextual banner for QA graders
+        if (isQaGrader && visibleTutorIds !== null) {
+            const banner = document.createElement('div');
+            banner.className = 'bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 text-sm text-purple-800 mb-1';
+            banner.innerHTML = visibleTutorIds.size > 0
+                ? `📋 <strong>Your QA list this week:</strong> ${visibleTutorIds.size} tutor${visibleTutorIds.size !== 1 ? 's' : ''} assigned to you. Grade them below.`
+                : `✅ <strong>You're all caught up!</strong> No outstanding QA grades assigned to you this week.`;
+            listEl.before(banner);
+        }
+
+        tutorsToRender.forEach((tutor, idx) => {
             const tutorStudents = studentsByTutor[tutor.email] || [];
             const activeStudents = tutorStudents.filter(s => !s.summerBreak && !['archived','graduated','transferred'].includes(s.status));
             const g = grades[tutor.id] || grades[tutor.email] || {};
