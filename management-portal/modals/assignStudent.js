@@ -116,10 +116,6 @@ window.showAssignStudentModal = async function() {
 // Matches tutorDirectory.js showAssignStudentModal logic
 // ============================================================
 
-import { db } from '../core/firebase.js';
-import { collection, doc, Timestamp, updateDoc, setDoc, addDoc } from '../core/firebase.js';
-import { escapeHtml, buildGradeOptions, buildTimeOptions, formatTimeTo12h } from '../core/utils.js';
-import { sessionCache, invalidateCache } from '../core/cache.js';
 
 window.showAssignStudentModal = async function() {
     try {

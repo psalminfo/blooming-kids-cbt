@@ -17,7 +17,6 @@ import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOption
          getScoreColor, getScoreBg, getScoreBar,
          getStudentTypeLabel, formatStudentSchedule } from '../core/utils.js';
 import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached } from '../core/cache.js';
-import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached, invalidateTabCache } from '../core/cache.js';
 import { logManagementActivity } from '../notifications/activityLog.js';
 
 // SUBSECTION 5.2: Enrollments Panel (COMPREHENSIVE TUTOR DISPLAY)
