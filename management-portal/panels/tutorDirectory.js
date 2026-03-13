@@ -1757,7 +1757,6 @@ export function renderDirectoryFromCache(searchTerm = '') {
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm);
         const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
-        const studentMatch = assignedStudents.some(s => s._searchMatch);
         
         return tutorMatch || studentMatch;
     });
