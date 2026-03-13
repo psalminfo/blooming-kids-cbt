@@ -119,7 +119,6 @@ export async function renderManagementTutorView(container) {
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         
-        document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
         let _searchDebounceTimer = null;
         document.getElementById('directory-search').addEventListener('input', (e) => {
             const val = e.target.value;
@@ -1610,8 +1609,6 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         ] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
-            getDocs(collection(db, "tutorAssignments")),
-            getDocs(collection(db, "tutorTransitions")),
             getDocs(query(collection(db, "tutorAssignments"), orderBy("assignedAt", "desc"), limit(300))),
             getDocs(query(collection(db, "tutorTransitions"), orderBy("createdAt", "desc"), limit(200))),
             getDocs(collection(db, "groupClasses"))
@@ -1672,9 +1669,6 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents);
         saveToLocalStorage('groupClasses', groupClasses);
-        sessionCache.tutorAssignments = tutorAssignments;
-        sessionCache.tutorTransitions = activeTransitions;
-        sessionCache._lastUpdate = Date.now();
         sessionCache.tutors = activeTutors;
         sessionCache.students = nonArchivedStudents;
         sessionCache.tutorAssignments = tutorAssignments;
@@ -1756,7 +1750,7 @@ export function renderDirectoryFromCache(searchTerm = '') {
         
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm);
-        const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
+        const studentMatch = assignedStudents.some(s => s._searchMatch);
         
         return tutorMatch || studentMatch;
     });
@@ -1784,7 +1778,6 @@ export function renderDirectoryFromCache(searchTerm = '') {
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors))
             .filter(student => !searchTerm || student._searchMatch)
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
@@ -2110,7 +2103,6 @@ export function showAssignStudentModal() {
 
                         <!-- Fee -->
                         <div class="mb-3">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Student Fee (₦) <span class="text-red-500">*</span></label>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦) <span class="text-red-500">*</span></label>
                             <input type="number" id="assign-studentFee" value="0" min="0"
                                 class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
@@ -2611,7 +2603,6 @@ export function showAssignStudentModal() {
         alert(`Student "${studentName}" assigned successfully!`);
         closeManagementModal('assign-modal');
         invalidateCache('students');
-        invalidateCache('tutorAssignments');
         sessionCache._lastUpdate = 0; // force next render to re-fetch
         renderManagementTutorView(document.getElementById('main-content'));
     }

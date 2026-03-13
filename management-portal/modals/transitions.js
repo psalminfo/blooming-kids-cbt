@@ -250,8 +250,6 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         
         // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
             originalTutorEmail: student.tutorEmail || '',
             originalTutorName: student.tutorName || student.currentTutor || 'Unassigned',
             tutorEmail: newTutor.email,
@@ -270,8 +268,6 @@ export async function performTransition(student, newTutor, startDate, endDate, r
         const transitionRef = await addDoc(collection(db, "tutorTransitions"), {
             studentId: student.id,
             studentName: student.studentName,
-            originalTutorEmail: student.tutorEmail,
-            originalTutorName: student.tutorName,
             originalTutorEmail: student.tutorEmail || '',
             originalTutorName: student.tutorName || student.currentTutor || 'Unassigned',
             temporaryTutorEmail: newTutor.email,

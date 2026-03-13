@@ -16,7 +16,7 @@ import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOption
          getCurrentMonthKeyLagos, getCurrentMonthLabelLagos,
          getScoreColor, getScoreBg, getScoreBar,
          getStudentTypeLabel, formatStudentSchedule } from '../core/utils.js';
-import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached } from '../core/cache.js';
+import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached, invalidateTabCache } from '../core/cache.js';
 import { logManagementActivity } from '../notifications/activityLog.js';
 
 // SUBSECTION 5.2: Enrollments Panel (COMPREHENSIVE TUTOR DISPLAY)
@@ -46,7 +46,6 @@ window.sessionCache = window.sessionCache || {};
 export function safeParseDate(dateInput) {
     if (!dateInput) return null;
     if (dateInput instanceof Date) return dateInput;
-    if (dateInput.seconds) { // Firestore Timestamp
     if (dateInput && typeof dateInput === 'object' && dateInput.seconds) { // Firestore Timestamp
         return new Date(dateInput.seconds * 1000);
     }
@@ -122,24 +121,17 @@ export async function checkTutorAssignments(enrollmentId, studentNames = []) {
         // Process students collection
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
-            const studentName = data.name || '';
             const studentName = data.studentName || data.name || '';
 
             // Determine academic tutor
             let tutorName = data.tutorName;
             let tutorEmail = data.tutorEmail;
-            let assignedDate = data.assignedDate;
             let assignedDate = data.assignedDate || data.createdAt;
 
             // Check nested tutor object
             if (data.tutor) {
                 tutorName = tutorName || data.tutor.tutorName || data.tutor.name;
                 tutorEmail = tutorEmail || data.tutor.tutorEmail || data.tutor.email;
-                assignedDate = assignedDate || data.tutor.assignedDate;
-            }
-
-            if (!assignedDate && (tutorName || tutorEmail)) {
-                assignedDate = data.createdAt;
             }
 
             assignments.push({
@@ -583,16 +575,6 @@ export async function fetchAndRenderEnrollments(forceRefresh = false) {
                 studentsByEnrollment[student.enrollmentId].push(student);
             });
 
-            // Also fetch pending_students for each enrollment (optional, can be done similarly but may not be needed for status)
-            // For simplicity, we'll still use checkTutorAssignments per enrollment but with an optimized version
-            // that accepts pre-fetched data. However, to keep code simpler, we'll keep the original but note that it's less efficient.
-            // In a production app, you'd want to batch this as well.
-
-            // For now, we'll use the existing checkTutorAssignments but we'll improve it to accept optional pre-fetched data if needed.
-            // But to avoid complexity, we'll leave as is, but at least we have the student data we could use.
-
-            const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
-                const assignments = await checkTutorAssignments(enrollment.id); // still does queries, but we can't avoid easily without major rewrite
             const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
                 const assignments = await checkTutorAssignments(enrollment.id);
                 const assignmentStatus = getEnrollmentAssignmentStatus(enrollment, assignments);
@@ -1893,18 +1875,6 @@ export async function approveEnrollmentWithDetails(enrollmentId) {
         // Clear relevant caches
         delete sessionCache.enrollments;
         delete sessionCache.pendingStudents;
-        // No need to delete students cache because we didn't create any students
-
-        // Refresh the view (invalidate cache since data changed)
-        const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
-        const mainContent = document.getElementById('main-content');
-        if (currentNavId) invalidateTabCache(currentNavId);
-        if (currentNavId && allNavItems[currentNavId] && mainContent) {
-            allNavItems[currentNavId].fn(mainContent);
-        } else {
-            const container = document.getElementById('main-content');
-            if (container) await renderEnrollmentsPanel(container);
-        }
 
         // Refresh the view
         await fetchAndRenderEnrollments(true);
