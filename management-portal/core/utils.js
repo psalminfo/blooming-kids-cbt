@@ -4,6 +4,13 @@
 // Import what you need: import { escapeHtml, formatNaira } from "../core/utils.js";
 // ============================================================
 
+<<<<<<< HEAD
+=======
+// Firestore imports required by logStudentEvent
+import { db } from './firebase.js';
+import { collection, addDoc } from './firebase.js';
+
+>>>>>>> main
 // XSS protection — always use before inserting user data into innerHTML
 export function escapeHtml(unsafe) {
     if (unsafe === undefined || unsafe === null) return '';
@@ -398,4 +405,8 @@ export function formatStudentSchedule(student) {
     }).join('');
 }
 
+<<<<<<< HEAD
 // --- Main Render Function ---
+=======
+// --- Main Render Function ---
+>>>>>>> main

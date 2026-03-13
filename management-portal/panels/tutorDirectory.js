@@ -119,7 +119,16 @@ export async function renderManagementTutorView(container) {
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         
+<<<<<<< HEAD
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+=======
+        let _searchDebounceTimer = null;
+        document.getElementById('directory-search').addEventListener('input', (e) => {
+            const val = e.target.value;
+            clearTimeout(_searchDebounceTimer);
+            _searchDebounceTimer = setTimeout(() => renderDirectoryFromCache(val), 250);
+        });
+>>>>>>> main
         
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
@@ -1570,6 +1579,22 @@ export function showManageTransitionModal(studentId) {
 // ======================================================
 
 export async function fetchAndRenderDirectory(forceRefresh = false) {
+<<<<<<< HEAD
+=======
+    // ── Cache freshness guard: skip Firestore if data is less than 5 min old ──
+    const CACHE_TTL_MS = 5 * 60 * 1000;
+    const cacheAge = Date.now() - (sessionCache._lastUpdate || 0);
+    const cacheIsValid = !forceRefresh
+        && cacheAge < CACHE_TTL_MS
+        && sessionCache.tutors?.length > 0
+        && sessionCache.students?.length > 0;
+
+    if (cacheIsValid) {
+        renderDirectoryFromCache();
+        return;
+    }
+
+>>>>>>> main
     if (forceRefresh) {
         invalidateCache('tutors'); 
         invalidateCache('students'); 
@@ -1591,8 +1616,13 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         ] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
+<<<<<<< HEAD
             getDocs(collection(db, "tutorAssignments")),
             getDocs(collection(db, "tutorTransitions")),
+=======
+            getDocs(query(collection(db, "tutorAssignments"), orderBy("assignedAt", "desc"), limit(300))),
+            getDocs(query(collection(db, "tutorTransitions"), orderBy("createdAt", "desc"), limit(200))),
+>>>>>>> main
             getDocs(collection(db, "groupClasses"))
         ]);
         
@@ -1617,6 +1647,10 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
+<<<<<<< HEAD
+=======
+        window.__allStudents = allStudents; // cache for handleEditStudent
+>>>>>>> main
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -1650,9 +1684,18 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents);
         saveToLocalStorage('groupClasses', groupClasses);
+<<<<<<< HEAD
         sessionCache.tutorAssignments = tutorAssignments;
         sessionCache.tutorTransitions = activeTransitions;
         sessionCache._lastUpdate = Date.now();
+=======
+        sessionCache.tutors = activeTutors;
+        sessionCache.students = nonArchivedStudents;
+        sessionCache.tutorAssignments = tutorAssignments;
+        sessionCache.tutorTransitions = activeTransitions;
+        sessionCache._lastUpdate = Date.now();
+        window.__allStudents = nonArchivedStudents;
+>>>>>>> main
         
         // Update all 7 counters
         if (document.getElementById('tutor-count-badge')) {
@@ -1707,10 +1750,23 @@ export function renderDirectoryFromCache(searchTerm = '') {
         return;
     }
 
+<<<<<<< HEAD
+=======
+    // Skip re-render if the same search + same data snapshot is already displayed
+    const _renderKey = searchTerm + '|' + (sessionCache._lastUpdate || '');
+    if (renderDirectoryFromCache._lastKey === _renderKey) return;
+    renderDirectoryFromCache._lastKey = _renderKey;
+
+>>>>>>> main
     const studentsByTutor = {};
     students.forEach(s => {
         if (s.tutorEmail) {
             if (!studentsByTutor[s.tutorEmail]) studentsByTutor[s.tutorEmail] = [];
+<<<<<<< HEAD
+=======
+            // Pre-compute search match once per student (avoids calling it twice below)
+            s._searchMatch = !searchTerm || searchStudentFromFirebase(s, searchTerm, tutors);
+>>>>>>> main
             studentsByTutor[s.tutorEmail].push(s);
         }
     });
@@ -1721,7 +1777,11 @@ export function renderDirectoryFromCache(searchTerm = '') {
         
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm);
+<<<<<<< HEAD
         const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
+=======
+        const studentMatch = assignedStudents.some(s => s._searchMatch);
+>>>>>>> main
         
         return tutorMatch || studentMatch;
     });
@@ -1749,7 +1809,11 @@ export function renderDirectoryFromCache(searchTerm = '') {
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
+<<<<<<< HEAD
             .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors))
+=======
+            .filter(student => !searchTerm || student._searchMatch)
+>>>>>>> main
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
         const breakCount = assignedStudents.filter(s => getStudentCategory(s) === 'break').length;
@@ -1828,9 +1892,16 @@ export function renderDirectoryFromCache(searchTerm = '') {
                 </tr>`;
         }).join('');
 
+<<<<<<< HEAD
         return `
             <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                 <details open>
+=======
+        const isMobile = window.innerWidth < 768;
+        return `
+            <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                <details ${isMobile ? '' : 'open'}>
+>>>>>>> main
                     <summary class="p-5 cursor-pointer flex justify-between bg-gradient-to-r from-gray-50 to-white border-b">
                         <div>
                             <h3 class="text-lg font-semibold text-green-700">${tutorTitle} 
@@ -1968,6 +2039,14 @@ export function showAssignStudentModal() {
                 <input type="text" id="${rowId}-subject" placeholder="e.g. Mathematics / Piano / SAT"
                        class="w-full rounded-md border border-gray-300 shadow-sm p-1.5 text-sm">
             </div>
+<<<<<<< HEAD
+=======
+            <div class="mt-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tutor Fee (₦) *</label>
+                <input type="number" id="${rowId}-fee" placeholder="e.g. 50000" min="0" value="0"
+                       class="w-full rounded-md border border-gray-300 shadow-sm p-1.5 text-sm">
+            </div>
+>>>>>>> main
         </div>`;
     }
 
@@ -2068,7 +2147,11 @@ export function showAssignStudentModal() {
 
                         <!-- Fee -->
                         <div class="mb-3">
+<<<<<<< HEAD
                             <label class="block text-sm font-medium text-gray-700 mb-1">Student Fee (₦) <span class="text-red-500">*</span></label>
+=======
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦) <span class="text-red-500">*</span></label>
+>>>>>>> main
                             <input type="number" id="assign-studentFee" value="0" min="0"
                                 class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
                         </div>
@@ -2421,6 +2504,10 @@ export function showAssignStudentModal() {
         const academicEmail = document.getElementById('am-tutor-academic-email').value;
         const academicName  = document.getElementById('am-tutor-academic-name').value;
         const academicSubj  = document.getElementById('am-tutor-academic-subject').value.trim();
+<<<<<<< HEAD
+=======
+        const academicFee   = Number(document.getElementById('am-tutor-academic-fee')?.value) || 0;
+>>>>>>> main
 
         if (!studentName || !grade || !days || !startTime || !endTime || !subjectsRaw) {
             alert('Please fill in all required student fields.'); return;
@@ -2444,6 +2531,10 @@ export function showAssignStudentModal() {
             tutorEmail: academicEmail,
             tutorName: academicName,
             subject: academicSubj || subjects.join(', '),
+<<<<<<< HEAD
+=======
+            tutorFee: academicFee,
+>>>>>>> main
             assignedDate: new Date().toISOString()
         }];
 
@@ -2451,6 +2542,10 @@ export function showAssignStudentModal() {
         const ecEmail   = document.getElementById('am-tutor-ec-email')?.value;
         const ecName    = document.getElementById('am-tutor-ec-name')?.value;
         const ecSubject = document.getElementById('am-tutor-ec-subject')?.value.trim();
+<<<<<<< HEAD
+=======
+        const ecFee     = Number(document.getElementById('am-tutor-ec-fee')?.value) || 0;
+>>>>>>> main
         const ecVisible = !document.getElementById('am-ec-section')?.classList.contains('hidden');
         if (ecVisible && ecEmail) {
             subjectAssignments.push({
@@ -2458,6 +2553,10 @@ export function showAssignStudentModal() {
                 tutorEmail: ecEmail,
                 tutorName: ecName,
                 subject: ecSubject || 'Extra-Curricular',
+<<<<<<< HEAD
+=======
+                tutorFee: ecFee,
+>>>>>>> main
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2466,6 +2565,10 @@ export function showAssignStudentModal() {
         const tpEmail   = document.getElementById('am-tutor-tp-email')?.value;
         const tpName    = document.getElementById('am-tutor-tp-name')?.value;
         const tpSubject = document.getElementById('am-tutor-tp-subject')?.value.trim();
+<<<<<<< HEAD
+=======
+        const tpFee     = Number(document.getElementById('am-tutor-tp-fee')?.value) || 0;
+>>>>>>> main
         const tpVisible = !document.getElementById('am-tp-section')?.classList.contains('hidden');
         if (tpVisible && tpEmail) {
             subjectAssignments.push({
@@ -2473,6 +2576,10 @@ export function showAssignStudentModal() {
                 tutorEmail: tpEmail,
                 tutorName: tpName,
                 subject: tpSubject || 'Test Prep',
+<<<<<<< HEAD
+=======
+                tutorFee: tpFee,
+>>>>>>> main
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2488,6 +2595,10 @@ export function showAssignStudentModal() {
             parentPhone,
             parentEmail,
             studentFee,
+<<<<<<< HEAD
+=======
+            tutorFee: academicFee,
+>>>>>>> main
             // Primary academic tutor (legacy fields kept for backward compat)
             tutorEmail: academicEmail,
             tutorName: academicName,
@@ -2561,7 +2672,11 @@ export function showAssignStudentModal() {
         alert(`Student "${studentName}" assigned successfully!`);
         closeManagementModal('assign-modal');
         invalidateCache('students');
+<<<<<<< HEAD
         invalidateCache('tutorAssignments');
+=======
+        sessionCache._lastUpdate = 0; // force next render to re-fetch
+>>>>>>> main
         renderManagementTutorView(document.getElementById('main-content'));
     }
 
@@ -2747,4 +2862,99 @@ window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
 
+<<<<<<< HEAD
+=======
+function handleEditStudent(studentId) {
+    const student = window.__allStudents?.find(s => s.id === studentId);
+    if (!student) { alert('Student not found. Please refresh.'); return; }
+    const existing = document.getElementById('edit-student-modal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="edit-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+            <div class="bg-white w-full max-w-lg rounded-lg shadow-xl" style="max-height:90vh;overflow-y:auto;">
+                <div class="flex justify-between items-center p-5 border-b sticky top-0 bg-white z-10">
+                    <h3 class="text-xl font-bold text-gray-800">Edit Student</h3>
+                    <button onclick="document.getElementById('edit-student-modal').remove()" class="text-gray-400 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                </div>
+                <form id="edit-student-form" class="p-5 space-y-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Student Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="edit-studentName" value="${escapeHtml(student.studentName || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                        <select id="edit-grade" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">${buildGradeOptions(student.grade)}</select></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Days/Week</label>
+                        <input type="text" id="edit-days" value="${escapeHtml(student.days || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                            <select id="edit-start-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">${buildTimeOptions(student.schedule?.[0]?.start)}</select></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                            <select id="edit-end-time" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">${buildTimeOptions(student.schedule?.[0]?.end)}</select></div>
+                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Academic Subjects</label>
+                        <input type="text" id="edit-subjects" value="${escapeHtml((student.subjects || []).join(', '))}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                        <input type="text" id="edit-parentName" value="${escapeHtml(student.parentName || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
+                        <input type="text" id="edit-parentPhone" value="${escapeHtml(student.parentPhone || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                        <input type="email" id="edit-parentEmail" value="${escapeHtml(student.parentEmail || '')}" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦)</label>
+                        <input type="number" id="edit-tutorFee" value="${student.tutorFee ?? student.studentFee ?? 0}" min="0" class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm"></div>
+                    <div class="flex justify-end gap-2 pt-2 border-t">
+                        <button type="button" onclick="document.getElementById('edit-student-modal').remove()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `);
+    document.getElementById('edit-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = 'Saving...';
+        try {
+            const updates = {
+                studentName: document.getElementById('edit-studentName').value.trim(),
+                grade:       document.getElementById('edit-grade').value,
+                days:        document.getElementById('edit-days').value.trim(),
+                subjects:    document.getElementById('edit-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
+                parentName:  document.getElementById('edit-parentName').value.trim(),
+                parentPhone: document.getElementById('edit-parentPhone').value.trim(),
+                parentEmail: document.getElementById('edit-parentEmail').value.trim(),
+                tutorFee:    Number(document.getElementById('edit-tutorFee').value) || 0,
+                studentFee:  Number(document.getElementById('edit-tutorFee').value) || 0,
+                updatedAt:   new Date().toISOString(),
+                updatedBy:   window.userData?.name || window.userData?.email || 'management'
+            };
+            const startTime = document.getElementById('edit-start-time').value;
+            const endTime   = document.getElementById('edit-end-time').value;
+            if (startTime && endTime) {
+                updates.academicTime = formatTimeTo12h(startTime) + ' - ' + formatTimeTo12h(endTime);
+                updates.schedule = [{ start: startTime, end: endTime }];
+            }
+            if (!updates.studentName) { alert('Student name is required.'); btn.disabled=false; btn.textContent='Save Changes'; return; }
+            await updateDoc(doc(db, 'students', studentId), updates);
+            alert('"' + updates.studentName + '" updated successfully!');
+            document.getElementById('edit-student-modal').remove();
+            invalidateCache('students');
+            sessionCache._lastUpdate = 0;
+            fetchAndRenderDirectory(true);
+        } catch(err) {
+            console.error('Edit student error:', err);
+            alert('Failed to save: ' + err.message);
+            btn.disabled = false; btn.textContent = 'Save Changes';
+        }
+    });
+}
+
+function handleDeleteStudent(studentId) {
+    if (!confirm('Are you sure you want to delete this student? This cannot be undone.')) return;
+    deleteDoc(doc(db, 'students', studentId))
+        .then(() => { alert('Student deleted.'); fetchAndRenderDirectory(true); })
+        .catch(err => alert('Error deleting student: ' + err.message));
+}
+
+window.handleEditStudent = handleEditStudent;
+window.handleDeleteStudent = handleDeleteStudent;
+
+>>>>>>> main
 // ======================================================
