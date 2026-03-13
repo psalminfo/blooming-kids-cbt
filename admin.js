@@ -98,17 +98,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: false,
             viewInactiveTutors: false,
             viewArchivedStudents: false,
-<<<<<<< HEAD
-            viewMasterPortal: false,   // Management Portal tab
-            canQA: false,              // QA Session Observation button
-            canQC: false               // Lesson Plan QC button
-=======
             viewMasterPortal: false,
             viewReferralsAdmin: false,
             viewUserDirectory: false,
             canQA: false,
             canQC: false
->>>>>>> main
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -133,17 +127,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: false,
             viewInactiveTutors: false,
             viewArchivedStudents: false,
-<<<<<<< HEAD
-            viewMasterPortal: false,   // Management Portal tab
-            canQA: false,              // QA Session Observation button
-            canQC: false               // Lesson Plan QC button
-=======
             viewMasterPortal: false,
             viewReferralsAdmin: false,
             viewUserDirectory: false,
             canQA: false,
             canQC: false
->>>>>>> main
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -168,17 +156,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-<<<<<<< HEAD
-            viewMasterPortal: true,    // Managers can see the Master View
-            canQA: false,              // Only QA officers rate sessions
-            canQC: false               // Only QC officers rate lesson plans
-=======
             viewMasterPortal: true,
             viewReferralsAdmin: true,
             viewUserDirectory: true,
             canQA: false,
             canQC: false
->>>>>>> main
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -203,17 +185,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-<<<<<<< HEAD
-            viewMasterPortal: true,    // Directors can see the Master View
-            canQA: true,               // Directors can do QA ratings
-            canQC: true                // Directors can do QC ratings
-=======
             viewMasterPortal: true,
             viewReferralsAdmin: true,
             viewUserDirectory: true,
             canQA: true,
             canQC: true
->>>>>>> main
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -238,17 +214,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-<<<<<<< HEAD
-            viewMasterPortal: true,    // Admins have full access
-            canQA: true,               // Admins can do QA ratings
-            canQC: true                // Admins can do QC ratings
-=======
             viewMasterPortal: true,
             viewReferralsAdmin: true,
             viewUserDirectory: true,
             canQA: true,
             canQC: true
->>>>>>> main
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -2648,11 +2618,8 @@ async function openPermissionsModal(staffId) {
                             <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
                             <label class="flex items-center col-span-2"><input type="checkbox" id="p-viewMasterPortal" class="mr-2" ${permissions.tabs?.viewMasterPortal ? 'checked' : ''}> <span class="font-semibold text-emerald-700">🗂 Management Portal (Master View)</span></label>
-<<<<<<< HEAD
-=======
                             <label class="flex items-center"><input type="checkbox" id="p-viewReferralsAdmin" class="mr-2" ${permissions.tabs?.viewReferralsAdmin ? 'checked' : ''}> <span class="text-indigo-700">🤝 Referral Management</span></label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewUserDirectory" class="mr-2" ${permissions.tabs?.viewUserDirectory ? 'checked' : ''}> <span class="text-teal-700">📋 User Directory</span></label>
->>>>>>> main
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -2696,11 +2663,8 @@ async function openPermissionsModal(staffId) {
                 viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
                 viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked,
                 viewMasterPortal: document.getElementById('p-viewMasterPortal').checked,
-<<<<<<< HEAD
-=======
                 viewReferralsAdmin: document.getElementById('p-viewReferralsAdmin').checked,
                 viewUserDirectory: document.getElementById('p-viewUserDirectory').checked,
->>>>>>> main
                 canQA: document.getElementById('p-canQA').checked,
                 canQC: document.getElementById('p-canQC').checked
             },
@@ -2941,24 +2905,6 @@ async function initializeGlobalSettings() {
         if (!docSnap.exists()) {
             // Document doesn't exist - create it with default values
             await setDoc(settingsDocRef, {
-<<<<<<< HEAD
-                isReportEnabled: true,          // Default: reports enabled
-                isTutorAddEnabled: true,        // Default: tutors can add students
-                isSummerBreakEnabled: false,    // Default: summer break disabled
-                showStudentFees: true,          // Default: show fees
-                showEditDeleteButtons: true,    // Default: show edit/delete
-                bypassPendingApproval: false,   // Default: require approval
-                showTransitionButton: true,     // Default: show transition button
-                preschoolAddTransition: true,   // Default: allow preschool add/transition
-                lastUpdated: Timestamp.now(),   // Track when created/updated
-                createdAt: Timestamp.now()      // Track creation time
-            });
-            
-            console.log("✅ Created global_settings document with default values");
-            
-            // Also patch any existing toggle event listeners to use setDoc instead of updateDoc
-            patchToggleListeners();
-=======
                 isReportEnabled: true,
                 isTutorAddEnabled: true,
                 isSummerBreakEnabled: false,
@@ -2971,7 +2917,6 @@ async function initializeGlobalSettings() {
                 createdAt: Timestamp.now()
             });
             console.log("✅ Created global_settings document with default values");
->>>>>>> main
         } else {
             console.log("✅ global_settings document already exists");
         }
@@ -2980,46 +2925,6 @@ async function initializeGlobalSettings() {
     }
 }
 
-<<<<<<< HEAD
-// Safely patch toggle event listeners to use setDoc instead of updateDoc
-// This prevents the "No document to update" error
-function patchToggleListeners() {
-    // Wait a moment for DOM to be ready
-    setTimeout(() => {
-        const settingsDocRef = doc(db, "settings", "global_settings");
-        
-        // Helper function to patch a single toggle
-        const patchToggle = (toggleId, fieldName) => {
-            const toggle = document.getElementById(toggleId);
-            if (toggle) {
-                // Remove existing listeners (if any)
-                const newToggle = toggle.cloneNode(true);
-                toggle.parentNode.replaceChild(newToggle, toggle);
-                
-                // Add new listener with setDoc (merge: true)
-                newToggle.addEventListener('change', e => {
-                    setDoc(settingsDocRef, { [fieldName]: e.target.checked }, { merge: true })
-                        .catch(error => console.error(`Error updating ${fieldName}:`, error));
-                });
-            }
-        };
-        
-        // Patch all toggle switches
-        patchToggle('report-toggle', 'isReportEnabled');
-        patchToggle('tutor-add-toggle', 'isTutorAddEnabled');
-        patchToggle('summer-break-toggle', 'isSummerBreakEnabled');
-        patchToggle('show-fees-toggle', 'showStudentFees');
-        patchToggle('edit-delete-toggle', 'showEditDeleteButtons');
-        patchToggle('bypass-approval-toggle', 'bypassPendingApproval');
-        patchToggle('show-transition-toggle', 'showTransitionButton');
-        patchToggle('preschool-add-toggle', 'preschoolAddTransition');
-        
-        console.log("✅ Toggle listeners patched to use setDoc with merge");
-    }, 1000); // Wait 1 second for DOM
-}
-
-=======
->>>>>>> main
 // Run initialization when auth state changes (safest place)
 onAuthStateChanged(auth, async (user) => {
     if (user && user.email === ADMIN_EMAIL) {
@@ -3038,7 +2943,3 @@ if (document.readyState === 'loading') {
 // ========================================================
 // END OF SAFE INITIALIZATION SCRIPT
 // ========================================================
-<<<<<<< HEAD
-
-=======
->>>>>>> main

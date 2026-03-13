@@ -32,13 +32,9 @@ function cleanupListeners(group) {
 
 /** Cleanup listeners for all tab-specific groups (keeps global ones like 'unread') */
 function cleanupTabListeners() {
-<<<<<<< HEAD
-    const tabGroups = ['dashboard', 'inbox', 'archive', 'students', 'schedule', 'courses', 'reports'];
-=======
     // ✅ FIX 1: 'global_students' intentionally excluded so the persistent
     // onSnapshot listener survives ALL tab switches without interruption.
     const tabGroups = ['dashboard', 'inbox', 'archive', 'schedule', 'courses', 'reports'];
->>>>>>> main
     tabGroups.forEach(g => cleanupListeners(g));
 }
 
@@ -573,11 +569,7 @@ function startPersistentClock() {
         return new Intl.DateTimeFormat('en-NG', {
             weekday:'short', day:'numeric', month:'short', year:'numeric',
             hour:'2-digit', minute:'2-digit', second:'2-digit',
-<<<<<<< HEAD
-            hour12: true, timeZone:'Africa/Lagos'
-=======
             hour12: false, timeZone:'Africa/Lagos'
->>>>>>> main
         }).format(new Date()) + ' (WAT)';
     }
 
@@ -703,8 +695,6 @@ async function fetchStudentsForTutor(tutor, col) {
 }
 
 /*******************************************************************************
-<<<<<<< HEAD
-=======
  * SESSION STUDENT CACHE + LIVE LISTENER
  * Single onSnapshot per session keeps all tabs in sync with Firestore.
  * localStorage provides a 30-day cold-start cache so the screen is never
@@ -854,7 +844,6 @@ async function getStudents(tutor) {
 }
 
 /*******************************************************************************
->>>>>>> main
  * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
  ******************************************************************************/
 
@@ -1046,14 +1035,8 @@ class ScheduleManager {
 
     async loadStudents() {
         try {
-<<<<<<< HEAD
-            const { query, collection, where, getDocs } = this.methods;
-            // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-            const fetchedStudents = await fetchStudentsForTutor(this.tutor, "students");
-=======
             // Use in-memory cache (populated by initStudentListener) — zero extra reads
             const fetchedStudents = await getStudents(this.tutor);
->>>>>>> main
             
             this.students = [];
             this.scheduledStudentIds.clear();
@@ -1355,11 +1338,7 @@ class ScheduleManager {
 
         } catch (error) {
             console.error(error);
-<<<<<<< HEAD
-            this.showAlert('Save failed. Check console.', 'error');
-=======
             this.showAlert('Save failed. Please try again.', 'error');
->>>>>>> main
         }
     }
 
@@ -2045,10 +2024,6 @@ function showHomeworkModal(student) {
                         });
                         // Update local object so re-opens of the modal reflect the new subject immediately
                         student.subjects = [...currentSubjects, subject];
-<<<<<<< HEAD
-                        console.log(`Custom subject "${subject}" added to student profile.`);
-=======
->>>>>>> main
                     } catch (subjectUpdateError) {
                         // Non-fatal — homework is still saved, subject just won't persist
                         console.warn('Could not persist custom subject to student profile:', subjectUpdateError.message);
@@ -2287,11 +2262,7 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-<<<<<<< HEAD
-    const tutorId = window.tutorData.messagingId || window.tutorData.id;
-=======
     const tutorId    = window.tutorData.messagingId || window.tutorData.id;
->>>>>>> main
     const tutorEmail = window.tutorData.email;
     if (unsubUnreadListener) unsubUnreadListener();
 
@@ -2316,32 +2287,6 @@ function initializeUnreadListener() {
         err => console.warn('Unread conv listener error:', err)
     );
 
-<<<<<<< HEAD
-    unsubUnreadListener = onSnapshot(q, async (snapshot) => {
-        let count = 0;
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
-                count += data.unreadCount;
-            }
-        });
-        
-        // Also count unread tutor_notifications
-        if (tutorEmail) {
-            try {
-                const nSnap = await getDocs(query(
-                    collection(db, "tutor_notifications"),
-                    where("tutorEmail", "==", tutorEmail),
-                    where("read", "==", false)
-                ));
-                count += nSnap.size;
-            } catch(e) { /* ignore */ }
-        }
-        
-        msgSectionUnreadCount = count;
-        updateFloatingBadges();
-    });
-=======
     // Listener 2: unread tutor_notifications (replaces getDocs-per-event)
     let notifUnsub = () => {};
     if (tutorEmail) {
@@ -2355,7 +2300,6 @@ function initializeUnreadListener() {
     }
 
     unsubUnreadListener = () => { convUnsub(); notifUnsub(); };
->>>>>>> main
 }
 
 // Compatibility Alias
@@ -2541,192 +2485,6 @@ function showEnhancedMessagingModal() {
                 }));
             } catch(e) {}
 
-<<<<<<< HEAD
-            // 3. Other tutors
-            try {
-                const tutorSnap = await getDocs(collection(db, 'tutors'));
-                const myId = tutor.messagingId || tutor.id;
-                tutorSnap.forEach(d => {
-                    if (d.id === tutor.id) return;
-                    const t = d.data();
-                    const tid = t.messagingId || t.tutorUid || d.id;
-                    if (tid === myId) return;
-                    allContacts.push({ id: tid, name: t.name || 'Tutor', role: 'tutor', extra: t.email || '' });
-                });
-            } catch(e) {}
-
-            // 4. Management/Admin
-            allContacts.push({ id: 'management', name: 'Admin (Management)', role: 'management', extra: '' });
-
-            renderList();
-        } catch(e) {
-            listEl.innerHTML = `<div style="padding:16px;text-align:center;color:#ef4444;font-size:.82rem;">Error loading contacts: ${escapeHtml(e.message)}</div>`;
-        }
-    })();
-
-    function renderList() {
-        const listEl = modal.querySelector('#nm-recipient-list');
-        const search = (modal.querySelector('#nm-search').value || '').toLowerCase().trim();
-        const filtered = allContacts.filter(c => {
-            const matchFilter = activeFilter === 'all' || c.role === activeFilter;
-            const matchSearch = !search || c.name.toLowerCase().includes(search) || (c.extra||'').toLowerCase().includes(search);
-            return matchFilter && matchSearch;
-        });
-
-        if (filtered.length === 0) {
-            listEl.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:.82rem;">No contacts found.</div>';
-            return;
-        }
-
-        const roleIcon = { student:'👤', parent:'🏠', tutor:'🧑‍🏫', management:'🏢' };
-        const roleColor = { student:'#dbeafe', parent:'#dcfce7', tutor:'#fef3c7', management:'#f3e8ff' };
-
-        listEl.innerHTML = filtered.map(c => `
-            <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f9fafb;cursor:pointer;transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                <input type="checkbox" class="nm-chk-recipient" value="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name)}" data-role="${escapeHtml(c.role)}" style="accent-color:#6366f1;width:15px;height:15px;flex-shrink:0;">
-                <span style="width:30px;height:30px;border-radius:50%;background:${roleColor[c.role]||'#f1f5f9'};display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">${roleIcon[c.role]||'👤'}</span>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:.84rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
-                    ${c.extra ? `<div style="font-size:.7rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.extra)}</div>` : ''}
-                </div>
-            </label>`).join('');
-
-        // Re-attach change listeners to update count
-        listEl.querySelectorAll('.nm-chk-recipient').forEach(chk => chk.addEventListener('change', updateCount));
-        updateCount();
-    }
-
-    function updateCount() {
-        const checked = modal.querySelectorAll('.nm-chk-recipient:checked');
-        const el = modal.querySelector('#nm-selected-count');
-        el.textContent = checked.length > 0 ? `${checked.length} recipient${checked.length !== 1 ? 's' : ''} selected` : '';
-    }
-
-    // Search
-    modal.querySelector('#nm-search').addEventListener('input', renderList);
-
-    // Filter tabs
-    modal.querySelectorAll('.nm-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            modal.querySelectorAll('.nm-tab').forEach(t => {
-                t.style.borderColor = '#e2e8f0'; t.style.background = '#fff'; t.style.color = '#64748b';
-                t.classList.remove('active-tab');
-            });
-            tab.style.borderColor = '#6366f1'; tab.style.background = '#eef2ff'; tab.style.color = '#4338ca';
-            tab.classList.add('active-tab');
-            activeFilter = tab.dataset.filter;
-            renderList();
-        });
-    });
-
-    // Select All / Clear
-    modal.querySelector('#nm-select-all').onclick = () => {
-        modal.querySelectorAll('.nm-chk-recipient').forEach(c => c.checked = true);
-        updateCount();
-    };
-    modal.querySelector('#nm-clear-all').onclick = () => {
-        modal.querySelectorAll('.nm-chk-recipient').forEach(c => c.checked = false);
-        updateCount();
-    };
-
-    // Send button
-    modal.querySelector('#btn-send-initial').onclick = async () => {
-        const checked = [...modal.querySelectorAll('.nm-chk-recipient:checked')];
-        if (checked.length === 0) { showCustomAlert('Please select at least one recipient.'); return; }
-
-        const content = (modal.querySelector('#msg-content').value || '').trim();
-        const subject = (modal.querySelector('#msg-subject').value || '').trim();
-        const isUrgent = modal.querySelector('#msg-urgent').checked;
-        const imageFile = modal.querySelector('#msg-image-file').files[0] || null;
-        if (!content && !imageFile) { showCustomAlert('Please type a message or attach an image.'); return; }
-
-        const sendBtn = modal.querySelector('#btn-send-initial');
-        sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
-
-        try {
-            let imageUrl = null;
-            if (imageFile) {
-                const fd = new FormData();
-                fd.append('file', imageFile);
-                fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-                fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
-                const data = await res.json();
-                imageUrl = data.secure_url || null;
-            }
-
-            const tutor = window.tutorData;
-            const myMsgId = tutor.messagingId || tutor.id;
-            const now = new Date();
-            const lastMsg = imageUrl ? (content || '📷 Image') : content;
-
-            for (const chk of checked) {
-                const targetId = chk.value;
-                const targetName = chk.dataset.name;
-                const targetRole = chk.dataset.role || 'student';
-                const convId = [myMsgId, targetId].sort().join('_');
-                const convRef = doc(db, "conversations", convId);
-
-                await setDoc(convRef, {
-                    participants: [tutor.id, targetId],
-                    participantDetails: {
-                        [tutor.id]: { name: tutor.name, role: 'tutor', email: tutor.email || '' },
-                        [targetId]: { name: targetName, role: targetRole }
-                    },
-                    tutorId: tutor.id,
-                    tutorEmail: tutor.email || '',
-                    tutorName: tutor.name || '',
-                    studentId: targetId,
-                    studentName: targetName,
-                    lastMessage: lastMsg,
-                    lastMessageTimestamp: now,
-                    lastSenderId: tutor.id,
-                    unreadCount: 1
-                }, { merge: true });
-
-                await addDoc(collection(db, "conversations", convId, "messages"), {
-                    content: content || '',
-                    subject: subject || '',
-                    imageUrl: imageUrl || null,
-                    senderId: tutor.id,
-                    senderName: tutor.name || '',
-                    senderRole: 'tutor',
-                    isUrgent: isUrgent,
-                    createdAt: now,
-                    read: false
-                });
-
-                // ═══ BRIDGE: Also write to management inbox collection ═══
-                if (targetId === 'management' || targetRole === 'management') {
-                    try {
-                        await addDoc(collection(db, "tutor_to_management_messages"), {
-                            tutorId: tutor.id, tutorEmail: tutor.email || '', tutorName: tutor.name || '',
-                            subject: subject || '', message: content || '', imageUrl: imageUrl || null,
-                            isUrgent: isUrgent, createdAt: now,
-                            managementRead: false, replied: false, managementReplies: [],
-                            conversationId: convId
-                        });
-                        await addDoc(collection(db, "management_notifications"), {
-                            type: 'tutor_message', title: 'Message from ' + (tutor.name || 'Tutor'),
-                            message: (content || '📷 Image').substring(0, 200),
-                            tutorEmail: tutor.email || '', tutorName: tutor.name || '',
-                            read: false, createdAt: now
-                        });
-                    } catch(bridgeErr) { console.warn('Management bridge write failed:', bridgeErr); }
-                }
-            }
-
-            modal.remove();
-            showCustomAlert(`✅ Message sent to ${checked.length} recipient${checked.length !== 1 ? 's' : ''}!`);
-        } catch(e) {
-            console.error('Messaging error:', e);
-            showCustomAlert('❌ Error: ' + e.message);
-            sendBtn.disabled = false; sendBtn.textContent = '✈️ Send Message';
-        }
-    };
-}
-
-=======
 // Session-level tutor list cache (populated on first messaging modal open, reused after)
 let _tutorListCache = null;
 async function getTutorList() {
@@ -2921,7 +2679,6 @@ async function getTutorList() {
     };
 }
 
->>>>>>> main
 /** Load recipients keyed by studentId (not parentPhone) so convId matches student portal */
 async function msgLoadRecipientsByStudentId(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
@@ -3044,26 +2801,11 @@ async function msgLoadRecipientsByStudentId(type, container) {
                 container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load parents: ${escapeHtml(e.message)}</div>`;
             }
         } else if (type === 'tutor') {
-<<<<<<< HEAD
-            // Load other tutors for tutor-to-tutor messaging (with search)
-            try {
-                const tutorSnap = await getDocs(collection(db, 'tutors'));
-                const myId = window.tutorData?.messagingId || window.tutorData?.id;
-                const tutors = [];
-                tutorSnap.forEach(d => {
-                    const t = d.data();
-                    const tMsgId = t.tutorUid || d.id;
-                    if (tMsgId !== myId && t.status !== 'inactive') {
-                        tutors.push({ id: tMsgId, docId: d.id, name: t.name || t.email || 'Tutor', email: t.email || '' });
-                    }
-                });
-=======
             // Load other tutors — use session cache, zero reads after first open
             try {
                 const myId = window.tutorData?.messagingId || window.tutorData?.id;
                 const allTutors = await getTutorList();
                 const tutors = allTutors.filter(t => t.id !== myId && t.docId !== window.tutorData?.id);
->>>>>>> main
                 container.innerHTML = `
                     <div style="position:relative;margin-bottom:6px;">
                         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -3690,17 +3432,11 @@ function msgStartInboxListener(modal) {
     };
 
     // ═══ AUTO-ENSURE MANAGEMENT CONVERSATION ═══
-<<<<<<< HEAD
-    // If there are management_message or management_reply notifications, ensure
-    // a conversation doc exists so it appears in the Chats tab (not just Alerts).
-    (async () => {
-=======
     // Only runs once per session (sessionStorage gate) to avoid firing on every inbox open.
     const _mgmtSeedKey = `mgmtConvSeeded_${tutorEmail}`;
     if (!sessionStorage.getItem(_mgmtSeedKey)) {
       sessionStorage.setItem(_mgmtSeedKey, '1');
       (async () => {
->>>>>>> main
         try {
             const mgmtNotifQ = query(
                 collection(db, "tutor_notifications"),
@@ -3763,12 +3499,8 @@ function msgStartInboxListener(modal) {
                 }
             }
         } catch(e) { console.warn('Auto-ensure management conversation error:', e); }
-<<<<<<< HEAD
-    })();
-=======
       })();
     } // end session gate
->>>>>>> main
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
@@ -4017,277 +3749,6 @@ function showScheduleCalendarModal() {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-<<<<<<< HEAD
-    function closeCalModal() { overlay.remove(); document.body.style.overflow = ''; }
-
-    overlay.querySelector('#cal-close-btn').addEventListener('click', closeCalModal);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeCalModal(); });
-    overlay.querySelector('#cal-edit-btn').addEventListener('click', () => {
-        closeCalModal();
-        if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
-    });
-    overlay.querySelector('#cal-print-btn').addEventListener('click', () => {
-        const content = overlay.querySelector('#calendar-view').innerHTML;
-        const w = window.open('', '_blank');
-        w.document.write(`<html><head><title>Schedule</title><style>body{font-family:sans-serif;padding:20px}.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}</style></head><body>${content}</body></html>`);
-        w.document.close(); w.print();
-    });
-
-    // Async data load
-    (async () => {
-        try {
-            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', window.tutorData.email)));
-            const students = [];
-            snap.forEach(d => {
-                const s = { id: d.id, ...d.data() };
-                if (!['archived','graduated','transferred'].includes(s.status) && s.schedule?.length > 0) students.push(s);
-            });
-
-            overlay.querySelector('#calendar-loading').style.display = 'none';
-            const calView = overlay.querySelector('#calendar-view');
-            calView.style.display = 'block';
-
-            if (students.length === 0) {
-                calView.innerHTML = `<div style="text-align:center;padding:60px 20px;">
-                    <div style="font-size:3rem;margin-bottom:16px;">📅</div>
-                    <h4 style="font-weight:800;color:#374151;font-size:1.1rem;margin-bottom:8px;">No Schedules Yet</h4>
-                    <p style="color:#9ca3af;margin-bottom:20px;">No active students have schedules set up.</p>
-                    <button id="setup-cal-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:700;cursor:pointer;">⚙️ Set Up Schedules</button>
-                </div>`;
-                calView.querySelector('#setup-cal-btn').addEventListener('click', () => {
-                    closeCalModal();
-                    if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
-                });
-                return;
-            }
-
-            const ALL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-            const byDay = {};
-            ALL_DAYS.forEach(d => byDay[d] = []);
-            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-
-            students.forEach(s => {
-                (s.schedule || []).forEach(slot => {
-                    if (!byDay[slot.day]) return;
-                    byDay[slot.day].push({
-                        student: s.studentName || 'Unknown',
-                        grade:   s.grade || '',
-                        subjects:(s.subjects || []).join(', '),
-                        start:   slot.start, end: slot.end,
-                        time:    formatScheduleTime(slot.start) + ' – ' + formatScheduleTime(slot.end),
-                        studentId: s.id,
-                        isOvernight: slot.isOvernight || false,
-                        color: ACOLORS[(s.studentName||'').charCodeAt(0) % ACOLORS.length],
-                    });
-                });
-            });
-            ALL_DAYS.forEach(d => byDay[d].sort((a,b) => a.start.localeCompare(b.start)));
-
-            const todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
-
-            let grid = `<div style="display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;min-width:1050px;">`;
-            ALL_DAYS.forEach(day => {
-                const pal = DAY_PAL[day] || { bg:'#f9fafb', hdr:'#374151', light:'#f3f4f6', dot:'#6b7280', text:'#374151' };
-                const isToday = day === todayName;
-                const events  = byDay[day];
-                grid += `
-                <div style="border-radius:14px;overflow:hidden;border:2px solid ${isToday?pal.dot:pal.light};${isToday?'box-shadow:0 0 0 3px '+pal.dot+'33;':''}">
-                    <div style="background:${isToday?pal.hdr:pal.light};padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
-                        <span style="font-weight:800;font-size:.85rem;color:${isToday?'#fff':pal.text};">${day}</span>
-                        ${isToday
-                            ? '<span style="background:rgba(255,255,255,.3);color:#fff;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:999px;">TODAY</span>'
-                            : `<span style="color:${pal.text};font-size:.72rem;opacity:.7;font-weight:600;">${events.length} class${events.length!==1?'es':''}</span>`}
-                    </div>
-                    <div style="background:${pal.bg};padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px;">
-                        ${events.length===0
-                            ? `<div style="text-align:center;padding:20px 4px;color:${pal.dot};opacity:.4;font-size:.78rem;">No classes</div>`
-                            : events.map(ev=>`
-                            <div class="cal-event-card" data-student-id="${escapeHtml(ev.studentId)}"
-                                style="background:#fff;border-radius:10px;padding:8px 10px;border-left:3px solid ${pal.dot};box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;"
-                                onmouseover="this.style.boxShadow='0 3px 10px rgba(0,0,0,.13)'"
-                                onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.07)'">
-                                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                                    <div style="width:20px;height:20px;border-radius:6px;background:${ev.color};color:#fff;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                        ${escapeHtml((ev.student||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}
-                                    </div>
-                                    <span style="font-weight:700;font-size:.78rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ev.student)}</span>
-                                </div>
-                                <div style="font-size:.72rem;font-weight:700;color:${pal.text};">⏰ ${escapeHtml(ev.time)}${ev.isOvernight?' 🌙':''}</div>
-                                ${ev.grade?`<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${escapeHtml(ev.grade)}${ev.subjects?' · '+escapeHtml(ev.subjects):''}</div>`:''}
-                            </div>`).join('')
-                        }
-                    </div>
-                </div>`;
-            });
-            grid += `</div>`;
-            calView.innerHTML = grid;
-
-            // Stats footer
-            const totalClasses = ALL_DAYS.reduce((s,d)=>s+byDay[d].length,0);
-            const busiest = ALL_DAYS.reduce((a,b)=>byDay[a].length>=byDay[b].length?a:b);
-            const statsEl = overlay.querySelector('#cal-stats');
-            statsEl.style.display = 'flex';
-            statsEl.innerHTML = `
-                <span><b style="color:#1e293b;">${students.length}</b> students scheduled</span>
-                <span><b style="color:#1e293b;">${totalClasses}</b> classes/week</span>
-                <span>Busiest day: <b style="color:#1e293b;">${escapeHtml(busiest)}</b></span>
-                <span>Earliest: <b style="color:#1e293b;">${escapeHtml(getEarliestClass(byDay))}</b></span>
-            `;
-
-            // Click-to-edit
-            calView.querySelectorAll('.cal-event-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const sid = card.getAttribute('data-student-id');
-                    const student = students.find(s => s.id === sid);
-                    if (student) { closeCalModal(); showEditScheduleModal(student); }
-                });
-            });
-
-        } catch (err) {
-            console.error('Calendar load error:', err);
-            overlay.querySelector('#calendar-loading').style.display = 'none';
-            const cv = overlay.querySelector('#calendar-view');
-            cv.style.display = 'block';
-            cv.innerHTML = `<div style="text-align:center;padding:40px;color:#dc2626;">⚠️ Failed to load: ${escapeHtml(err.message)}</div>`;
-        }
-    })();
-}
-
-// Edit Schedule Modal — visually coordinated with the main schedule manager
-function showEditScheduleModal(student) {
-    const DAY_STYLES = {
-        Monday:{bg:'#eff6ff',border:'#bfdbfe',dot:'#3b82f6',accent:'#1d4ed8'},
-        Tuesday:{bg:'#f5f3ff',border:'#ddd6fe',dot:'#8b5cf6',accent:'#6d28d9'},
-        Wednesday:{bg:'#ecfdf5',border:'#a7f3d0',dot:'#10b981',accent:'#065f46'},
-        Thursday:{bg:'#fff7ed',border:'#fed7aa',dot:'#f97316',accent:'#9a3412'},
-        Friday:{bg:'#fdf4ff',border:'#f3e8ff',dot:'#a855f7',accent:'#6b21a8'},
-        Saturday:{bg:'#fefce8',border:'#fef08a',dot:'#f59e0b',accent:'#92400e'},
-        Sunday:{bg:'#fff1f2',border:'#fecdd3',dot:'#f43f5e',accent:'#9f1239'},
-    };
-    const APAL = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-    const avatarBg = APAL[(student.studentName||'').charCodeAt(0) % APAL.length];
-    const initials = (student.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;';
-    overlay.innerHTML = `
-        <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden;">
-            <!-- Header -->
-            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:20px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
-                <div style="width:46px;height:46px;border-radius:14px;background:${avatarBg};color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-                <div style="flex:1;min-width:0;">
-                    <div style="color:#fff;font-weight:800;font-size:1.05rem;">✏️ Edit Schedule</div>
-                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${escapeHtml(student.studentName)} · ${escapeHtml(student.grade||'')}</div>
-                </div>
-                <button id="edit-sched-close" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
-            </div>
-            <!-- Info strip -->
-            <div style="background:#f0f9ff;border-bottom:1px solid #bae6fd;padding:9px 22px;font-size:.8rem;color:#0369a1;font-weight:600;flex-shrink:0;">
-                💡 Overnight sessions supported (e.g. 11 PM → 1 AM)
-            </div>
-            <!-- Slots -->
-            <div id="edit-schedule-entries" style="flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;"></div>
-            <!-- Add slot -->
-            <div style="padding:0 18px 12px;flex-shrink:0;">
-                <button id="add-edit-slot-btn" style="width:100%;padding:11px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;color:#475569;font-size:.875rem;font-weight:600;cursor:pointer;">＋ Add Time Slot</button>
-            </div>
-            <!-- Footer -->
-            <div style="border-top:1px solid #f1f5f9;padding:14px 18px;display:flex;gap:10px;background:#f8fafc;flex-shrink:0;">
-                <button id="cancel-edit-schedule-btn" style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;padding:12px;border-radius:12px;font-size:.875rem;font-weight:600;cursor:pointer;">Cancel</button>
-                <button id="save-edit-schedule-btn" style="flex:2;background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;padding:12px;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;">✅ Save Schedule</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-
-    function closeMod() { overlay.remove(); document.body.style.overflow = ''; }
-    overlay.querySelector('#edit-sched-close').addEventListener('click', closeMod);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeMod(); });
-    overlay.querySelector('#cancel-edit-schedule-btn').addEventListener('click', () => { closeMod(); showScheduleCalendarModal(); });
-
-    const selSt = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff;outline:none;cursor:pointer;';
-    const timeOpts = sel => TIME_SLOTS.map(s=>`<option value="${escapeHtml(s.value)}" ${s.value===sel?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
-    const dayOpts  = sel => DAYS_OF_WEEK.map(d=>`<option value="${escapeHtml(d)}" ${d===sel?'selected':''}>${escapeHtml(d)}</option>`).join('');
-
-    const container = overlay.querySelector('#edit-schedule-entries');
-
-    function addSlot(slot = null) {
-        const day   = slot?.day   || 'Monday';
-        const start = slot?.start || '09:00';
-        const end   = slot?.end   || '10:00';
-        const S = DAY_STYLES[day] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
-        const row = document.createElement('div');
-        row.style.cssText = `background:${S.bg};border:1.5px solid ${S.border};border-radius:14px;padding:13px 15px;`;
-        row.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:7px;">
-                    <span class="edot" style="width:9px;height:9px;border-radius:50%;background:${S.dot};display:inline-block;flex-shrink:0;"></span>
-                    <span class="elbl" style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${S.accent};">${escapeHtml(day)}</span>
-                </div>
-                <button class="rm-slot-btn" style="background:#fee2e2;border:none;color:#ef4444;width:28px;height:28px;border-radius:8px;font-size:.8rem;cursor:pointer;font-weight:700;">✕</button>
-            </div>
-            <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;">
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Day</label>
-                    <select class="schedule-day" style="${selSt}">${dayOpts(day)}</select>
-                </div>
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Starts</label>
-                    <select class="schedule-start" style="${selSt}">${timeOpts(start)}</select>
-                </div>
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Ends</label>
-                    <select class="schedule-end" style="${selSt}">${timeOpts(end)}</select>
-                </div>
-            </div>
-        `;
-        // Live colour on day change
-        const sel = row.querySelector('.schedule-day');
-        sel.addEventListener('change', () => {
-            const d = sel.value;
-            const s = DAY_STYLES[d]||{bg:'#f8fafc',border:'#e2e8f0',dot:'#94a3b8',accent:'#475569'};
-            row.style.background=s.bg; row.style.borderColor=s.border;
-            row.querySelector('.edot').style.background=s.dot;
-            row.querySelector('.elbl').style.color=s.accent;
-            row.querySelector('.elbl').textContent=d;
-        });
-        row.querySelector('.rm-slot-btn').addEventListener('click', () => {
-            if (container.children.length > 1) row.remove();
-            else showCustomAlert('At least one time slot is required.');
-        });
-        container.appendChild(row);
-    }
-
-    // Populate existing slots (or blank if none)
-    if (student.schedule && student.schedule.length > 0) {
-        student.schedule.forEach(s => addSlot(s));
-    } else {
-        addSlot();
-    }
-
-    overlay.querySelector('#add-edit-slot-btn').addEventListener('click', () => addSlot());
-
-    overlay.querySelector('#save-edit-schedule-btn').addEventListener('click', async () => {
-        const saveBtn = overlay.querySelector('#save-edit-schedule-btn');
-        const entries = container.querySelectorAll(':scope > div');
-        const schedule = [];
-        let hasError = false;
-
-        for (const entry of entries) {
-            const day   = entry.querySelector('.schedule-day').value;
-            const start = entry.querySelector('.schedule-start').value;
-            const end   = entry.querySelector('.schedule-end').value;
-            const v = validateScheduleTime(start, end);
-            if (!v.valid) { showCustomAlert(v.message); hasError = true; break; }
-            schedule.push({ day, start, end, isOvernight: v.isOvernight||false, duration: v.duration });
-        }
-        if (hasError || !schedule.length) return;
-
-        saveBtn.disabled = true;
-        saveBtn.textContent = '⏳ Saving…';
-        try {
-=======
     // ✅ FIX 9b: closeCalModal also removes the global event bus listener to prevent memory leaks
     function closeCalModal() {
         overlay.remove();
@@ -4577,7 +4038,6 @@ function showEditScheduleModal(student) {
         saveBtn.disabled = true;
         saveBtn.textContent = '⏳ Saving…';
         try {
->>>>>>> main
             await updateDoc(doc(db, 'students', student.id), { schedule });
             closeMod();
             showCustomAlert('✅ Schedule updated successfully!');
@@ -5310,11 +4770,7 @@ function renderTutorDashboard(container, tutor) {
         }
         function formatLagosDT() {
             const opts = { weekday:'short', day:'numeric', month:'short', year:'numeric',
-<<<<<<< HEAD
-                           hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone:'Africa/Lagos' };
-=======
                            hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, timeZone:'Africa/Lagos' };
->>>>>>> main
             return new Intl.DateTimeFormat('en-NG', opts).format(new Date());
         }
         const clockEl = document.getElementById('tutor-lagos-clock');
@@ -5344,27 +4800,15 @@ function renderTutorDashboard(container, tutor) {
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
             const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-<<<<<<< HEAD
-            const [stuSnap, topicSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'),            where('tutorEmail', '==', te))),
-=======
             const [allStudentsRaw, topicSnap, hwSnap] = await Promise.all([
                 getStudents(window.tutorData),  // from cache — zero reads
->>>>>>> main
                 getDocs(query(collection(db, 'daily_topics'),        where('tutorEmail', '==', te))),
                 getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', te)))
             ]);
 
-<<<<<<< HEAD
-            const activeStudents = stuSnap.docs.filter(d => {
-                const s = d.data();
-                return !s.summerBreak && !['archived','graduated','transferred'].includes(s.status);
-            }).length;
-=======
             const activeStudents = allStudentsRaw.filter(s =>
                 !s.summerBreak && !['archived','graduated','transferred'].includes(s.status)
             ).length;
->>>>>>> main
 
             let topicsThisMonth = 0;
             topicSnap.forEach(d => {
@@ -6181,11 +5625,7 @@ async function renderStudentDatabase(container, tutor) {
     const allResultsQuery     = query(collection(db, "student_results"),   where("tutorEmail", "==", tutor.email));
 
     const [allStudentDocs, allSubmissionsSnapshot, allResultsSnapshot] = await Promise.all([
-<<<<<<< HEAD
-        fetchStudentsForTutor(tutor, "students"),
-=======
         getStudents(tutor),  // reads from in-memory cache — zero Firestore reads on tab switch
->>>>>>> main
         getDocs(allSubmissionsQuery),
         getDocs(allResultsQuery)
     ]);
@@ -6200,11 +5640,6 @@ async function renderStudentDatabase(container, tutor) {
         if (r.studentId)   studentsWithResults.add(r.studentId);
         if (r.studentName) studentsWithResultNames.add(r.studentName.trim().toLowerCase());
     });
-<<<<<<< HEAD
-    console.log(`[Placement] student_results fetched: ${allResultsSnapshot.size} docs | ids: ${studentsWithResults.size} | names: ${studentsWithResultNames.size}`);
-
-=======
->>>>>>> main
     // Process Students - ONLY APPROVED STUDENTS
     let approvedStudents = allStudentDocs
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
@@ -6361,36 +5796,18 @@ async function renderStudentDatabase(container, tutor) {
                     ? student.createdAt.toDate()
                     : (student.createdAt ? new Date(student.createdAt) : null);
                 const _isNewEnough      = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
-<<<<<<< HEAD
-=======
                 // Students approved from pending approvals bypass the date cutoff —
                 // management explicitly approved them so the tutor must always see the button.
                 const _fromPending      = student.fromPendingApproval === true;
->>>>>>> main
                 const _hasResult        = studentsWithResults.has(student.id) ||
                     studentsWithResultNames.has((student.studentName || '').trim().toLowerCase());
                 const _gradeOk          = isPlacementTestEligible(student.grade);
                 const _notDone          = (student.placementTestStatus || '') !== 'completed';
-<<<<<<< HEAD
-                const _showPlacementBtn = _isNewEnough && _gradeOk && !_hasResult && _notDone;
-=======
                 const _showPlacementBtn = (_isNewEnough || _fromPending) && _gradeOk && !_hasResult && _notDone;
->>>>>>> main
 
                 // ── DEBUG — logs every grade 3–12 student so you can see exactly why
                 //            the button is/isn't showing. Check browser console.
                 if (_gradeOk) {
-<<<<<<< HEAD
-                    console.log(
-                        `[Placement] ${student.studentName}` +
-                        ` | grade="${student.grade}" gradeOk=${_gradeOk}` +
-                        ` | createdAt=${studentCreatedAt ? studentCreatedAt.toISOString() : 'MISSING ⚠️'} newEnough=${_isNewEnough}` +
-                        ` | hasResult=${_hasResult} (byId:${studentsWithResults.has(student.id)} byName:${studentsWithResultNames.has((student.studentName||'').trim().toLowerCase())})` +
-                        ` | placementTestStatus="${student.placementTestStatus||''}" notDone=${_notDone}` +
-                        ` | ➡ SHOW BUTTON: ${_showPlacementBtn}`
-                    );
-=======
->>>>>>> main
                 }
 
                 if (_showPlacementBtn) {
@@ -7076,10 +6493,6 @@ async function renderStudentDatabase(container, tutor) {
                     placementTestCompletedAt: new Date(),
                     placementTestSubject:     subject || ''
                 });
-<<<<<<< HEAD
-                console.log('Placement test marked complete for student:', studentId);
-=======
->>>>>>> main
             } catch (e) {
                 // Non-fatal — button is already removed from the UI
                 console.warn('Could not persist placementTestStatus:', e.message);
@@ -7310,55 +6723,6 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
-<<<<<<< HEAD
-        const tutorRef = doc(db, "tutors", tutorId);
-
-        // ── Primary: live listener on tutor doc (written by management after grading) ──
-        onSnapshot(tutorRef, async (docSnap) => {
-            if (!docSnap.exists()) return;
-            const data = docSnap.data();
-
-            // ── Authoritative: also query tutor_grades for current month directly ──
-            const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-            const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
-            const tutorEmail = data.email || (window.tutorData && window.tutorData.email) || '';
-
-            let qaScore = null, qcScore = null;
-            let qaAdvice = '', qcAdvice = '';
-            let qaGradedByName = '', qcGradedByName = '';
-            let perfMonth = monthKey;
-
-            try {
-                const gradesSnap = await getDocs(
-                    query(collection(db, 'tutor_grades'),
-                        where('tutorEmail', '==', tutorEmail),
-                        where('month', '==', monthKey))
-                );
-
-                if (!gradesSnap.empty) {
-                    // Use tutor_grades as source-of-truth
-                    const g = gradesSnap.docs[0].data();
-                    qaScore        = (g.qa && g.qa.score != null)  ? g.qa.score  : null;
-                    qcScore        = (g.qc && g.qc.score != null)  ? g.qc.score  : null;
-                    qaAdvice       = (g.qa && g.qa.notes)          ? g.qa.notes  : '';
-                    qcAdvice       = (g.qc && g.qc.notes)          ? g.qc.notes  : '';
-                    qaGradedByName = (g.qa && g.qa.gradedByName)   ? g.qa.gradedByName : '';
-                    qcGradedByName = (g.qc && g.qc.gradedByName)   ? g.qc.gradedByName : '';
-                    perfMonth      = g.month || monthKey;
-                } else {
-                    // Fallback: use cached values from tutor doc
-                    qaScore        = data.qaScore        ?? null;
-                    qcScore        = data.qcScore        ?? null;
-                    qaAdvice       = data.qaAdvice       || '';
-                    qcAdvice       = data.qcAdvice       || '';
-                    qaGradedByName = data.qaGradedByName || '';
-                    qcGradedByName = data.qcGradedByName || '';
-                    perfMonth      = data.performanceMonth || '';
-                }
-            } catch (gradeErr) {
-                // Index not ready or permission issue – fall back to tutor doc
-                console.warn('tutor_grades query failed, using tutor doc cache:', gradeErr.message);
-=======
         const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
         const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
         const tutorEmail = window.tutorData?.email || '';
@@ -7386,7 +6750,6 @@ async function initGamification(tutorId) {
                 qcGradedByName = g.qc?.gradedByName || '';
                 perfMonth      = g.month || monthKey;
             } else {
->>>>>>> main
                 qaScore        = data.qaScore        ?? null;
                 qcScore        = data.qcScore        ?? null;
                 qaAdvice       = data.qaAdvice       || '';
@@ -7394,42 +6757,6 @@ async function initGamification(tutorId) {
                 qaGradedByName = data.qaGradedByName || '';
                 qcGradedByName = data.qcGradedByName || '';
                 perfMonth      = data.performanceMonth || '';
-<<<<<<< HEAD
-            }
-
-            // Merge into window.tutorData
-            if (window.tutorData) {
-                window.tutorData.qaScore          = qaScore;
-                window.tutorData.qcScore          = qcScore;
-                window.tutorData.qaAdvice         = qaAdvice;
-                window.tutorData.qcAdvice         = qcAdvice;
-                window.tutorData.qaGradedByName   = qaGradedByName;
-                window.tutorData.qcGradedByName   = qcGradedByName;
-                window.tutorData.performanceMonth = perfMonth;
-            }
-
-            let combined = 0;
-            if (qaScore !== null && qcScore !== null) combined = qaScore + qcScore;
-            else if (qaScore !== null) combined = qaScore;
-            else if (qcScore !== null) combined = qcScore;
-
-            currentTutorScore = combined;
-            updateScoreDisplay(combined, {
-                qaScore, qcScore, qaAdvice, qcAdvice,
-                qaGradedByName, qcGradedByName,
-                performanceMonth: perfMonth
-            });
-
-            // 🎉 Trigger confetti the first time grades appear this session
-            if (combined > 0 && (qaScore !== null || qcScore !== null)) {
-                const gradeKey = `confetti_grades_${monthKey}_${tutorId}`;
-                if (!sessionStorage.getItem(gradeKey)) {
-                    sessionStorage.setItem(gradeKey, 'true');
-                    // Slight delay so the widget renders first
-                    setTimeout(() => triggerConfetti(), 600);
-                }
-=======
->>>>>>> main
             }
 
             if (window.tutorData) {
@@ -7466,8 +6793,6 @@ async function initGamification(tutorId) {
             renderGamification();
         });
 
-<<<<<<< HEAD
-=======
         // Listener 2: tutor_grades for this month (replaces getDocs-per-tutor-doc-change)
         onSnapshot(
             query(collection(db, 'tutor_grades'),
@@ -7480,7 +6805,6 @@ async function initGamification(tutorId) {
             err => console.warn('tutor_grades listener failed, using tutor doc cache:', err.message)
         );
 
->>>>>>> main
         checkWinnerStatus(tutorId);
 
     } catch (error) {
@@ -7743,15 +7067,6 @@ onSnapshot(settingsDocRef, (docSnap) => {
         // NOTE: Admin flags must NOT be logged to console — tutors can see DevTools.
         // console.log removed intentionally for security.
 
-<<<<<<< HEAD
-        // Re‑render student database if it's currently visible
-        const mainContent = document.getElementById('mainContent');
-        if (mainContent && mainContent.querySelector('#student-list-view')) {
-            renderStudentDatabase(mainContent, window.tutorData);
-        }
-    } else {
-        console.warn('⚠️ global_settings document does not exist yet. Using defaults.');
-=======
         // ✅ FIX 8: Dispatch settings-changed event so any visible tab re-renders
         // immediately when an admin toggle changes (e.g. showEditDeleteButtons).
         document.dispatchEvent(new CustomEvent('adminSettingsUpdated'));
@@ -7765,7 +7080,6 @@ onSnapshot(settingsDocRef, (docSnap) => {
         }
     } else {
         /* global_settings not found, using defaults */
->>>>>>> main
     }
 }, (error) => {
     console.error('❌ Settings listener error:', error);
@@ -8101,14 +7415,6 @@ async function renderPlacementTestsTab(container, tutor) {
             if (['archived','graduated','transferred'].includes(s.status)) return;
             if (s.summerBreak) return;
             const createdAt = s.createdAt?.toDate ? s.createdAt.toDate() : (s.createdAt ? new Date(s.createdAt) : null);
-<<<<<<< HEAD
-            const isNewEnough = createdAt && createdAt >= PLACEMENT_CUTOFF;
-            const gradeOk     = isPlacementTestEligible(s.grade);
-            const hasResult   = studentsWithResults.has(s.id) ||
-                                studentsWithResultNames.has((s.studentName || '').trim().toLowerCase());
-            const notDone     = (s.placementTestStatus || '') !== 'completed';
-            if (isNewEnough && gradeOk && !hasResult && notDone) eligible.push(s);
-=======
             const isNewEnough   = createdAt && createdAt >= PLACEMENT_CUTOFF;
             // Students approved from pending approvals bypass the date cutoff —
             // management explicitly approved them so the tutor must always see them here.
@@ -8118,7 +7424,6 @@ async function renderPlacementTestsTab(container, tutor) {
                                   studentsWithResultNames.has((s.studentName || '').trim().toLowerCase());
             const notDone       = (s.placementTestStatus || '') !== 'completed';
             if ((isNewEnough || fromPending) && gradeOk && !hasResult && notDone) eligible.push(s);
->>>>>>> main
         });
 
         if (eligible.length === 0) {
@@ -8272,41 +7577,11 @@ async function initTutorApp() {
                 // Use tutorUid as the primary messaging ID (falls back to Firestore doc ID)
                 tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 
-<<<<<<< HEAD
-                // Ensure every tutor has a stable UID for messaging (generates one if missing)
-                if (!tutorData.tutorUid) {
-                    const generatedUid = 'tutor_' + tutorDoc.id + '_' + Date.now();
-                    try {
-                        await updateDoc(doc(db, 'tutors', tutorDoc.id), { tutorUid: generatedUid });
-                        tutorData.tutorUid = generatedUid;
-                    } catch(e) { tutorData.tutorUid = tutorDoc.id; }
-                }
-                tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
-=======
->>>>>>> main
                 window.tutorData = tutorData;
 
                 // Start the global student cache + live listener (once per session).
                 // All tab renders read from _studentStore instead of calling getDocs.
                 initStudentListener(tutorData);
-                
-                // ✅ Auth verified — remove the full-page guard overlay
-                clearTimeout(window._authGuardTimeout);
-                const _guard = document.getElementById('auth-guard');
-                if (_guard) {
-                    _guard.style.transition = 'opacity 0.3s';
-                    _guard.style.opacity = '0';
-                    setTimeout(() => _guard.remove(), 320);
-                }
-                if (!window.__firebaseConfig) {
-                    // Try to read the config from the already-initialised Firebase app
-                    try {
-                        const _app = (await import('./firebaseConfig.js')).default || {};
-                        window.__firebaseConfig = _app.options || null;
-                    } catch(_) {
-                        // Will be null – the grading tab will log a warning
-                    }
-                }
                 
                 // ✅ Auth verified — remove the full-page guard overlay
                 clearTimeout(window._authGuardTimeout);
@@ -8660,16 +7935,9 @@ async function autoSyncStudentSchedules(tutor) {
                     updatedAt: new Date()
                 }, { merge: true });
             } catch (err) {
-<<<<<<< HEAD
-                console.warn(`Auto-sync schedule failed for ${student.studentName}:`, err.message);
-            }
-        }
-        console.log(`✅ Auto-schedule sync complete for ${tutor.email}`);
-=======
                 console.warn('Auto-sync schedule failed:', err.message);
             }
         }
->>>>>>> main
     } catch (err) {
         console.warn('autoSyncStudentSchedules error:', err);
     }

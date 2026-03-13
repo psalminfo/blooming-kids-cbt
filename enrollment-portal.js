@@ -532,13 +532,7 @@ class EnrollmentApp {
     generateCourseSelectionHTML(id) {
         // Generate hour options for select dropdowns (hour only, no minutes)
         const hourOptions = CONFIG.HOURS.map(hour => {
-<<<<<<< HEAD
-            const hour12 = hour % 12 || 12;
-            const ampm = hour < 12 ? 'AM' : 'PM';
-            return `<option value="${hour.toString().padStart(2, '0')}">${hour12} ${ampm}</option>`;
-=======
             return `<option value="${hour.toString().padStart(2, '0')}">${hour.toString().padStart(2, '0')}:00</option>`;
->>>>>>> main
         }).join('');
 
         // 1. Academic HTML with Sessions, Days & Time
@@ -582,11 +576,7 @@ class EnrollmentApp {
                         </div>
                         <div class="error-message available-days-error-${id}"></div>
                         
-<<<<<<< HEAD
-                        <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
-=======
                         <h5><i class="far fa-clock"></i> Your Country Preferred Time (00:00 - 23:00) <span class="required">*</span></h5>
->>>>>>> main
                         <div class="time-selection">
                             <div class="time-input-group">
                                 <label>From:</label>
@@ -649,11 +639,7 @@ class EnrollmentApp {
                     </div>
                     <div class="error-message extracurricular-days-error-${id}-${activity.id}" style="display: none;"></div>
                     
-<<<<<<< HEAD
-                    <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
-=======
                     <h5><i class="far fa-clock"></i> Your Country Preferred Time (00:00 - 23:00) <span class="required">*</span></h5>
->>>>>>> main
                     <div class="time-selection">
                         <div class="time-input-group">
                             <label>From:</label>
@@ -709,11 +695,7 @@ class EnrollmentApp {
                     </div>
                     <div class="error-message test-prep-days-error-${id}-${test.id}" style="display: none;"></div>
                     
-<<<<<<< HEAD
-                    <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
-=======
                     <h5><i class="far fa-clock"></i> Your Country Preferred Time (00:00 - 23:00) <span class="required">*</span></h5>
->>>>>>> main
                     <div class="time-selection">
                         <div class="time-input-group">
                             <label>From:</label>
@@ -1182,10 +1164,6 @@ class EnrollmentApp {
         }
         
         try {
-<<<<<<< HEAD
-            const start = new Date(startDate);
-            const dayOfMonth = start.getDate();
-=======
             // FIX (Bug 2): Parse date parts manually to avoid UTC/local timezone shift.
             // new Date('YYYY-MM-DD') parses as UTC midnight, so getDate() returns the wrong
             // day for users in negative UTC-offset timezones (e.g. UTC-1 shifts the day back
@@ -1195,7 +1173,6 @@ class EnrollmentApp {
             const year = parseInt(parts[0], 10);
             const monthIndex = parseInt(parts[1], 10) - 1; // 0-indexed for Date constructor
             const dayOfMonth = parseInt(parts[2], 10);
->>>>>>> main
             
             // FIXED: 1st of ANY month = ALWAYS full fee
             if (dayOfMonth === 1) {
@@ -1218,13 +1195,7 @@ class EnrollmentApp {
             }
             
             // Starting from 7th onward: Calculate proration
-<<<<<<< HEAD
-            const year = start.getFullYear();
-            const month = start.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-=======
             const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
->>>>>>> main
             
             // Calculate days remaining from start date to end of month (inclusive)
             const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
@@ -1314,15 +1285,10 @@ class EnrollmentApp {
         let extracurricularTotal = 0;
         let testPrepTotal = 0;
         let hasAcademicSelection = false;
-<<<<<<< HEAD
-        let earliestStartDate = null;
-        let totalActualAcademicFee = 0;
-=======
         let totalActualAcademicFee = 0;
         let proratedAcademicTotal = 0;  // FIX (Bug 1): sum of per-student prorated academic fees
         let prorationDeduction = 0;     // FIX (Bug 1): accumulated per-student deductions
         let prorationExplanations = []; // FIX (Bug 1): per-student proration explanation strings
->>>>>>> main
         
         const studentEntries = document.querySelectorAll('.student-entry');
         const breakdownContainer = document.getElementById('fee-details');
@@ -1350,16 +1316,6 @@ class EnrollmentApp {
             // Get selected academic days for this student
             const selectedAcademicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
             
-<<<<<<< HEAD
-            // Track earliest start date for proration
-            if (startDate) {
-                if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
-                    earliestStartDate = startDate;
-                }
-            }
-            
-=======
->>>>>>> main
             // 1. Academic Calculation - WITH PRORATION
             const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected'));
             
@@ -1367,21 +1323,11 @@ class EnrollmentApp {
                 hasAcademicSelection = true;
                 const baseFee = CONFIG.ACADEMIC_FEES[grade][sessions];
                 academicBaseTotal += baseFee;
-<<<<<<< HEAD
-                studentSubtotal += baseFee;
-=======
->>>>>>> main
                 studentActualAcademicFee += baseFee;
                 
                 const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
                 const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
                 additionalSubjectsTotal += extraFee;
-<<<<<<< HEAD
-                studentSubtotal += extraFee;
-                studentActualAcademicFee += extraFee;
-                
-                totalActualAcademicFee += studentActualAcademicFee;
-=======
                 studentActualAcademicFee += extraFee;
                 
                 totalActualAcademicFee += studentActualAcademicFee;
@@ -1402,7 +1348,6 @@ class EnrollmentApp {
                 // so the per-student breakdown card shows what the student actually pays,
                 // and the per-student subtotals add up correctly to the displayed total.
                 studentSubtotal += studentAcademicProration.toPay;
->>>>>>> main
             }
             
             // 2. Extracurricular - UPDATED WITH PRORATION (FIXED)
@@ -1471,32 +1416,6 @@ class EnrollmentApp {
             discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
         }
         
-<<<<<<< HEAD
-        let proratedAmountToPay = totalAcademicFee;
-        let prorationDeduction = 0;
-        let prorationExplanation = '';
-        
-        // Apply proration to academic fees if applicable
-        if (hasAcademicSelection && earliestStartDate && totalActualAcademicFee > 0) {
-            const prorationResult = this.calculateProratedMonthlyFee(
-                totalActualAcademicFee, 
-                earliestStartDate
-            );
-            
-            proratedAmountToPay = prorationResult.toPay || 0;
-            prorationDeduction = prorationResult.deduction || 0;
-            
-            if (prorationResult.explanation) {
-                prorationExplanation = prorationResult.explanation;
-            }
-        }
-        
-        // CORRECTED: Total payable calculation (proration already applied to individual fees)
-        const totalPayable = Math.max(0, 
-            proratedAmountToPay + // Use prorated amount for academic
-            extracurricularTotal + // Already prorated
-            testPrepTotal - // Already prorated
-=======
         // FIX (Bug 1): prorationDeduction and proratedAcademicTotal are already accumulated
         // per student inside the loop above. Join per-student explanations for display.
         const prorationExplanation = prorationExplanations.join(' | ');
@@ -1508,7 +1427,6 @@ class EnrollmentApp {
             proratedAcademicTotal +  // Prorated per student, summed
             extracurricularTotal +   // Already prorated per student
             testPrepTotal -          // Already prorated per student
->>>>>>> main
             discount
         );
         
@@ -1623,8 +1541,6 @@ class EnrollmentApp {
         return isValid;
     }
     
-<<<<<<< HEAD
-=======
     // Rebuild the "To" dropdown so it only contains hours strictly after the chosen "From" hour.
     // This makes it physically impossible to pick an invalid end time,
     // eliminating the "End time must be after start time" error entirely.
@@ -1660,7 +1576,6 @@ class EnrollmentApp {
         }
     }
 
->>>>>>> main
     validateTimeSelection(section, studentId, itemId = null) {
         let isValid = true;
         
@@ -1678,11 +1593,7 @@ class EnrollmentApp {
                 const startTime = parseInt(startHour);
                 const endTime = parseInt(endHour);
                 
-<<<<<<< HEAD
-                if (endTime <= startTime) {
-=======
                 if (endTime <= startTime && endTime !== 0) { // 0 = 00:00 midnight, valid overnight end
->>>>>>> main
                     isValid = false;
                     if (errorElement) {
                         errorElement.textContent = 'End time must be after start time';
@@ -1712,11 +1623,7 @@ class EnrollmentApp {
                     const startTime = parseInt(startHour);
                     const endTime = parseInt(endHour);
                     
-<<<<<<< HEAD
-                    if (endTime <= startTime) {
-=======
                     if (endTime <= startTime && endTime !== 0) { // 0 = 00:00 midnight, valid overnight end
->>>>>>> main
                         isValid = false;
                         if (errorElement) {
                             errorElement.textContent = 'End time must be after start time';
@@ -1749,11 +1656,7 @@ class EnrollmentApp {
                     const startTime = parseInt(startHour);
                     const endTime = parseInt(endHour);
                     
-<<<<<<< HEAD
-                    if (endTime <= startTime) {
-=======
                     if (endTime <= startTime && endTime !== 0) { // 0 = 00:00 midnight, valid overnight end
->>>>>>> main
                         isValid = false;
                         if (errorElement) {
                             errorElement.textContent = 'End time must be after start time';
@@ -2232,13 +2135,8 @@ class EnrollmentApp {
             const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
             
             if (startHour && endHour) {
-<<<<<<< HEAD
-                const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-                const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
-=======
                 const startTime = `${startHour}:00`;
                 const endTime = `${endHour}:00`;
->>>>>>> main
                 studentData.academicTime = `${startHour}:${endHour}`;
                 studentData.academicSchedule = `${academicDays.join(', ')} from ${startTime} to ${endTime}`;
             }
@@ -2264,13 +2162,8 @@ class EnrollmentApp {
                 const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityData.id}`)?.value || '';
                 
                 if (startHour && endHour) {
-<<<<<<< HEAD
-                    const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-                    const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
-=======
                     const startTime = `${startHour}:00`;
                     const endTime = `${endHour}:00`;
->>>>>>> main
                     activityData.time = `${startHour}:${endHour}`;
                     activityData.schedule = `${activityData.days.join(', ')} from ${startTime} to ${endTime}`;
                 }
@@ -2300,13 +2193,8 @@ class EnrollmentApp {
                     const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testData.id}`)?.value || '';
                     
                     if (startHour && endHour) {
-<<<<<<< HEAD
-                        const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
-=======
                         const startTime = `${startHour}:00`;
                         const endTime = `${endHour}:00`;
->>>>>>> main
                         testData.time = `${startHour}:${endHour}`;
                         testData.schedule = `${testData.days.join(', ')} from ${startTime} to ${endTime}`;
                     }
@@ -2546,13 +2434,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
                 const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
                 
-<<<<<<< HEAD
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
-=======
                 const startTime = startHour ? `${startHour}:00` : '';
                 const endTime = endHour ? `${endHour}:00` : '';
->>>>>>> main
                 
                 // Get tutor preference
                 const selectedTutor = entry.querySelector('.tutor-option.selected');
@@ -2583,13 +2466,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityId}`)?.value || '';
                 const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityId}`)?.value || '';
                 
-<<<<<<< HEAD
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
-=======
                 const startTime = startHour ? `${startHour}:00` : '';
                 const endTime = endHour ? `${endHour}:00` : '';
->>>>>>> main
                 
                 const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activityId);
                 const description = `${studentName}: ${activityName} (${selectedDays.join(', ')}, ${startTime}-${endTime})`;
@@ -2627,13 +2505,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testId}`)?.value || '';
                 const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testId}`)?.value || '';
                 
-<<<<<<< HEAD
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
-=======
                 const startTime = startHour ? `${startHour}:00` : '';
                 const endTime = endHour ? `${endHour}:00` : '';
->>>>>>> main
                 
                 const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
                 
@@ -2700,13 +2573,8 @@ class EnrollmentApp {
             const endHour = document.getElementById(`academic-end-hour-${studentId}`)?.value || '';
             
             if (selectedSubjects.length > 0) {
-<<<<<<< HEAD
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
-=======
                 const startTime = startHour ? `${startHour}:00` : '';
                 const endTime = endHour ? `${endHour}:00` : '';
->>>>>>> main
                 
                 detailsHTML += `
                     <div class="student-schedule">
@@ -2728,13 +2596,8 @@ class EnrollmentApp {
                     const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${activityId}`)?.value || '';
                     const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${activityId}`)?.value || '';
                     
-<<<<<<< HEAD
-                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
-=======
                     const startTime = startHour ? `${startHour}:00` : '';
                     const endTime = endHour ? `${endHour}:00` : '';
->>>>>>> main
                     
                     detailsHTML += `${activityName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime}<br>`;
                 });
@@ -2755,13 +2618,8 @@ class EnrollmentApp {
                     const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${testId}`)?.value || '';
                     const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${testId}`)?.value || '';
                     
-<<<<<<< HEAD
-                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
-                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
-=======
                     const startTime = startHour ? `${startHour}:00` : '';
                     const endTime = endHour ? `${endHour}:00` : '';
->>>>>>> main
                     
                     detailsHTML += `${testName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime} (${hours}hrs/session)<br>`;
                 });
@@ -2838,11 +2696,7 @@ class EnrollmentApp {
             btn.disabled = true;
 
             // Show simple OK popup - invoice stays visible behind it
-<<<<<<< HEAD
-            this._showGoToPortalPopup();
-=======
             this._showGoToPortalPopup(portalResult);
->>>>>>> main
 
         } catch (error) {
             console.error("Enrollment Submission Error:", error);
@@ -2897,11 +2751,7 @@ class EnrollmentApp {
     // PASSWORD MODAL — shown after successful enrollment
     // Blocks redirect until parent confirms they've saved their credentials
     // ==============================================
-<<<<<<< HEAD
-    _showGoToPortalPopup() {
-=======
     _showGoToPortalPopup(portalResult = null) {
->>>>>>> main
         const existing = document.getElementById('bkh-goto-portal-popup');
         if (existing) existing.remove();
 
@@ -2934,8 +2784,6 @@ class EnrollmentApp {
         document.body.appendChild(modal);
 
         document.getElementById('bkh-ok-btn').addEventListener('click', () => {
-<<<<<<< HEAD
-=======
             // Re-write credentials to localStorage right before opening the tab
             // This ensures the new tab always has fresh credentials to read
             const stored = localStorage.getItem('bkh_new_parent');
@@ -2947,7 +2795,6 @@ class EnrollmentApp {
                 }));
                 console.log('✅ bkh_new_parent re-written before opening portal tab');
             }
->>>>>>> main
             modal.remove();
             window.open('parent.html', '_blank');
         });
@@ -3089,12 +2936,8 @@ class EnrollmentApp {
                 }
 
                 // createUserWithEmailAndPassword already signs the user in automatically
-<<<<<<< HEAD
-                // Store credentials in sessionStorage so parent.html can sign them in on load
-=======
                 // Store credentials in localStorage so parent.html (new tab) can sign them in on load
                 // NOTE: sessionStorage is tab-scoped and cannot be read by a new tab — must use localStorage
->>>>>>> main
                 localStorage.setItem('bkh_new_parent', JSON.stringify({
                     email: parentEmail,
                     tempPassword: randomPassword,
@@ -3102,14 +2945,9 @@ class EnrollmentApp {
                     parentName: parentName,
                     isFirstLogin: true
                 }));
-<<<<<<< HEAD
-
-                return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
-=======
                 console.log('✅ bkh_new_parent written to localStorage for:', parentEmail);
 
                 return { isNew: true, uid: user.uid, email: parentEmail, password: randomPassword, referralCode: newReferralCode };
->>>>>>> main
             }
         } catch (error) {
             console.error('Error setting up parent portal account:', error);
