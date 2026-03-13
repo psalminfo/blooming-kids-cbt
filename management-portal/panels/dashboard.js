@@ -4,18 +4,15 @@
 // ============================================================
 
 import { db } from '../core/firebase.js';
-<<<<<<< HEAD
 import { collection, getDocs, doc, getDoc, where, query, orderBy,
          Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc,
          limit, startAfter, onSnapshot } from '../core/firebase.js';
-=======
 import {
          Timestamp, addDoc, collection, deleteDoc,
          doc, getDoc, getDocs, limit,
          onSnapshot, orderBy, query, setDoc,
          startAfter, updateDoc, where, writeBatch
     } from '../core/firebase.js';
->>>>>>> main
 import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOptions,
          formatTimeTo12h, sanitizeInput, rateLimitCheck,
          safeToString, safeSearch, formatBadgeDate, calculateYearsOfService,
@@ -259,7 +256,6 @@ export async function loadDashboardData() {
 }
 
 // ======================================================
-<<<<<<< HEAD
 // QUICK ACTION MODAL FUNCTIONS
 // ======================================================
 
@@ -634,11 +630,9 @@ window.showMarkInactiveModal = async function() {
         alert('Failed to load tutor data. Please try again.');
     }
 };
-=======
 
 
 
->>>>>>> main
 
 // ======================================================
 // MODAL SUBMISSION FUNCTIONS
@@ -955,8 +949,5 @@ window.refreshAllDashboardData = async function() {
     alert('Dashboard data refreshed successfully!');
 };
 
-<<<<<<< HEAD
 // ======================================================
-=======
 // ======================================================
->>>>>>> main

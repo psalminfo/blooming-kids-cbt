@@ -1,7 +1,6 @@
 // ============================================================
 // modals/assignStudent.js
 // Assign new student — single and group class
-<<<<<<< HEAD
 // ============================================================
 
 import { db } from '../core/firebase.js';
@@ -114,7 +113,6 @@ window.showAssignStudentModal = async function() {
                             <i class="fas fa-user-plus mr-2"></i> Assign Student
                         </button>
                     </div>
-=======
 // Matches tutorDirectory.js showAssignStudentModal logic
 // ============================================================
 
@@ -389,12 +387,10 @@ window.showAssignStudentModal = async function() {
                             </button>
                         </div>
                     </form>
->>>>>>> main
                 </div>
             </div>
         `;
 
-<<<<<<< HEAD
         // Add modal to DOM
         const modalContainer = document.createElement('div');
         modalContainer.id = 'assign-student-modal';
@@ -428,7 +424,6 @@ window.showAssignStudentModal = async function() {
                     if (opt.dataset.parentEmail !== undefined) {
                         const emailInput = document.getElementById('assign-parent-email');
                         if (emailInput && opt.dataset.parentEmail) emailInput.value = opt.dataset.parentEmail;
-=======
         document.body.insertAdjacentHTML('beforeend', modalHtml);
 
         // ── Wire tutor dropdowns ──────────────────────────────────────────────
@@ -467,12 +462,10 @@ window.showAssignStudentModal = async function() {
                     dropdown.classList.add('hidden');
                     if (rowId === 'am-tutor-academic' && opt.dataset.email) {
                         document.getElementById('am-add-more-btns')?.classList.remove('hidden');
->>>>>>> main
                     }
                 });
             });
             document.addEventListener('click', (e) => {
-<<<<<<< HEAD
                 if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
                     dropdown.classList.add('hidden');
                 }
@@ -485,7 +478,6 @@ window.showAssignStudentModal = async function() {
             document.getElementById('assign-tutor-search')?.focus();
         }, 100);
         
-=======
                 if (searchEl && !searchEl.contains(e.target) && dropdown && !dropdown.contains(e.target)) {
                     dropdown.classList.add('hidden');
                 }
@@ -828,7 +820,6 @@ window.showAssignStudentModal = async function() {
             else if (window.renderManagementTutorView) window.renderManagementTutorView(document.getElementById('main-content'));
         }
 
->>>>>>> main
     } catch (error) {
         console.error('Error showing assign student modal:', error);
         alert('Failed to load assignment data. Please try again.');

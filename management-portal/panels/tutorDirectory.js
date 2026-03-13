@@ -119,16 +119,13 @@ export async function renderManagementTutorView(container) {
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         
-<<<<<<< HEAD
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-=======
         let _searchDebounceTimer = null;
         document.getElementById('directory-search').addEventListener('input', (e) => {
             const val = e.target.value;
             clearTimeout(_searchDebounceTimer);
             _searchDebounceTimer = setTimeout(() => renderDirectoryFromCache(val), 250);
         });
->>>>>>> main
         
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
@@ -1579,8 +1576,6 @@ export function showManageTransitionModal(studentId) {
 // ======================================================
 
 export async function fetchAndRenderDirectory(forceRefresh = false) {
-<<<<<<< HEAD
-=======
     // ── Cache freshness guard: skip Firestore if data is less than 5 min old ──
     const CACHE_TTL_MS = 5 * 60 * 1000;
     const cacheAge = Date.now() - (sessionCache._lastUpdate || 0);
@@ -1594,7 +1589,6 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         return;
     }
 
->>>>>>> main
     if (forceRefresh) {
         invalidateCache('tutors'); 
         invalidateCache('students'); 
@@ -1616,13 +1610,10 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         ] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
-<<<<<<< HEAD
             getDocs(collection(db, "tutorAssignments")),
             getDocs(collection(db, "tutorTransitions")),
-=======
             getDocs(query(collection(db, "tutorAssignments"), orderBy("assignedAt", "desc"), limit(300))),
             getDocs(query(collection(db, "tutorTransitions"), orderBy("createdAt", "desc"), limit(200))),
->>>>>>> main
             getDocs(collection(db, "groupClasses"))
         ]);
         
@@ -1647,10 +1638,7 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-<<<<<<< HEAD
-=======
         window.__allStudents = allStudents; // cache for handleEditStudent
->>>>>>> main
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -1684,18 +1672,15 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents);
         saveToLocalStorage('groupClasses', groupClasses);
-<<<<<<< HEAD
         sessionCache.tutorAssignments = tutorAssignments;
         sessionCache.tutorTransitions = activeTransitions;
         sessionCache._lastUpdate = Date.now();
-=======
         sessionCache.tutors = activeTutors;
         sessionCache.students = nonArchivedStudents;
         sessionCache.tutorAssignments = tutorAssignments;
         sessionCache.tutorTransitions = activeTransitions;
         sessionCache._lastUpdate = Date.now();
         window.__allStudents = nonArchivedStudents;
->>>>>>> main
         
         // Update all 7 counters
         if (document.getElementById('tutor-count-badge')) {
@@ -1750,23 +1735,17 @@ export function renderDirectoryFromCache(searchTerm = '') {
         return;
     }
 
-<<<<<<< HEAD
-=======
     // Skip re-render if the same search + same data snapshot is already displayed
     const _renderKey = searchTerm + '|' + (sessionCache._lastUpdate || '');
     if (renderDirectoryFromCache._lastKey === _renderKey) return;
     renderDirectoryFromCache._lastKey = _renderKey;
 
->>>>>>> main
     const studentsByTutor = {};
     students.forEach(s => {
         if (s.tutorEmail) {
             if (!studentsByTutor[s.tutorEmail]) studentsByTutor[s.tutorEmail] = [];
-<<<<<<< HEAD
-=======
             // Pre-compute search match once per student (avoids calling it twice below)
             s._searchMatch = !searchTerm || searchStudentFromFirebase(s, searchTerm, tutors);
->>>>>>> main
             studentsByTutor[s.tutorEmail].push(s);
         }
     });
@@ -1777,11 +1756,8 @@ export function renderDirectoryFromCache(searchTerm = '') {
         
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm);
-<<<<<<< HEAD
         const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
-=======
         const studentMatch = assignedStudents.some(s => s._searchMatch);
->>>>>>> main
         
         return tutorMatch || studentMatch;
     });
@@ -1809,11 +1785,8 @@ export function renderDirectoryFromCache(searchTerm = '') {
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-<<<<<<< HEAD
             .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors))
-=======
             .filter(student => !searchTerm || student._searchMatch)
->>>>>>> main
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
         const breakCount = assignedStudents.filter(s => getStudentCategory(s) === 'break').length;
@@ -1892,16 +1865,13 @@ export function renderDirectoryFromCache(searchTerm = '') {
                 </tr>`;
         }).join('');
 
-<<<<<<< HEAD
         return `
             <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                 <details open>
-=======
         const isMobile = window.innerWidth < 768;
         return `
             <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                 <details ${isMobile ? '' : 'open'}>
->>>>>>> main
                     <summary class="p-5 cursor-pointer flex justify-between bg-gradient-to-r from-gray-50 to-white border-b">
                         <div>
                             <h3 class="text-lg font-semibold text-green-700">${tutorTitle} 
@@ -2039,14 +2009,11 @@ export function showAssignStudentModal() {
                 <input type="text" id="${rowId}-subject" placeholder="e.g. Mathematics / Piano / SAT"
                        class="w-full rounded-md border border-gray-300 shadow-sm p-1.5 text-sm">
             </div>
-<<<<<<< HEAD
-=======
             <div class="mt-2">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Tutor Fee (₦) *</label>
                 <input type="number" id="${rowId}-fee" placeholder="e.g. 50000" min="0" value="0"
                        class="w-full rounded-md border border-gray-300 shadow-sm p-1.5 text-sm">
             </div>
->>>>>>> main
         </div>`;
     }
 
@@ -2147,11 +2114,8 @@ export function showAssignStudentModal() {
 
                         <!-- Fee -->
                         <div class="mb-3">
-<<<<<<< HEAD
                             <label class="block text-sm font-medium text-gray-700 mb-1">Student Fee (₦) <span class="text-red-500">*</span></label>
-=======
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tutor Fee (₦) <span class="text-red-500">*</span></label>
->>>>>>> main
                             <input type="number" id="assign-studentFee" value="0" min="0"
                                 class="w-full rounded-md border border-gray-300 shadow-sm p-2 text-sm">
                         </div>
@@ -2504,10 +2468,7 @@ export function showAssignStudentModal() {
         const academicEmail = document.getElementById('am-tutor-academic-email').value;
         const academicName  = document.getElementById('am-tutor-academic-name').value;
         const academicSubj  = document.getElementById('am-tutor-academic-subject').value.trim();
-<<<<<<< HEAD
-=======
         const academicFee   = Number(document.getElementById('am-tutor-academic-fee')?.value) || 0;
->>>>>>> main
 
         if (!studentName || !grade || !days || !startTime || !endTime || !subjectsRaw) {
             alert('Please fill in all required student fields.'); return;
@@ -2531,10 +2492,7 @@ export function showAssignStudentModal() {
             tutorEmail: academicEmail,
             tutorName: academicName,
             subject: academicSubj || subjects.join(', '),
-<<<<<<< HEAD
-=======
             tutorFee: academicFee,
->>>>>>> main
             assignedDate: new Date().toISOString()
         }];
 
@@ -2542,10 +2500,7 @@ export function showAssignStudentModal() {
         const ecEmail   = document.getElementById('am-tutor-ec-email')?.value;
         const ecName    = document.getElementById('am-tutor-ec-name')?.value;
         const ecSubject = document.getElementById('am-tutor-ec-subject')?.value.trim();
-<<<<<<< HEAD
-=======
         const ecFee     = Number(document.getElementById('am-tutor-ec-fee')?.value) || 0;
->>>>>>> main
         const ecVisible = !document.getElementById('am-ec-section')?.classList.contains('hidden');
         if (ecVisible && ecEmail) {
             subjectAssignments.push({
@@ -2553,10 +2508,7 @@ export function showAssignStudentModal() {
                 tutorEmail: ecEmail,
                 tutorName: ecName,
                 subject: ecSubject || 'Extra-Curricular',
-<<<<<<< HEAD
-=======
                 tutorFee: ecFee,
->>>>>>> main
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2565,10 +2517,7 @@ export function showAssignStudentModal() {
         const tpEmail   = document.getElementById('am-tutor-tp-email')?.value;
         const tpName    = document.getElementById('am-tutor-tp-name')?.value;
         const tpSubject = document.getElementById('am-tutor-tp-subject')?.value.trim();
-<<<<<<< HEAD
-=======
         const tpFee     = Number(document.getElementById('am-tutor-tp-fee')?.value) || 0;
->>>>>>> main
         const tpVisible = !document.getElementById('am-tp-section')?.classList.contains('hidden');
         if (tpVisible && tpEmail) {
             subjectAssignments.push({
@@ -2576,10 +2525,7 @@ export function showAssignStudentModal() {
                 tutorEmail: tpEmail,
                 tutorName: tpName,
                 subject: tpSubject || 'Test Prep',
-<<<<<<< HEAD
-=======
                 tutorFee: tpFee,
->>>>>>> main
                 assignedDate: new Date().toISOString()
             });
         }
@@ -2595,10 +2541,7 @@ export function showAssignStudentModal() {
             parentPhone,
             parentEmail,
             studentFee,
-<<<<<<< HEAD
-=======
             tutorFee: academicFee,
->>>>>>> main
             // Primary academic tutor (legacy fields kept for backward compat)
             tutorEmail: academicEmail,
             tutorName: academicName,
@@ -2672,11 +2615,8 @@ export function showAssignStudentModal() {
         alert(`Student "${studentName}" assigned successfully!`);
         closeManagementModal('assign-modal');
         invalidateCache('students');
-<<<<<<< HEAD
         invalidateCache('tutorAssignments');
-=======
         sessionCache._lastUpdate = 0; // force next render to re-fetch
->>>>>>> main
         renderManagementTutorView(document.getElementById('main-content'));
     }
 
@@ -2862,8 +2802,6 @@ window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
 
-<<<<<<< HEAD
-=======
 function handleEditStudent(studentId) {
     const student = window.__allStudents?.find(s => s.id === studentId);
     if (!student) { alert('Student not found. Please refresh.'); return; }
@@ -2956,5 +2894,4 @@ function handleDeleteStudent(studentId) {
 window.handleEditStudent = handleEditStudent;
 window.handleDeleteStudent = handleDeleteStudent;
 
->>>>>>> main
 // ======================================================

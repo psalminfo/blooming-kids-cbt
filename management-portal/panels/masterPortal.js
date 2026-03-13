@@ -57,7 +57,6 @@ export async function renderMasterPortalPanel(container) {
             </div>
         </div>
 
-<<<<<<< HEAD
         <!-- Tutor of the Month Banner -->
         <div id="totm-banner" class="hidden bg-gradient-to-r from-yellow-400 to-amber-500 rounded-2xl p-4 text-white shadow flex items-center gap-4">
             <div class="text-4xl">🏆</div>
@@ -67,7 +66,6 @@ export async function renderMasterPortalPanel(container) {
             </div>
             <div class="ml-auto text-right">
                 <div class="text-xs opacity-80">${monthLabel}</div>
-=======
         <!-- ── Tab Navigation ───────────────────────────────────── -->
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-1 flex gap-1">
             <button id="mp-tab-btn-tutors"
@@ -121,7 +119,6 @@ export async function renderMasterPortalPanel(container) {
             </button>
             <div id="bottom5-body" class="hidden">
                 <div id="bottom5-list" class="divide-y divide-red-50"></div>
->>>>>>> main
             </div>
         </div>
 
@@ -150,8 +147,6 @@ export async function renderMasterPortalPanel(container) {
 
         <!-- Tutors accordion list -->
         <div id="master-portal-list" class="space-y-3 hidden"></div>
-<<<<<<< HEAD
-=======
 
         </div><!-- /mp-panel-tutors -->
 
@@ -163,7 +158,6 @@ export async function renderMasterPortalPanel(container) {
             </div>
         </div>
 
->>>>>>> main
     </div>
     `;
 
@@ -175,8 +169,6 @@ export async function renderMasterPortalPanel(container) {
     // Cleanup on tab change
     window._masterPortalClockInterval = clockInterval;
 
-<<<<<<< HEAD
-=======
     // ── Tab switching logic ─────────────────────────────────────────
     const _mpPanelTutors  = document.getElementById('mp-panel-tutors');
     const _mpPanelGrading = document.getElementById('mp-panel-grading');
@@ -202,7 +194,6 @@ export async function renderMasterPortalPanel(container) {
     _mpBtnTutors.addEventListener('click',  () => _mpActivateTab('tutors'));
     _mpBtnGrading.addEventListener('click', () => _mpActivateTab('grading'));
 
->>>>>>> main
     try {
         // Load all data in parallel
         const [tutorsSnap, studentsSnap, gradesSnap, cycleSnap] = await Promise.all([
@@ -225,7 +216,6 @@ export async function renderMasterPortalPanel(container) {
             studentsByTutor[key].push(s);
         });
 
-<<<<<<< HEAD
         // Determine leading tutor
         let leadingTutor = null, leadingScore = -1;
         tutors.forEach(t => {
@@ -244,7 +234,6 @@ export async function renderMasterPortalPanel(container) {
             totmBanner.classList.remove('hidden');
         }
 
-=======
         // Rank all tutors who have at least one score
         const rankedTutors = tutors
             .map(t => {
@@ -310,7 +299,6 @@ export async function renderMasterPortalPanel(container) {
             });
         }
 
->>>>>>> main
         // Render accordion list
         const listEl = document.getElementById('master-portal-list');
         const currentStaff = window.userData;
@@ -508,8 +496,6 @@ export async function renderMasterPortalPanel(container) {
     }
 }
 
-<<<<<<< HEAD
-=======
 
 // ============================================================
 // GRADING ACTIVITY TAB
@@ -820,7 +806,6 @@ export async function renderGradingActivityTab(container) {
     }
 }
 
->>>>>>> main
 // --- QA/QC Grade Modal ---
 export function openGradeModal(type, dataset, grades, monthKey) {
     const tutorId = dataset.tutorId;
@@ -836,10 +821,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
     const themeColor = isQA ? 'purple' : 'amber';
     const title = isQA ? '📋 QA — Session Observation Rating' : '📐 QC — Lesson Plan Quality Control';
 
-<<<<<<< HEAD
     // QA has 7 areas, QC has 10 areas
-=======
->>>>>>> main
     const areas = isQA ? [
         { id: 'preparation',    label: 'Lesson Preparation & Resources', max: 15 },
         { id: 'delivery',       label: 'Teaching Delivery & Clarity',    max: 15 },
@@ -934,14 +916,11 @@ export function openGradeModal(type, dataset, grades, monthKey) {
 
     // Save
     if (!isReadOnly) {
-<<<<<<< HEAD
         modal.querySelector('#save-grade-modal').addEventListener('click', async () => {
-=======
         // FIX 1: btn declared here — outside try/catch — so catch block can reference it
         const btn = modal.querySelector('#save-grade-modal');
 
         btn.addEventListener('click', async () => {
->>>>>>> main
             const breakdownData = {};
             areas.forEach(a => {
                 const val = parseInt(document.getElementById(`area-${a.id}`)?.value || 0) || 0;
@@ -960,19 +939,13 @@ export function openGradeModal(type, dataset, grades, monthKey) {
             };
 
             try {
-<<<<<<< HEAD
                 const btn = modal.querySelector('#save-grade-modal');
-=======
->>>>>>> main
                 btn.textContent = 'Saving…'; btn.disabled = true;
 
                 if (gradeId) {
                     await updateDoc(doc(db, 'tutor_grades', gradeId), { [type]: sectionData });
                 } else {
-<<<<<<< HEAD
                     // Create new doc
-=======
->>>>>>> main
                     const newDoc = {
                         tutorId,
                         tutorEmail,
@@ -982,21 +955,15 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     await addDoc(collection(db, 'tutor_grades'), newDoc);
                 }
 
-<<<<<<< HEAD
                 // Update performanceScore on tutor doc for tutor.js to read
                 // ── Re-fetch the grade doc from Firestore to get the LATEST qa+qc data ──
-=======
                 // Re-fetch the grade doc to get latest qa+qc data
->>>>>>> main
                 let freshGrade = {};
                 if (gradeId) {
                     const freshSnap = await getDoc(doc(db, 'tutor_grades', gradeId));
                     if (freshSnap.exists()) freshGrade = freshSnap.data();
                 } else {
-<<<<<<< HEAD
                     // Newly created — find it by tutorId + month
-=======
->>>>>>> main
                     const freshQuery = await getDocs(
                         query(collection(db, 'tutor_grades'),
                               where('tutorId', '==', tutorId),
@@ -1004,10 +971,7 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     );
                     if (!freshQuery.empty) freshGrade = freshQuery.docs[0].data();
                     else {
-<<<<<<< HEAD
                         // fallback: by email
-=======
->>>>>>> main
                         const freshQuery2 = await getDocs(
                             query(collection(db, 'tutor_grades'),
                                   where('tutorEmail', '==', tutorEmail),
@@ -1017,11 +981,8 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     }
                 }
 
-<<<<<<< HEAD
                 // The just-saved section is already in sectionData; merge with freshGrade
-=======
                 // Merge just-saved section with freshGrade for combined score
->>>>>>> main
                 const freshQA = type === 'qa' ? sectionData : (freshGrade.qa || null);
                 const freshQC = type === 'qc' ? sectionData : (freshGrade.qc || null);
                 const qaScore = freshQA?.score ?? null;
@@ -1032,34 +993,25 @@ export function openGradeModal(type, dataset, grades, monthKey) {
 
                 if (combined !== null) {
                     const tutorDocRef = doc(db, 'tutors', tutorId);
-<<<<<<< HEAD
-=======
 
->>>>>>> main
                     await updateDoc(tutorDocRef, {
                         performanceScore: combined,
                         qaScore: qaScore,
                         qcScore: qcScore,
                         performanceMonth: monthKey,
-<<<<<<< HEAD
                         qaAdvice: type === 'qa' ? notes : (existingGradeForTutor.qa?.notes || ''),
                         qcAdvice: type === 'qc' ? notes : (existingGradeForTutor.qc?.notes || ''),
                         qaGradedByName: type === 'qa' ? sectionData.gradedByName : (existingGradeForTutor.qa?.gradedByName || ''),
                         qcGradedByName: type === 'qc' ? sectionData.gradedByName : (existingGradeForTutor.qc?.gradedByName || '')
-=======
                         qaAdvice: type === 'qa' ? notes : (freshGrade.qa?.notes || ''),
                         qcAdvice: type === 'qc' ? notes : (freshGrade.qc?.notes || ''),
                         qaGradedByName: type === 'qa' ? sectionData.gradedByName : (freshGrade.qa?.gradedByName || ''),
                         qcGradedByName: type === 'qc' ? sectionData.gradedByName : (freshGrade.qc?.gradedByName || '')
->>>>>>> main
                     });
                 }
 
                 modal.remove();
-<<<<<<< HEAD
                 // Refresh portal
-=======
->>>>>>> main
                 renderMasterPortalPanel(document.getElementById('main-content'));
             } catch (e) {
                 console.error('Grade save error:', e);

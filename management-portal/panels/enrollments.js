@@ -16,11 +16,8 @@ import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOption
          getCurrentMonthKeyLagos, getCurrentMonthLabelLagos,
          getScoreColor, getScoreBg, getScoreBar,
          getStudentTypeLabel, formatStudentSchedule } from '../core/utils.js';
-<<<<<<< HEAD
 import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached } from '../core/cache.js';
-=======
 import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached, invalidateTabCache } from '../core/cache.js';
->>>>>>> main
 import { logManagementActivity } from '../notifications/activityLog.js';
 
 // SUBSECTION 5.2: Enrollments Panel (COMPREHENSIVE TUTOR DISPLAY)
@@ -50,11 +47,8 @@ window.sessionCache = window.sessionCache || {};
 export function safeParseDate(dateInput) {
     if (!dateInput) return null;
     if (dateInput instanceof Date) return dateInput;
-<<<<<<< HEAD
     if (dateInput.seconds) { // Firestore Timestamp
-=======
     if (dateInput && typeof dateInput === 'object' && dateInput.seconds) { // Firestore Timestamp
->>>>>>> main
         return new Date(dateInput.seconds * 1000);
     }
     if (typeof dateInput === 'string' || typeof dateInput === 'number') {
@@ -129,33 +123,24 @@ export async function checkTutorAssignments(enrollmentId, studentNames = []) {
         // Process students collection
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
-<<<<<<< HEAD
             const studentName = data.name || '';
-=======
             const studentName = data.studentName || data.name || '';
->>>>>>> main
 
             // Determine academic tutor
             let tutorName = data.tutorName;
             let tutorEmail = data.tutorEmail;
-<<<<<<< HEAD
             let assignedDate = data.assignedDate;
-=======
             let assignedDate = data.assignedDate || data.createdAt;
->>>>>>> main
 
             // Check nested tutor object
             if (data.tutor) {
                 tutorName = tutorName || data.tutor.tutorName || data.tutor.name;
                 tutorEmail = tutorEmail || data.tutor.tutorEmail || data.tutor.email;
-<<<<<<< HEAD
                 assignedDate = assignedDate || data.tutor.assignedDate;
             }
 
             if (!assignedDate && (tutorName || tutorEmail)) {
                 assignedDate = data.createdAt;
-=======
->>>>>>> main
             }
 
             assignments.push({
@@ -599,7 +584,6 @@ export async function fetchAndRenderEnrollments(forceRefresh = false) {
                 studentsByEnrollment[student.enrollmentId].push(student);
             });
 
-<<<<<<< HEAD
             // Also fetch pending_students for each enrollment (optional, can be done similarly but may not be needed for status)
             // For simplicity, we'll still use checkTutorAssignments per enrollment but with an optimized version
             // that accepts pre-fetched data. However, to keep code simpler, we'll keep the original but note that it's less efficient.
@@ -610,10 +594,8 @@ export async function fetchAndRenderEnrollments(forceRefresh = false) {
 
             const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
                 const assignments = await checkTutorAssignments(enrollment.id); // still does queries, but we can't avoid easily without major rewrite
-=======
             const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
                 const assignments = await checkTutorAssignments(enrollment.id);
->>>>>>> main
                 const assignmentStatus = getEnrollmentAssignmentStatus(enrollment, assignments);
                 return {
                     ...enrollment,
@@ -866,8 +848,6 @@ export function renderEnrollmentsFromCache(searchTerm = '') {
     enrollmentsList.innerHTML = tableRows;
 }
 
-<<<<<<< HEAD
-=======
 // -------------------- FIXED: Delete Enrollment Function --------------------
 
 /**
@@ -915,7 +895,6 @@ window.deleteEnrollment = async function(enrollmentId) {
     }
 };
 
->>>>>>> main
 export function filterEnrollments(searchTerm) {
     renderEnrollmentsFromCache(searchTerm);
 }
@@ -1399,8 +1378,6 @@ window.showEnrollmentDetails = async function (enrollmentId) {
     }
 };
 
-<<<<<<< HEAD
-=======
 // Placeholder for downloadEnrollmentInvoice function (you'll need to implement this)
 window.downloadEnrollmentInvoice = async function(enrollmentId) {
     alert('Invoice download functionality will be implemented soon.');
@@ -1412,7 +1389,6 @@ window.closeManagementModal = function(modalId) {
     if (modal) modal.remove();
 };
 
->>>>>>> main
 window.approveEnrollmentModal = async function (enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -1918,7 +1894,6 @@ export async function approveEnrollmentWithDetails(enrollmentId) {
         // Clear relevant caches
         delete sessionCache.enrollments;
         delete sessionCache.pendingStudents;
-<<<<<<< HEAD
         // No need to delete students cache because we didn't create any students
 
         // Refresh the view (invalidate cache since data changed)
@@ -1931,11 +1906,9 @@ export async function approveEnrollmentWithDetails(enrollmentId) {
             const container = document.getElementById('main-content');
             if (container) await renderEnrollmentsPanel(container);
         }
-=======
 
         // Refresh the view
         await fetchAndRenderEnrollments(true);
->>>>>>> main
 
     } catch (error) {
         console.error("Error approving enrollment:", error);

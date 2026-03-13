@@ -19,10 +19,8 @@ import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOption
 import { sessionCache, saveToLocalStorage, invalidateCache, switchToTabCached } from '../core/cache.js';
 import { logManagementActivity } from '../notifications/activityLog.js';
 
-<<<<<<< HEAD
 // SUBSECTION 5.3: Pending Approvals Panel (UPDATED)
 // ======================================================
-=======
 // ============================================================
 // HELPERS
 // ============================================================
@@ -76,7 +74,6 @@ async function ensureTutorsLoaded() {
 // ============================================================
 // SUBSECTION 5.3: Pending Approvals Panel
 // ============================================================
->>>>>>> main
 
 export async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
@@ -84,16 +81,13 @@ export async function renderPendingApprovalsPanel(container) {
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-green-700">Pending Approvals</h2>
                 <div class="flex items-center gap-4">
-<<<<<<< HEAD
                     <input type="search" id="pending-search" placeholder="Search by student, parent, or tutor..." class="p-2 border rounded-md w-64">
                     <button id="refresh-pending-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-=======
                     <input type="search" id="pending-search"
                         placeholder="Search by student, parent, or tutor..."
                         class="p-2 border rounded-md w-64">
                     <button id="refresh-pending-btn"
                         class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
->>>>>>> main
                 </div>
             </div>
             <div id="pending-approvals-list" class="space-y-4">
@@ -101,7 +95,6 @@ export async function renderPendingApprovalsPanel(container) {
             </div>
         </div>
     `;
-<<<<<<< HEAD
     document.getElementById('refresh-pending-btn').addEventListener('click', () => fetchAndRenderPendingApprovals(true));
     document.getElementById('pending-search').addEventListener('input', (e) => filterPendingApprovals(e.target.value));
     fetchAndRenderPendingApprovals();
@@ -142,7 +135,6 @@ export async function fetchAndRenderPendingApprovals(forceRefresh = false) {
     }
 }
 
-=======
     document.getElementById('refresh-pending-btn')
         .addEventListener('click', () => fetchAndRenderPendingApprovals(true));
     document.getElementById('pending-search')
@@ -193,14 +185,12 @@ export async function fetchAndRenderPendingApprovals(forceRefresh = false) {
 // FILTER
 // ============================================================
 
->>>>>>> main
 export function filterPendingApprovals(searchTerm = '') {
     const pendingStudents = sessionCache.pendingStudents || [];
     const listContainer = document.getElementById('pending-approvals-list');
     if (!listContainer) return;
 
     if (searchTerm) {
-<<<<<<< HEAD
         const lowerCaseTerm = searchTerm.toLowerCase();
         const filtered = pendingStudents.filter(student =>
             student.studentName?.toLowerCase().includes(lowerCaseTerm) ||
@@ -208,7 +198,6 @@ export function filterPendingApprovals(searchTerm = '') {
             student.tutorEmail?.toLowerCase().includes(lowerCaseTerm) ||
             student.parentEmail?.toLowerCase().includes(lowerCaseTerm) ||
             student.parentPhone?.toLowerCase().includes(lowerCaseTerm)
-=======
         const term = searchTerm.toLowerCase();
         const filtered = pendingStudents.filter(s =>
             s.studentName?.toLowerCase().includes(term) ||
@@ -216,7 +205,6 @@ export function filterPendingApprovals(searchTerm = '') {
             s.tutorEmail?.toLowerCase().includes(term) ||
             s.parentEmail?.toLowerCase().includes(term) ||
             s.parentPhone?.toLowerCase().includes(term)
->>>>>>> main
         );
         renderPendingApprovalsFromCache(filtered);
     } else {
@@ -224,30 +212,23 @@ export function filterPendingApprovals(searchTerm = '') {
     }
 }
 
-<<<<<<< HEAD
-=======
 // ============================================================
 // RENDER
 // ============================================================
 
->>>>>>> main
 export function renderPendingApprovalsFromCache(studentsToRender = null) {
     const pendingStudents = studentsToRender || sessionCache.pendingStudents || [];
     const listContainer = document.getElementById('pending-approvals-list');
     if (!listContainer) return;
 
     if (pendingStudents.length === 0) {
-<<<<<<< HEAD
         listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
-=======
         listContainer.innerHTML =
             `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
->>>>>>> main
         return;
     }
 
     listContainer.innerHTML = pendingStudents.map(student => {
-<<<<<<< HEAD
         // Get tutor name if available from tutors cache
         let tutorName = student.tutorEmail;
         if (sessionCache.tutors) {
@@ -272,7 +253,6 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
         const gradeNum = parseInt(String(gradeDisplay).toLowerCase().replace('grade','').trim(), 10);
         const needsPlacementTest = !isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12 && student.placementTestStatus !== 'completed';
         
-=======
         // Resolve tutor display name
         let tutorName = student.tutorEmail || 'Not assigned';
         if (sessionCache.tutors) {
@@ -327,13 +307,11 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
                     : student.enrollmentData.subjects)
                 : student.subjects || 'N/A');
 
->>>>>>> main
         return `
             <div class="border p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div class="flex flex-col md:flex-row justify-between items-start gap-4">
                     <div class="flex-1 min-w-0">
                         <div class="flex flex-wrap items-center gap-2 mb-2">
-<<<<<<< HEAD
                             <h3 class="font-bold text-lg text-gray-800">${student.studentName}${fromEnrollment}</h3>
                             ${student.enrollmentId ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">From Enrollment</span>` : ''}
                             ${needsPlacementTest ? `<span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-semibold">📝 Needs Placement Test</span>` : ''}
@@ -361,7 +339,6 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
                         <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-blue-600 transition-colors" data-student-id="${student.id}"><i class="fas fa-edit mr-1"></i>Edit</button>
                         <button class="approve-btn bg-green-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-green-700 transition-colors" data-student-id="${student.id}"><i class="fas fa-check mr-1"></i>Approve</button>
                         <button class="reject-btn bg-red-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-red-700 transition-colors" data-student-id="${student.id}"><i class="fas fa-times mr-1"></i>Reject</button>
-=======
                             <h3 class="font-bold text-lg text-gray-800">${escapeHtml(student.studentName || 'Unknown')}</h3>
                             ${student.enrollmentId ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">From Enrollment</span>` : ''}
                             ${placementBadge}
@@ -397,13 +374,11 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
                         <button class="reject-btn bg-red-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-red-700 transition-colors" data-student-id="${student.id}">
                             <i class="fas fa-times mr-1"></i>Reject
                         </button>
->>>>>>> main
                     </div>
                 </div>
             </div>
         `;
     }).join('');
-<<<<<<< HEAD
     
     // Reattach event listeners
     document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
@@ -412,7 +387,6 @@ export function renderPendingApprovalsFromCache(studentsToRender = null) {
 }
 
 // ======================================================
-=======
 
     listContainer.querySelectorAll('.edit-pending-btn').forEach(btn =>
         btn.addEventListener('click', () => handleEditPendingStudent(btn.dataset.studentId)));
@@ -755,4 +729,3 @@ export async function handleRejectStudent(studentId) {
         alert('Failed to reject student. Please try again.');
     }
 }
->>>>>>> main
