@@ -4166,28 +4166,12 @@ function initializeParentPortalV2() {
     setupEventListeners();
     setupGlobalErrorHandler();
 
-<<<<<<< HEAD
-    // AUTO-LOGIN: If coming from enrollment portal, sign in using stored credentials
-    // firebaseConfig.js uses browserSessionPersistence so each tab needs its own sign-in
-=======
     // AUTO-LOGIN: Check if coming from enrollment portal
->>>>>>> main
     const newParentData = localStorage.getItem('bkh_new_parent');
     if (newParentData) {
         try {
             const { email, tempPassword } = JSON.parse(newParentData);
             if (email && tempPassword) {
-<<<<<<< HEAD
-                firebase.auth().signInWithEmailAndPassword(email, tempPassword)
-                    .then(() => console.log('✅ Auto-login success for new parent'))
-                    .catch((err) => {
-                        console.warn('Auto-login failed:', err.message);
-                        localStorage.removeItem('bkh_new_parent');
-                    });
-            }
-        } catch(e) {
-            console.warn('Auto-login parse error:', e.message);
-=======
                 // Initialize FIRST so onAuthStateChanged listener is registered
                 authManager.initialize();
                 // Reset debounce so the auth state change is never silently skipped
@@ -4211,7 +4195,6 @@ function initializeParentPortalV2() {
             }
         } catch(e) {
             console.warn('❌ Auto-login parse error:', e.message);
->>>>>>> main
             localStorage.removeItem('bkh_new_parent');
         }
     }
@@ -5279,20 +5262,11 @@ window.saveFirstTimePassword = async function(uid) {
     if (spinner) spinner.style.display = 'block';
     
     try {
-<<<<<<< HEAD
-        // Use firebase.auth() compat SDK since window.auth may not be available
-        const user = firebase.auth().currentUser;
-        if (!user) throw new Error('Not authenticated');
-
-        // Re-authenticate using stored temp credentials before updating password
-        // Required by Firebase for sensitive operations
-=======
         const user = auth.currentUser;
         if (!user) throw new Error('Not authenticated — please refresh and try again');
 
         // Re-authenticate with temp credentials before updatePassword
         // Firebase requires recent login before allowing password changes
->>>>>>> main
         const storedData = localStorage.getItem('bkh_new_parent');
         if (storedData) {
             try {
@@ -5300,30 +5274,18 @@ window.saveFirstTimePassword = async function(uid) {
                 if (email && tempPassword) {
                     const credential = firebase.auth.EmailAuthProvider.credential(email, tempPassword);
                     await user.reauthenticateWithCredential(credential);
-<<<<<<< HEAD
-                    console.log('✅ Re-auth successful');
-                }
-            } catch (reAuthError) {
-                console.warn('Re-auth failed, trying anyway:', reAuthError.message);
-=======
                     console.log('✅ Re-authentication successful');
                 }
             } catch (reAuthErr) {
                 console.warn('⚠️ Re-auth skipped:', reAuthErr.message);
->>>>>>> main
             }
         }
 
         await user.updatePassword(pwd);
 
-<<<<<<< HEAD
-        // Clear stored temp credentials now that password is set
-        localStorage.removeItem('bkh_new_parent');
-=======
         // Clear temp credentials now that password is permanently set
         localStorage.removeItem('bkh_new_parent');
         console.log('✅ Temp credentials cleared');
->>>>>>> main
 
         // Update Firestore record
         await db.collection('parent_users').doc(uid).update({
@@ -5331,15 +5293,9 @@ window.saveFirstTimePassword = async function(uid) {
             firstLoginCompleted: true,
             passwordSetAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-<<<<<<< HEAD
-        
-        showMsg('Password saved successfully! Welcome to your portal!', false);
-        
-=======
 
         showMsg('Password saved successfully! Welcome to your portal!', false);
 
->>>>>>> main
         setTimeout(() => {
             const modal = document.getElementById('firstTimePasswordModal');
             if (modal) modal.remove();
@@ -5349,11 +5305,7 @@ window.saveFirstTimePassword = async function(uid) {
         console.error('Error saving password:', error);
         let msg = 'Failed to save password. Please try again.';
         if (error.code === 'auth/requires-recent-login') {
-<<<<<<< HEAD
-            msg = 'Session expired. Please refresh the page and try again.';
-=======
             msg = 'Session expired. Please log out and log back in to set your password.';
->>>>>>> main
         }
         showMsg(msg, true);
         if (btn) btn.disabled = false;

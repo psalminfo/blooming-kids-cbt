@@ -3,17 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<<<<<<< HEAD
-    <!-- SECURITY: Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self';
-        script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-        connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.cloudinary.com;
-        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-        font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-        img-src 'self' data: https: blob:;
-        frame-ancestors 'none';
-=======
     <!-- SECURITY: Content Security Policy
          Note: frame-ancestors only works as an HTTP header, not a meta tag.
          Set it at your hosting/server level instead.
@@ -49,7 +38,6 @@
         media-src 'self' blob: https://res.cloudinary.com;
         frame-src https://res.cloudinary.com https://docs.google.com https://drive.google.com;
         worker-src 'self' blob:;
->>>>>>> main
     ">
     <title>Blooming · Tutor Portal</title>
 
@@ -833,17 +821,6 @@
         }
 
         .report-textarea { min-height: 150px; font-size: 1rem; line-height: 1.6; }
-<<<<<<< HEAD
-
-        /* Edit schedule button */
-        .edit-schedule-btn {
-            background-color: var(--info-color); color: white;
-            border: none; padding: 0.35rem 0.8rem;
-            border-radius: var(--radius); font-size: 0.75rem;
-            cursor: pointer; font-weight: 600;
-            transition: all 0.2s ease;
-            box-shadow: 0 3px 8px rgba(59,130,246,0.3);
-=======
 
         /* Edit schedule button */
         .edit-schedule-btn {
@@ -1028,159 +1005,8 @@
             background-color: #0a1520;
             border-top-color: rgba(255,255,255,0.08);
             color: #94a3b8;
->>>>>>> main
         }
-        .edit-schedule-btn:hover { background-color: #1d4ed8; transform: translateY(-1px); }
 
-<<<<<<< HEAD
-        /* File upload */
-        .file-upload-container {
-            border: 2px dashed var(--border-color);
-            border-radius: var(--radius);
-            padding: 1.75rem;
-            text-align: center;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            background: #fafafa;
-        }
-        .file-upload-container:hover {
-            border-color: var(--primary-color);
-            background-color: #f0fdf4;
-        }
-        .file-upload-label { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-        .file-upload-icon  { font-size: 2.2rem; margin-bottom: 0.6rem; color: var(--primary-color); }
-        .file-preview      { margin-top: 1rem; padding: 0.8rem; background-color: var(--light-color); border-radius: var(--radius); }
-        .file-name         { font-size: 0.875rem; color: var(--dark-color); font-weight: 600; margin-bottom: 0.2rem; }
-        .file-size         { font-size: 0.75rem; color: var(--dark-color); opacity: 0.6; }
-
-        /* Email */
-        .email-settings    { background-color: #f8fafc; border-radius: var(--radius); padding: 1.1rem; margin-top: 1rem; border: 1px solid var(--border-color); }
-        .email-preview     { background-color: white; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.1rem; margin-top: 1rem; font-size: 0.875rem; line-height: 1.6; }
-        .email-preview-header { border-bottom: 1px solid var(--border-color); padding-bottom: 0.6rem; margin-bottom: 1rem; }
-
-        /* Chat (WhatsApp-style) */
-        .whatsapp-chat-container {
-            display: flex; flex-direction: column;
-            height: 520px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-        }
-        .chat-header {
-            background: linear-gradient(135deg, #128c7e 0%, #075e54 100%);
-            color: white; padding: 1rem;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .chat-header-info   { display: flex; align-items: center; gap: 0.75rem; }
-        .chat-avatar {
-            width: 40px; height: 40px; border-radius: 50%;
-            background-color: rgba(255,255,255,0.2);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; border: 1.5px solid rgba(255,255,255,0.4);
-        }
-        .chat-header-text h4 { margin:0; font-weight:700; }
-        .chat-header-text p  { margin:0; font-size:0.78rem; opacity:0.85; }
-        .chat-messages {
-            flex: 1; padding: 1rem; overflow-y: auto;
-            background-color: #e5ddd5;
-            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z' fill='%23a8a8a8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
-            display: flex; flex-direction: column;
-        }
-        .message-bubble {
-            max-width: 70%; padding: 0.55rem 0.8rem;
-            border-radius: 1rem; margin-bottom: 0.5rem;
-            position: relative; word-wrap: break-word;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-        }
-        .message-bubble.sent     { background:#dcf8c6; align-self:flex-end; margin-left:auto; border-bottom-right-radius:0.25rem; }
-        .message-bubble.received { background:white; align-self:flex-start; margin-right:auto; border-bottom-left-radius:0.25rem; }
-        .message-content { font-size:0.88rem; line-height:1.45; }
-        .message-time    { font-size:0.68rem; color:#666; text-align:right; margin-top:0.2rem; }
-        .message-sender  { font-weight:700; font-size:0.78rem; margin-bottom:0.2rem; color:#333; }
-        .chat-input-area {
-            padding: 0.75rem;
-            background-color: #f0f0f0;
-            border-top: 1px solid var(--border-color);
-            display: flex; gap: 0.5rem; align-items: center;
-        }
-        .chat-input {
-            flex: 1; padding: 0.6rem 1.1rem;
-            border: none; border-radius: 2rem;
-            font-size: 0.9rem; font-family: inherit;
-            background: white;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        }
-        .chat-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(18,140,126,0.25); }
-        .send-message-btn {
-            background: linear-gradient(135deg, #25d366, #128c7e);
-            color: white; border: none;
-            border-radius: 50%; width: 42px; height: 42px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: all 0.2s ease;
-            box-shadow: 0 3px 10px rgba(18,140,126,0.4);
-        }
-        .send-message-btn:hover { transform: scale(1.1); background: linear-gradient(135deg, #128c7e, #075e54); }
-
-        /* Recipient options */
-        .message-recipient-options {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 1rem; margin: 1.5rem 0;
-        }
-        .recipient-option {
-            border: 2px solid var(--border-color);
-            border-radius: var(--radius);
-            padding: 1rem; cursor: pointer;
-            transition: all 0.2s ease; text-align: center;
-            background: white;
-        }
-        .recipient-option:hover  { border-color: var(--primary-color); background: #f0fdf4; }
-        .recipient-option.selected { border-color: var(--primary-color); background: #dcfce7; box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
-        .recipient-option input[type="checkbox"] { margin-right: 0.4rem; }
-        .recipient-label { font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 0.45rem; }
-
-        /* Inbox */
-        .inbox-container { display: flex; height: 600px; }
-        .conversations-sidebar {
-            width: 300px;
-            border-right: 1px solid var(--border-color);
-            display: flex; flex-direction: column;
-            background: #fafafa;
-        }
-        .conversations-header { padding: 1rem; border-bottom: 1px solid var(--border-color); font-weight: 700; font-size: 0.95rem; }
-        .conversations-list   { flex: 1; overflow-y: auto; }
-        .conversation-item {
-            padding: 0.9rem 1rem;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: background-color 0.15s ease;
-        }
-        .conversation-item:hover  { background-color: #f1f5f9; }
-        .conversation-item.active { background-color: #dcfce7; border-left: 3px solid var(--primary-color); }
-        .conversation-info    { display: flex; align-items: center; gap: 0.7rem; }
-        .conversation-avatar  {
-            width: 38px; height: 38px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
-        }
-        .conversation-details   { flex: 1; min-width: 0; }
-        .conversation-title     { font-weight: 700; margin: 0; display: flex; justify-content: space-between; font-size: 0.875rem; }
-        .conversation-preview   { font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .conversation-time      { font-size: 0.72rem; color: #94a3b8; }
-        .conversation-unread {
-            background-color: var(--primary-color); color: white;
-            border-radius: 50%; width: 20px; height: 20px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.68rem; font-weight: 700;
-        }
-        .chat-main { flex: 1; display: flex; flex-direction: column; background: white; }
-        .new-message-indicator {
-            background-color: var(--danger);
-            border-radius: 50%; width: 8px; height: 8px;
-            display: inline-block; margin-left: 0.4rem;
-=======
         /* ── Forms ────────────────────────────────────── */
         body.dark .form-input,
         body.dark .form-textarea,
@@ -1436,7 +1262,6 @@
         body.dark [style*="border: 1px solid #e5e7eb"],
         body.dark [style*="border:1.5px solid #e2e8f0"] {
             border-color: rgba(255,255,255,0.08) !important;
->>>>>>> main
         }
     </style>
 </head>
