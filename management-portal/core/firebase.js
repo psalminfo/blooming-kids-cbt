@@ -3,7 +3,7 @@
 // To upgrade SDK: change the version string once here.
 // ============================================================
 
-export { auth, db } from '../firebaseConfig.js';
+export { auth, db } from '/firebaseConfig.js';
 
 export {
     collection, getDocs, doc, getDoc, where, query, orderBy,
