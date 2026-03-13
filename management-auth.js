@@ -3,7 +3,7 @@
 // Sign-up, sign-in and password reset for management staff.
 // ============================================================
 
-import { auth, db } from './core/firebase.js';
+import { auth, db } from './management-portal/core/firebase.js';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword,
          sendPasswordResetEmail }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
