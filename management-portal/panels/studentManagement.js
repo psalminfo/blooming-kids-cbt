@@ -164,10 +164,10 @@ export async function fetchAndRenderArchivedStudents(forceRefresh = false) {
         const graduatedCount = archivedStudents.filter(s => s.status === 'graduated').length;
         const transferredCount = archivedStudents.filter(s => s.status === 'transferred').length;
         
-        document.getElementById('archived-count-badge').textContent = archivedCount;
-        document.getElementById('active-students-badge').textContent = activeStudents.length;
-        document.getElementById('graduated-count-badge').textContent = graduatedCount;
-        document.getElementById('transferred-count-badge').textContent = transferredCount;
+        const archivedBadge = document.getElementById('archived-count-badge'); if(archivedBadge) archivedBadge.textContent = archivedCount;
+        const activeBadge = document.getElementById('active-students-badge'); if(activeBadge) activeBadge.textContent = activeStudents.length;
+        const graduatedBadge = document.getElementById('graduated-count-badge'); if(graduatedBadge) graduatedBadge.textContent = graduatedCount;
+        const transferredBadge = document.getElementById('transferred-count-badge'); if(transferredBadge) transferredBadge.textContent = transferredCount;
         
         renderArchivedStudentsFromCache();
     } catch (error) {
