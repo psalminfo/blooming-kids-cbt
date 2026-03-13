@@ -3,16 +3,7 @@
 // Dashboard stats & quick-action cards
 // ============================================================
 
-import { db } from '../core/firebase.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy,
-         Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc,
-         limit, startAfter, onSnapshot } from '../core/firebase.js';
-import {
-         Timestamp, addDoc, collection, deleteDoc,
-         doc, getDoc, getDocs, limit,
-         onSnapshot, orderBy, query, setDoc,
-         startAfter, updateDoc, where, writeBatch
-    } from '../core/firebase.js';
+import { db, collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter, onSnapshot } from '../core/firebase.js';
 import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOptions,
          formatTimeTo12h, sanitizeInput, rateLimitCheck,
          safeToString, safeSearch, formatBadgeDate, calculateYearsOfService,
