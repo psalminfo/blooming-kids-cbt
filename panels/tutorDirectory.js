@@ -119,7 +119,12 @@ export async function renderManagementTutorView(container) {
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         
-        document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+        let _searchDebounceTimer = null;
+        document.getElementById('directory-search').addEventListener('input', (e) => {
+            const val = e.target.value;
+            clearTimeout(_searchDebounceTimer);
+            _searchDebounceTimer = setTimeout(() => renderDirectoryFromCache(val), 250);
+        });
         
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
@@ -1570,6 +1575,19 @@ export function showManageTransitionModal(studentId) {
 // ======================================================
 
 export async function fetchAndRenderDirectory(forceRefresh = false) {
+    // ── Cache freshness guard: skip Firestore if data is less than 5 min old ──
+    const CACHE_TTL_MS = 5 * 60 * 1000;
+    const cacheAge = Date.now() - (sessionCache._lastUpdate || 0);
+    const cacheIsValid = !forceRefresh
+        && cacheAge < CACHE_TTL_MS
+        && sessionCache.tutors?.length > 0
+        && sessionCache.students?.length > 0;
+
+    if (cacheIsValid) {
+        renderDirectoryFromCache();
+        return;
+    }
+
     if (forceRefresh) {
         invalidateCache('tutors'); 
         invalidateCache('students'); 
@@ -1591,8 +1609,8 @@ export async function fetchAndRenderDirectory(forceRefresh = false) {
         ] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
-            getDocs(collection(db, "tutorAssignments")),
-            getDocs(collection(db, "tutorTransitions")),
+            getDocs(query(collection(db, "tutorAssignments"), orderBy("assignedAt", "desc"), limit(300))),
+            getDocs(query(collection(db, "tutorTransitions"), orderBy("createdAt", "desc"), limit(200))),
             getDocs(collection(db, "groupClasses"))
         ]);
         
@@ -1711,10 +1729,17 @@ export function renderDirectoryFromCache(searchTerm = '') {
         return;
     }
 
+    // Skip re-render if the same search + same data snapshot is already displayed
+    const _renderKey = searchTerm + '|' + (sessionCache._lastUpdate || '');
+    if (renderDirectoryFromCache._lastKey === _renderKey) return;
+    renderDirectoryFromCache._lastKey = _renderKey;
+
     const studentsByTutor = {};
     students.forEach(s => {
         if (s.tutorEmail) {
             if (!studentsByTutor[s.tutorEmail]) studentsByTutor[s.tutorEmail] = [];
+            // Pre-compute search match once per student (avoids calling it twice below)
+            s._searchMatch = !searchTerm || searchStudentFromFirebase(s, searchTerm, tutors);
             studentsByTutor[s.tutorEmail].push(s);
         }
     });
@@ -1725,7 +1750,7 @@ export function renderDirectoryFromCache(searchTerm = '') {
         
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm);
-        const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
+        const studentMatch = assignedStudents.some(s => s._searchMatch);
         
         return tutorMatch || studentMatch;
     });
@@ -1753,7 +1778,7 @@ export function renderDirectoryFromCache(searchTerm = '') {
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors))
+            .filter(student => !searchTerm || student._searchMatch)
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
         const breakCount = assignedStudents.filter(s => getStudentCategory(s) === 'break').length;
@@ -1832,9 +1857,10 @@ export function renderDirectoryFromCache(searchTerm = '') {
                 </tr>`;
         }).join('');
 
+        const isMobile = window.innerWidth < 768;
         return `
             <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                <details open>
+                <details ${isMobile ? '' : 'open'}>
                     <summary class="p-5 cursor-pointer flex justify-between bg-gradient-to-r from-gray-50 to-white border-b">
                         <div>
                             <h3 class="text-lg font-semibold text-green-700">${tutorTitle} 
@@ -2577,7 +2603,7 @@ export function showAssignStudentModal() {
         alert(`Student "${studentName}" assigned successfully!`);
         closeManagementModal('assign-modal');
         invalidateCache('students');
-        invalidateCache('tutorAssignments');
+        sessionCache._lastUpdate = 0; // force next render to re-fetch
         renderManagementTutorView(document.getElementById('main-content'));
     }
 
@@ -2835,6 +2861,7 @@ function handleEditStudent(studentId) {
             alert('"' + updates.studentName + '" updated successfully!');
             document.getElementById('edit-student-modal').remove();
             invalidateCache('students');
+            sessionCache._lastUpdate = 0;
             fetchAndRenderDirectory(true);
         } catch(err) {
             console.error('Edit student error:', err);
