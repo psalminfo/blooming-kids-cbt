@@ -1864,9 +1864,6 @@ export function renderDirectoryFromCache(searchTerm = '') {
                 </tr>`;
         }).join('');
 
-        return `
-            <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                <details open>
         const isMobile = window.innerWidth < 768;
         return `
             <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
