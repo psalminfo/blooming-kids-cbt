@@ -36,6 +36,247 @@ import { logManagementActivity } from '../notifications/activityLog.js';
 
 // --- Schedule Display ---
 
+
+// ============================================================
+// QA ROTATION SYSTEM — helpers
+// ============================================================
+
+/** Emails excluded from receiving an assigned QA list.
+ *  They still have QA permission and can grade freely. */
+const QA_ROTATION_EXCLUDED = ['ade@gmail.com'];
+
+/** Fisher-Yates shuffle — returns a NEW shuffled array. */
+function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/**
+ * Returns every Monday–Sunday week that overlaps the given
+ * year/month (0-based), as an array of:
+ *   { weekNum (1-indexed), monday, sunday, weekKey }
+ * Always in Lagos local calendar.
+ */
+function getWeeksInMonth(year, month) {
+    const firstDay   = new Date(year, month, 1);
+    const dow        = firstDay.getDay(); // 0=Sun
+    const sinceMonday = dow === 0 ? 6 : dow - 1;
+    let monday = new Date(year, month, 1 - sinceMonday);
+
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    const weeks = [];
+    let weekNum = 0;
+    while (monday <= monthEnd) {
+        const sunday = new Date(monday.getFullYear(), monday.getMonth(),
+                                monday.getDate() + 6, 23, 59, 59, 999);
+        weekNum++;
+        weeks.push({
+            weekNum,
+            monday: new Date(monday),
+            sunday: new Date(sunday),
+            weekKey: `${year}-${String(month + 1).padStart(2,'0')}-W${weekNum}`
+        });
+        monday = new Date(monday.getFullYear(), monday.getMonth(),
+                          monday.getDate() + 7);
+    }
+    return weeks;
+}
+
+/** Split array into numChunks roughly-equal slices (front-heavy). */
+function splitIntoChunks(arr, numChunks) {
+    if (numChunks <= 0) return [];
+    const chunks = [];
+    const base  = Math.floor(arr.length / numChunks);
+    const extra = arr.length % numChunks;
+    let idx = 0;
+    for (let i = 0; i < numChunks; i++) {
+        const size = base + (i < extra ? 1 : 0);
+        chunks.push(arr.slice(idx, idx + size));
+        idx += size;
+    }
+    return chunks;
+}
+
+/**
+ * Average QC score from a qa_grades array.
+ * Returns null when the array is empty / has no numeric scores.
+ */
+function calcAvgQaScore(qcGrades) {
+    if (!qcGrades || qcGrades.length === 0) return null;
+    const valid = qcGrades.filter(e => typeof e.score === 'number');
+    if (valid.length === 0) return null;
+    return Math.round(valid.reduce((s, e) => s + e.score, 0) / valid.length);
+}
+
+/**
+ * Concatenate all QC notes (one per grader) into a single string.
+ * Each entry is prefixed with the grader's name in brackets.
+ */
+function concatQaNotes(qcGrades) {
+    if (!qcGrades || qcGrades.length === 0) return '';
+    return qcGrades
+        .filter(e => e.notes && e.notes.trim())
+        .map(e => `[${e.gradedByName || e.gradedBy}]: ${e.notes.trim()}`)
+        .join('\n');
+}
+
+/**
+ * Get or create the monthly QC assignment plan.
+ *
+ * Firestore doc: qc_assignments/{monthKey}
+ * {
+ *   month, generatedAt, lastUpdated,
+ *   weeks: [
+ *     { weekNum, weekKey, mondayISO, sundayISO,
+ *       assignments: { staffEmail: [tutorId, …] } }
+ *   ]
+ * }
+ *
+ * Algorithm
+ * ---------
+ * 1. Each QC staff member (excluding QA_ROTATION_EXCLUDED) gets a
+ *    DIFFERENT randomised slice of tutors each week.
+ * 2. The slices rotate so that by end of month every staff member
+ *    has graded every tutor exactly once.
+ * 3. Mid-month activation: tutors already graded by a staff member
+ *    are excluded from that staff member's remaining pool — their
+ *    grades stay untouched.
+ * 4. New tutors added after the plan was first created are
+ *    automatically inserted into the remaining weeks.
+ *
+ * @param {string}   monthKey               e.g. "2026-03"
+ * @param {string[]} allTutorIds            all active tutor doc IDs
+ * @param {string[]} qaStaffEmails          staff with canQA, excl. EXCLUDED
+ * @param {Object}   existingQaGradesByTutor { tutorId: [{gradedBy}] }
+ */
+async function getOrCreateQaAssignmentPlan(
+    monthKey, allTutorIds, qaStaffEmails, existingQaGradesByTutor
+) {
+    const planRef = doc(db, 'qa_assignments', monthKey);
+
+    // Which week-index are we in right now? (0-based)
+    const [yrS, moS] = monthKey.split('-');
+    const year  = parseInt(yrS, 10);
+    const month = parseInt(moS, 10) - 1; // 0-based
+    const weeks = getWeeksInMonth(year, month);
+    const numWeeks = weeks.length;
+
+    const lagosNow = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' })
+    );
+    let curWeekIdx = weeks.findIndex(
+        w => lagosNow >= w.monday && lagosNow <= w.sunday
+    );
+    if (curWeekIdx === -1) curWeekIdx = numWeeks - 1;
+
+    // ── Load existing plan ──────────────────────────────────────────
+    let planSnap;
+    try { planSnap = await getDoc(planRef); }
+    catch(e) { planSnap = { exists: () => false }; }
+
+    if (planSnap.exists && planSnap.exists()) {
+        const existingPlan = planSnap.data();
+
+        // Find tutors not yet in the plan (new mid-month tutors)
+        const plannedIds = new Set();
+        (existingPlan.weeks || []).forEach(w =>
+            Object.values(w.assignments || {}).forEach(ids =>
+                ids.forEach(id => plannedIds.add(id))
+            )
+        );
+        const newTutors = allTutorIds.filter(id => !plannedIds.has(id));
+
+        if (newTutors.length > 0) {
+            // Distribute new tutors across remaining weeks, per staff
+            const remaining = weeks.slice(curWeekIdx);
+            const numRemaining = remaining.length;
+            const updatedWeeks = (existingPlan.weeks || []).map((w, wi) => {
+                if (wi < curWeekIdx) return w;
+                const slotIdx  = wi - curWeekIdx;
+                const newAssig = { ...w.assignments };
+                qaStaffEmails.forEach((email, si) => {
+                    // Each staff gets a different rotated slice of new tutors
+                    const shuffledNew = shuffleArray(newTutors);
+                    const chunks      = splitIntoChunks(shuffledNew, numRemaining);
+                    const myChunk     = chunks[(slotIdx + si) % numRemaining] || [];
+                    newAssig[email] = [...(newAssig[email] || []), ...myChunk];
+                });
+                return { ...w, assignments: newAssig };
+            });
+            try {
+                await updateDoc(planRef, {
+                    weeks: updatedWeeks,
+                    lastUpdated: new Date()
+                });
+            } catch(e) { /* non-critical */ }
+            return { ...existingPlan, weeks: updatedWeeks };
+        }
+
+        return existingPlan;
+    }
+
+    // ── Generate fresh plan ────────────────────────────────────────
+    // Build "already graded" sets per staff for mid-month activation
+    const alreadyByStaff = {};
+    qaStaffEmails.forEach(e => { alreadyByStaff[e] = new Set(); });
+    Object.entries(existingQaGradesByTutor).forEach(([tid, entries]) => {
+        entries.forEach(entry => {
+            if (alreadyByStaff[entry.gradedBy]) {
+                alreadyByStaff[entry.gradedBy].add(tid);
+            }
+        });
+    });
+
+    // Remaining tutors per staff = all tutors minus already graded
+    const remainingByStaff = {};
+    qaStaffEmails.forEach(email => {
+        remainingByStaff[email] = allTutorIds.filter(
+            id => !alreadyByStaff[email].has(id)
+        );
+    });
+
+    // Build week documents
+    const weekDocs = weeks.map(w => ({
+        weekNum:   w.weekNum,
+        weekKey:   w.weekKey,
+        mondayISO: w.monday.toISOString().slice(0, 10),
+        sundayISO: w.sunday.toISOString().slice(0, 10),
+        assignments: {}
+    }));
+
+    // Remaining weeks (current onward)
+    const remIdxs = weeks.map((_, i) => i).filter(i => i >= curWeekIdx);
+    const numRem  = remIdxs.length;
+
+    // Each staff gets a shuffled-then-split list across remaining weeks,
+    // rotated so they never share the same tutors in the same week.
+    qaStaffEmails.forEach((email, si) => {
+        const shuffled = shuffleArray(remainingByStaff[email]);
+        const chunks   = splitIntoChunks(shuffled, numRem);
+        remIdxs.forEach((wIdx, chunkPos) => {
+            // staff si gets chunk at position (chunkPos + si) % numRem
+            // so no two staff share the same chunk in the same week
+            const myChunk = chunks[(chunkPos + si) % numRem] || [];
+            weekDocs[wIdx].assignments[email] = myChunk;
+        });
+    });
+
+    const plan = {
+        month: monthKey,
+        generatedAt: new Date(),
+        lastUpdated: new Date(),
+        weeks: weekDocs
+    };
+
+    try { await setDoc(planRef, plan); }
+    catch(e) { console.error('Failed to save QA plan:', e); }
+    return plan;
+}
+
 // --- Main Render Function ---
 export async function renderMasterPortalPanel(container) {
     const monthKey = getCurrentMonthKeyLagos();
@@ -211,7 +452,9 @@ export async function renderMasterPortalPanel(container) {
         const rankedTutors = tutors
             .map(t => {
                 const g = grades[t.id] || grades[t.email] || {};
-                const qa = g.qa?.score ?? null;
+                // QA score = average of all qa_grades; fallback to legacy single qa
+                const qa = calcAvgQaScore(g.qa_grades) ?? (g.qa?.score ?? null);
+                // QC score = single grader
                 const qc = g.qc?.score ?? null;
                 const total = (qa !== null && qc !== null)
                     ? Math.round((qa + qc) / 2)
@@ -276,11 +519,78 @@ export async function renderMasterPortalPanel(container) {
         const listEl = document.getElementById('master-portal-list');
         const currentStaff = window.userData;
 
-        tutors.forEach((tutor, idx) => {
+        // ── QA assignment filter ────────────────────────────────────
+        // If the logged-in staff has canQA AND is not in the excluded
+        // list, only show them the tutors assigned to them this week
+        // (current week + any carryover ungraded from earlier weeks).
+        // Everyone else sees all tutors.
+        let visibleTutorIds = null; // null = show all
+
+        const isQaGrader = currentStaff?.permissions?.tabs?.canQA
+                        && !QA_ROTATION_EXCLUDED.includes(currentStaff?.email);
+
+        if (isQaGrader) {
+            try {
+                const planSnap = await getDoc(doc(db, 'qa_assignments', monthKey));
+                if (planSnap.exists()) {
+                    const plan = planSnap.data();
+
+                    // Which week are we in?
+                    const lagosNow = new Date(
+                        new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' })
+                    );
+                    let curWeekIdx = (plan.weeks || []).findIndex(w => {
+                        const mon = new Date(w.mondayISO + 'T00:00:00');
+                        const sun = new Date(w.sundayISO + 'T23:59:59');
+                        return lagosNow >= mon && lagosNow <= sun;
+                    });
+                    if (curWeekIdx === -1) curWeekIdx = (plan.weeks || []).length - 1;
+
+                    // Collect all tutors assigned to this staff in
+                    // weeks 0..curWeekIdx that haven't been graded yet
+                    // (their current week's list + carryover)
+                    const myAssigned = new Set();
+                    for (let wi = 0; wi <= curWeekIdx; wi++) {
+                        const ids = ((plan.weeks[wi] || {}).assignments || {})[currentStaff.email] || [];
+                        ids.forEach(id => myAssigned.add(id));
+                    }
+
+                    // Remove already-graded tutors (only show what still needs doing)
+                    gradesSnap.docs.forEach(d => {
+                        const g = d.data();
+                        const tid = g.tutorId || d.id;
+                        const alreadyGraded = (g.qa_grades || []).some(e => e.gradedBy === currentStaff.email)
+                                           || (!g.qa_grades?.length && g.qa?.gradedBy === currentStaff.email);
+                        if (alreadyGraded) myAssigned.delete(tid);
+                    });
+
+                    visibleTutorIds = myAssigned; // Set of tutorIds to show
+                }
+            } catch(e) { /* plan not available yet — fall through to show all */ }
+        }
+
+        // Apply filter: if visibleTutorIds is a Set, only render matching tutors
+        const tutorsToRender = visibleTutorIds !== null
+            ? tutors.filter(t => visibleTutorIds.has(t.id))
+            : tutors;
+
+        // Show a contextual banner for QA graders
+        if (isQaGrader && visibleTutorIds !== null) {
+            const banner = document.createElement('div');
+            banner.className = 'bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 text-sm text-purple-800 mb-1';
+            banner.innerHTML = visibleTutorIds.size > 0
+                ? `📋 <strong>Your QA list this week:</strong> ${visibleTutorIds.size} tutor${visibleTutorIds.size !== 1 ? 's' : ''} assigned to you. Grade them below.`
+                : `✅ <strong>You're all caught up!</strong> No outstanding QA grades assigned to you this week.`;
+            listEl.before(banner);
+        }
+
+        tutorsToRender.forEach((tutor, idx) => {
             const tutorStudents = studentsByTutor[tutor.email] || [];
             const activeStudents = tutorStudents.filter(s => !s.summerBreak && !['archived','graduated','transferred'].includes(s.status));
             const g = grades[tutor.id] || grades[tutor.email] || {};
-            const qaScore = g.qa?.score ?? null;
+            // QA score: average of all qa_grades; fall back to legacy g.qa?.score
+            const qaScore = calcAvgQaScore(g.qa_grades) ?? (g.qa?.score ?? null);
+            // QC score: single grader
             const qcScore = g.qc?.score ?? null;
             const totalScore = (qaScore !== null && qcScore !== null)
                 ? Math.round((qaScore + qcScore) / 2)
@@ -292,7 +602,10 @@ export async function renderMasterPortalPanel(container) {
             // Check if current user already graded this tutor
             const canQA = currentStaff?.permissions?.tabs?.canQA;
             const canQC = currentStaff?.permissions?.tabs?.canQC;
-            const alreadyQA = g.qa?.gradedBy === currentStaff?.email;
+            // alreadyQA: check qa_grades array (multi-grader); fall back to legacy single qa field
+            const alreadyQA = (g.qa_grades || []).some(e => e.gradedBy === currentStaff?.email)
+                           || (!g.qa_grades?.length && g.qa?.gradedBy === currentStaff?.email);
+            // alreadyQC: simple single grader check
             const alreadyQC = g.qc?.gradedBy === currentStaff?.email;
 
             const card = document.createElement('div');
@@ -320,22 +633,29 @@ export async function renderMasterPortalPanel(container) {
             <div class="accordion-body hidden border-t border-gray-100">
                 <!-- Mini score breakdown -->
                 <div class="p-4 grid grid-cols-2 gap-3 bg-gray-50">
-                    <!-- QA Score -->
+                    <!-- QA Score (multi-grader averaged) -->
                     <div class="bg-white rounded-xl border border-purple-100 p-3">
                         <div class="flex justify-between items-start mb-1">
                             <div class="text-xs font-bold text-purple-600 uppercase tracking-wide">QA – Session Obs.</div>
-                            ${g.qa?.gradedByName ? `<span class="text-xs text-gray-400">by ${escapeHtml(g.qa.gradedByName)}</span>` : ''}
+                            ${(g.qa_grades||[]).length > 0
+                                ? `<span class="text-xs text-gray-400">${(g.qa_grades||[]).length} grader${(g.qa_grades||[]).length>1?'s':''}</span>`
+                                : (g.qa?.gradedByName ? `<span class="text-xs text-gray-400">by ${escapeHtml(g.qa.gradedByName)}</span>` : '')}
                         </div>
                         ${qaScore !== null ? `
-                            <div class="text-3xl font-black ${getScoreColor(qaScore)}">${qaScore}<span class="text-sm">%</span></div>
+                            <div class="text-3xl font-black ${getScoreColor(qaScore)}">${qaScore}<span class="text-sm font-normal text-gray-400 ml-1">% avg</span></div>
                             <div class="w-full bg-gray-100 rounded-full h-1.5 mt-2">
                                 <div class="${getScoreBar(qaScore)} h-1.5 rounded-full" style="width:${qaScore}%"></div>
                             </div>
-                            ${g.qa?.notes ? `<div class="mt-2 text-xs text-gray-600 bg-purple-50 rounded p-1.5 italic">"${escapeHtml(g.qa.notes)}"</div>` : ''}
-                        ` : `<div class="text-gray-400 text-sm mt-1">Not graded</div>`}
+                            ${ (g.qa_grades||[]).length > 0 ? (g.qa_grades||[]).map(e =>
+                                `<div class="mt-1.5 flex justify-between text-xs text-gray-500 bg-purple-50 rounded px-2 py-1">
+                                    <span>${escapeHtml(e.gradedByName||e.gradedBy)}</span>
+                                    <span class="font-bold ${getScoreColor(e.score)}">${e.score}%</span>
+                                </div>`).join('') : '' }
+                            ${concatQaNotes(g.qa_grades||[]) ? `<div class="mt-2 text-xs text-gray-600 bg-purple-50 rounded p-1.5 italic">"${escapeHtml(concatQaNotes(g.qa_grades||[]))}"</div>` : (g.qa?.notes ? `<div class="mt-2 text-xs text-gray-600 bg-purple-50 rounded p-1.5 italic">"${escapeHtml(g.qa.notes)}"</div>` : '')}
+                        ` : `<div class="text-gray-400 text-sm mt-1">Not graded yet</div>`}
                         ${canQA && !alreadyQA ? `
                             <button class="open-qa-btn mt-2 w-full bg-purple-600 text-white text-xs rounded-lg py-1.5 hover:bg-purple-700" data-tutor-id="${tutor.id}" data-tutor-name="${escapeHtml(tutor.name)}" data-tutor-email="${escapeHtml(tutor.email)}" data-grade-id="${g.id || ''}">
-                                ${qaScore !== null ? '✏️ View QA' : '📋 Grade QA'}
+                                ${qaScore !== null ? '✏️ Add My QA Grade' : '📋 Grade QA'}
                             </button>
                         ` : canQA && alreadyQA ? `
                             <div class="mt-2 text-xs text-green-600 font-semibold text-center">✅ You graded QA this month</div>
@@ -557,29 +877,128 @@ export async function renderGradingActivityTab(container) {
             </div>
         </div>
 
-        <!-- Content -->
-        <div id="grading-activity-content">
+        <!-- Sub-tab bar -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-1 flex gap-1">
+            <button id="ga-tab-activity"
+                class="flex-1 py-2 px-3 rounded-xl text-sm font-semibold bg-blue-600 text-white transition-colors">
+                📋 This Week's Grading
+            </button>
+            <button id="ga-tab-ungraded"
+                class="flex-1 py-2 px-3 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
+                ⚠️ Ungraded
+            </button>
+        </div>
+
+        <!-- Sub-tab panels -->
+        <div id="ga-panel-activity">
             <div class="text-center py-12">
                 <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
                 <p class="text-gray-500">Fetching grades…</p>
             </div>
         </div>
+        <div id="ga-panel-ungraded" class="hidden">
+            <div class="text-center py-12">
+                <div class="inline-block w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p class="text-gray-500">Loading assignments…</p>
+            </div>
+        </div>
     </div>`;
 
-    const contentEl = container.querySelector('#grading-activity-content');
+    const activityPanel = container.querySelector('#ga-panel-activity');
+    const ungradedPanel = container.querySelector('#ga-panel-ungraded');
+    const tabActivity   = container.querySelector('#ga-tab-activity');
+    const tabUngraded   = container.querySelector('#ga-tab-ungraded');
+
+    function activateGaTab(tab) {
+        const isActivity = tab === 'activity';
+        activityPanel.classList.toggle('hidden', !isActivity);
+        ungradedPanel.classList.toggle('hidden', isActivity);
+        tabActivity.classList.toggle('bg-blue-600', isActivity);
+        tabActivity.classList.toggle('text-white',  isActivity);
+        tabActivity.classList.toggle('text-gray-600', !isActivity);
+        tabUngraded.classList.toggle('bg-blue-600', !isActivity);
+        tabUngraded.classList.toggle('text-white',  !isActivity);
+        tabUngraded.classList.toggle('text-gray-600', isActivity);
+    }
+    tabActivity.addEventListener('click', () => activateGaTab('activity'));
+    tabUngraded.addEventListener('click', () => activateGaTab('ungraded'));
 
     try {
-        // Fetch all grades for this month + tutor names
-        const [gradesSnap, tutorsSnap] = await Promise.all([
+        // ── Fetch all data in parallel ─────────────────────────────
+        const [gradesSnap, tutorsSnap, staffSnap] = await Promise.all([
             getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey))),
-            getDocs(query(collection(db, 'tutors'), orderBy('name')))
+            getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+            getDocs(collection(db, 'tutors'))   // staff list (reuse tutors collection gate)
         ]);
 
-        // Build tutorId → name map for display
-        const tutorNameById = {};
-        tutorsSnap.docs.forEach(d => { tutorNameById[d.id] = d.data().name || d.data().email || d.id; });
+        // We need QC staff list — staff are in a separate collection or use window.userData context.
+        // Use the staffList already available via Firestore (query staff with canQA permission).
+        // Since staff accounts aren't in "tutors", fetch from users/staff collection if available,
+        // or read canQC from any available staff source. Here we derive from grades already recorded.
+        // For plan generation we need real staff emails — fetch from 'staff' or 'management' collection.
+        let allQaStaff = [];
+        try {
+            const staffDocs = await getDocs(collection(db, 'staff'));
+            staffDocs.docs.forEach(d => {
+                const data = d.data();
+                if (data?.permissions?.tabs?.canQA && !QA_ROTATION_EXCLUDED.includes(data.email)) {
+                    allQaStaff.push({ id: d.id, email: data.email, name: data.name || data.email });
+                }
+            });
+        } catch(e) { /* staff collection may be named differently — handled below */ }
 
-        // Group entries by grader for QA and QC separately
+        // Fallback: derive QC staff from existing grades if staff collection unavailable
+        if (allQaStaff.length === 0) {
+            const seenGraders = new Set();
+            gradesSnap.docs.forEach(d => {
+                const g = d.data();
+                (g.qa_grades || []).forEach(e => {
+                    if (!QA_ROTATION_EXCLUDED.includes(e.gradedBy) && !seenGraders.has(e.gradedBy)) {
+                        seenGraders.add(e.gradedBy);
+                        allQaStaff.push({ email: e.gradedBy, name: e.gradedByName || e.gradedBy });
+                    }
+                });
+                if (g.qc?.gradedBy && !QA_ROTATION_EXCLUDED.includes(g.qc.gradedBy)
+                    && !seenGraders.has(g.qc.gradedBy)) {
+                    seenGraders.add(g.qc.gradedBy);
+                    allQaStaff.push({ email: g.qc.gradedBy, name: g.qc.gradedByName || g.qc.gradedBy });
+                }
+            });
+        }
+
+        // Build tutorId → name map
+        const tutorNameById  = {};
+        const allTutorIds    = [];
+        tutorsSnap.docs.forEach(d => {
+            tutorNameById[d.id] = d.data().name || d.data().email || d.id;
+            allTutorIds.push(d.id);
+        });
+
+        // Build existing QC grades by tutor (for plan generation)
+        const existingQaGradesByTutor = {};
+        gradesSnap.docs.forEach(d => {
+            const g = d.data();
+            const tid = g.tutorId || d.id;
+            const entries = [];
+            (g.qa_grades || []).forEach(e => entries.push({ gradedBy: e.gradedBy }));
+            if (entries.length === 0 && g.qa?.gradedBy) {
+                entries.push({ gradedBy: g.qa.gradedBy });
+            }
+            if (entries.length > 0) existingQaGradesByTutor[tid] = entries;
+        });
+
+        // Get or create the monthly QC plan
+        const qaStaffEmails = allQaStaff.map(s => s.email);
+        let plan = null;
+        if (qaStaffEmails.length > 0) {
+            plan = await getOrCreateQaAssignmentPlan(
+                monthKey, allTutorIds, qaStaffEmails, existingQaGradesByTutor
+            );
+        }
+
+        // ── THIS WEEK'S GRADING (accordion cards) ─────────────────
+
+        // Group QA and QC graded entries by grader for this week
         const qaByGrader = {};
         const qcByGrader = {};
 
@@ -587,34 +1006,32 @@ export async function renderGradingActivityTab(container) {
             const g = d.data();
             const tutorName = tutorNameById[g.tutorId] || g.tutorEmail || g.tutorId || '—';
 
-            // ── QA ──
-            if (g.qa && g.qa.gradedBy) {
-                const gradedAt = toDate(g.qa.gradedAt);
+            // QA — from qa_grades array (multi-grader)
+            const qaEntries = g.qa_grades && g.qa_grades.length > 0
+                ? g.qa_grades
+                : (g.qa?.gradedBy ? [g.qa] : []);
+            qaEntries.forEach(entry => {
+                if (!entry.gradedBy) return;
+                const gradedAt = toDate(entry.gradedAt);
                 if (gradedAt && gradedAt >= weekStart && gradedAt <= weekEnd) {
-                    const grader = g.qa.gradedByName || g.qa.gradedBy;
+                    const grader = entry.gradedByName || entry.gradedBy;
                     if (!qaByGrader[grader]) qaByGrader[grader] = [];
                     qaByGrader[grader].push({
-                        tutorName,
-                        tutorEmail: g.tutorEmail || '',
-                        score:    g.qa.score ?? '—',
-                        notes:    g.qa.notes || '',
-                        gradedAt
+                        tutorName, tutorEmail: g.tutorEmail || '',
+                        score: entry.score ?? '—', notes: entry.notes || '', gradedAt
                     });
                 }
-            }
+            });
 
-            // ── QC ──
+            // QC — single grader
             if (g.qc && g.qc.gradedBy) {
                 const gradedAt = toDate(g.qc.gradedAt);
                 if (gradedAt && gradedAt >= weekStart && gradedAt <= weekEnd) {
                     const grader = g.qc.gradedByName || g.qc.gradedBy;
                     if (!qcByGrader[grader]) qcByGrader[grader] = [];
                     qcByGrader[grader].push({
-                        tutorName,
-                        tutorEmail: g.tutorEmail || '',
-                        score:    g.qc.score ?? '—',
-                        notes:    g.qc.notes || '',
-                        gradedAt
+                        tutorName, tutorEmail: g.tutorEmail || '',
+                        score: g.qc.score ?? '—', notes: g.qc.notes || '', gradedAt
                     });
                 }
             }
@@ -623,23 +1040,7 @@ export async function renderGradingActivityTab(container) {
         const hasQA = Object.keys(qaByGrader).length > 0;
         const hasQC = Object.keys(qcByGrader).length > 0;
 
-        if (!hasQA && !hasQC) {
-            contentEl.innerHTML = `
-            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center">
-                <div class="text-4xl mb-3">📭</div>
-                <p class="text-gray-500 font-semibold">No grades recorded this week yet.</p>
-                <p class="text-xs text-gray-400 mt-1">Grades will appear here as staff grade tutors.</p>
-            </div>`;
-            return;
-        }
-
-        // ── Build the accordion cards ────────────────────────────────
-        // One card per grader per type. Clicking the header expands the table inline.
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'space-y-4';
-
-        // Section divider helper
+        // Build section divider
         function appendDivider(parent, label, color) {
             const div = document.createElement('div');
             div.className = 'flex items-center gap-3';
@@ -652,24 +1053,20 @@ export async function renderGradingActivityTab(container) {
 
         // Build one accordion card per grader
         function appendGraderCard(parent, graderName, entries, typeColor, typeLabel, typeBadge) {
-            const sorted = [...entries].sort((a, b) => b.gradedAt - a.gradedAt);
-
-            // Average score for the header summary
-            const scores = sorted.map(e => e.score).filter(s => typeof s === 'number');
+            const sorted   = [...entries].sort((a, b) => b.gradedAt - a.gradedAt);
+            const scores   = sorted.map(e => e.score).filter(s => typeof s === 'number');
             const avgScore = scores.length > 0
                 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
                 : null;
             const avgColor = avgScore !== null ? getScoreColor(avgScore) : 'text-gray-400';
 
-            // Rows for the expanded table
             const rows = sorted.map(e => {
-                const scoreNum = typeof e.score === 'number' ? e.score : null;
+                const scoreNum   = typeof e.score === 'number' ? e.score : null;
                 const scoreColor = scoreNum !== null ? getScoreColor(scoreNum) : 'text-gray-400';
-                const dateStr = e.gradedAt
+                const dateStr    = e.gradedAt
                     ? e.gradedAt.toLocaleDateString('en-GB', {
                         weekday: 'short', day: 'numeric', month: 'short',
-                        hour: '2-digit', minute: '2-digit',
-                        timeZone: 'Africa/Lagos'
+                        hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos'
                       })
                     : '—';
                 return `
@@ -690,35 +1087,26 @@ export async function renderGradingActivityTab(container) {
                 </tr>`;
             }).join('');
 
-            // Card element
             const card = document.createElement('div');
             card.className = `bg-white rounded-2xl border border-${typeColor}-100 shadow-sm overflow-hidden`;
-
             card.innerHTML = `
-            <!-- Accordion header — clickable -->
             <button class="ga-accordion-btn w-full text-left p-4 flex items-center gap-4 hover:bg-${typeColor}-50 transition-colors">
-                <!-- Type badge -->
                 <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-${typeColor}-100 flex items-center justify-center text-lg">
                     ${typeBadge}
                 </div>
-                <!-- Name + count -->
                 <div class="flex-1 min-w-0">
                     <div class="font-bold text-gray-800">${escapeHtml(graderName)}</div>
                     <div class="text-xs text-${typeColor}-500 font-semibold mt-0.5">
                         ${typeLabel} · ${entries.length} tutor${entries.length !== 1 ? 's' : ''} graded this week
                     </div>
                 </div>
-                <!-- Avg score pill -->
                 ${avgScore !== null ? `
                 <div class="flex-shrink-0 text-center px-3 py-1.5 rounded-xl bg-${typeColor}-50 border border-${typeColor}-100">
                     <div class="text-lg font-black ${avgColor}">${avgScore}%</div>
                     <div class="text-xs text-gray-400">avg</div>
                 </div>` : ''}
-                <!-- Chevron -->
                 <i class="ga-chevron fas fa-chevron-down text-gray-400 transition-transform flex-shrink-0"></i>
             </button>
-
-            <!-- Accordion body — hidden by default -->
             <div class="ga-accordion-body hidden border-t border-${typeColor}-100">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -735,7 +1123,6 @@ export async function renderGradingActivityTab(container) {
                 </div>
             </div>`;
 
-            // Wire up the accordion toggle
             card.querySelector('.ga-accordion-btn').addEventListener('click', () => {
                 const body    = card.querySelector('.ga-accordion-body');
                 const chevron = card.querySelector('.ga-chevron');
@@ -743,40 +1130,180 @@ export async function renderGradingActivityTab(container) {
                 body.classList.toggle('hidden', isOpen);
                 chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
             });
-
             parent.appendChild(card);
         }
 
-        // ── QA cards ────────────────────────────────────────────────
-        if (hasQA) {
-            appendDivider(wrapper, 'QA — Session Observation', 'purple');
-            Object.entries(qaByGrader)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .forEach(([grader, entries]) => {
-                    appendGraderCard(wrapper, grader, entries, 'purple', 'QA', '📋');
-                });
+        // Render activity panel
+        if (!hasQA && !hasQC) {
+            activityPanel.innerHTML = `
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center">
+                <div class="text-4xl mb-3">📭</div>
+                <p class="text-gray-500 font-semibold">No grades recorded this week yet.</p>
+                <p class="text-xs text-gray-400 mt-1">Grades will appear here as staff grade tutors.</p>
+            </div>`;
+        } else {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'space-y-4';
+            if (hasQA) {
+                appendDivider(wrapper, 'QA — Session Observation', 'purple');
+                Object.entries(qaByGrader).sort(([a],[b]) => a.localeCompare(b))
+                    .forEach(([g, e]) => appendGraderCard(wrapper, g, e, 'purple', 'QA', '📋'));
+            }
+            if (hasQC) {
+                appendDivider(wrapper, 'QC — Lesson Plan', 'amber');
+                Object.entries(qcByGrader).sort(([a],[b]) => a.localeCompare(b))
+                    .forEach(([g, e]) => appendGraderCard(wrapper, g, e, 'amber', 'QC', '📐'));
+            }
+            activityPanel.innerHTML = '';
+            activityPanel.appendChild(wrapper);
         }
 
-        // ── QC cards ────────────────────────────────────────────────
-        if (hasQC) {
-            appendDivider(wrapper, 'QC — Lesson Plan', 'amber');
-            Object.entries(qcByGrader)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .forEach(([grader, entries]) => {
-                    appendGraderCard(wrapper, grader, entries, 'amber', 'QC', '📐');
-                });
-        }
-
-        contentEl.innerHTML = '';
-        contentEl.appendChild(wrapper);
+        // ── UNGRADED TAB ───────────────────────────────────────────
+        renderUngradedPanel(
+            ungradedPanel, plan, tutorNameById, gradesSnap, weekStart, weekEnd, allQaStaff
+        );
 
     } catch (err) {
         console.error('Grading Activity tab error:', err);
-        contentEl.innerHTML = `
+        activityPanel.innerHTML = `
         <div class="bg-white rounded-2xl border border-red-200 shadow-sm p-6 text-center">
             <p class="text-red-500 font-semibold">❌ Failed to load: ${escapeHtml(err.message)}</p>
         </div>`;
     }
+}
+
+/**
+ * Render the Ungraded panel.
+ * For the current week's QC plan, show each staff member and which
+ * of their assigned tutors have NOT yet been graded this week
+ * (including any carryover from previous weeks still ungraded).
+ */
+function renderUngradedPanel(panel, plan, tutorNameById, gradesSnap, weekStart, weekEnd, allQaStaff) {
+    if (!plan || !plan.weeks || allQaStaff.length === 0) {
+        panel.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+            <div class="text-3xl mb-2">📋</div>
+            <p class="text-gray-500 font-semibold">No QC assignment plan yet for this month.</p>
+            <p class="text-xs text-gray-400 mt-1">The plan generates automatically. Check back shortly.</p>
+        </div>`;
+        return;
+    }
+
+    // Which week is current?
+    const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    let curWeekIdx = plan.weeks.findIndex(w => {
+        const mon = new Date(w.mondayISO + 'T00:00:00');
+        const sun = new Date(w.sundayISO + 'T23:59:59');
+        return lagosNow >= mon && lagosNow <= sun;
+    });
+    if (curWeekIdx === -1) curWeekIdx = plan.weeks.length - 1;
+
+    // Build set of (staffEmail, tutorId) pairs that have been QA graded this month
+    const gradedPairs = new Set();
+    gradesSnap.docs.forEach(d => {
+        const g   = d.data();
+        const tid = g.tutorId || d.id;
+        const qaEntries = g.qa_grades && g.qa_grades.length > 0
+            ? g.qa_grades
+            : (g.qa?.gradedBy ? [g.qa] : []);
+        qaEntries.forEach(e => {
+            if (e.gradedBy) gradedPairs.add(`${e.gradedBy}::${tid}`);
+        });
+    });
+
+    // For each QA staff, collect ALL tutors assigned up to and
+    // including this week that have NOT been graded yet (the deficit).
+    const staffByEmail = {};
+    allQaStaff.forEach(s => { staffByEmail[s.email] = s; });
+
+    const staffDeficits = allQaStaff.map(staff => {
+        // Gather every tutor assigned to this staff member in weeks 0..curWeekIdx
+        const assignedSoFar = new Set();
+        for (let wi = 0; wi <= curWeekIdx; wi++) {
+            const week = plan.weeks[wi];
+            if (!week) continue;
+            const ids = (week.assignments || {})[staff.email] || [];
+            ids.forEach(id => assignedSoFar.add(id));
+        }
+        // Subtract already graded
+        const ungraded = [...assignedSoFar].filter(
+            tid => !gradedPairs.has(`${staff.email}::${tid}`)
+        );
+        return { staff, ungraded };
+    }).filter(x => x.ungraded.length > 0);
+
+    if (staffDeficits.length === 0) {
+        panel.innerHTML = `
+        <div class="bg-white rounded-2xl border border-green-100 shadow-sm p-10 text-center">
+            <div class="text-4xl mb-3">✅</div>
+            <p class="text-green-600 font-bold">All QA grades are up to date!</p>
+            <p class="text-xs text-gray-400 mt-1">Every staff member has completed their assigned list so far.</p>
+        </div>`;
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'space-y-4';
+
+    // Header note
+    const note = document.createElement('div');
+    note.className = 'bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800';
+    note.innerHTML = `<strong>⚠️ Deficit:</strong> These tutors are on a QA staff member's assigned list but have not been graded yet (including carryover from previous weeks this month).`;
+    wrapper.appendChild(note);
+
+    staffDeficits.forEach(({ staff, ungraded }) => {
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden';
+
+        const rows = ungraded.map(tid => {
+            const name = tutorNameById[tid] || tid;
+            return `<tr class="border-b border-gray-50 hover:bg-amber-50 transition-colors">
+                <td class="py-3 px-4 font-semibold text-gray-800 text-sm">${escapeHtml(name)}</td>
+                <td class="py-3 px-4 text-xs text-amber-600 font-semibold">Ungraded</td>
+            </tr>`;
+        }).join('');
+
+        card.innerHTML = `
+        <button class="ug-accordion-btn w-full text-left p-4 flex items-center gap-4 hover:bg-amber-50 transition-colors">
+            <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-lg">👤</div>
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-gray-800">${escapeHtml(staff.name || staff.email)}</div>
+                <div class="text-xs text-amber-600 font-semibold mt-0.5">
+                    ${ungraded.length} tutor${ungraded.length !== 1 ? 's' : ''} not yet graded
+                </div>
+            </div>
+            <span class="flex-shrink-0 text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-bold">
+                ${ungraded.length} pending
+            </span>
+            <i class="ug-chevron fas fa-chevron-down text-gray-400 transition-transform flex-shrink-0"></i>
+        </button>
+        <div class="ug-accordion-body hidden border-t border-amber-100">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide bg-gray-50">
+                            <th class="text-left py-2.5 px-4 font-semibold">Tutor</th>
+                            <th class="text-left py-2.5 px-4 font-semibold">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>`;
+
+        card.querySelector('.ug-accordion-btn').addEventListener('click', () => {
+            const body    = card.querySelector('.ug-accordion-body');
+            const chevron = card.querySelector('.ug-chevron');
+            const isOpen  = !body.classList.contains('hidden');
+            body.classList.toggle('hidden', isOpen);
+            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+        });
+
+        wrapper.appendChild(card);
+    });
+
+    panel.innerHTML = '';
+    panel.appendChild(wrapper);
 }
 
 // --- QA/QC Grade Modal ---
@@ -788,7 +1315,11 @@ export function openGradeModal(type, dataset, grades, monthKey) {
     const isReadOnly = dataset.readonly === 'true';
     const staff = window.userData;
     const existingGrade = gradeId ? (Object.values(grades).find(g => g.id === gradeId) || {}) : {};
-    const existingSection = existingGrade[type] || {};
+    // For QA: show THIS staff member's own entry from qa_grades (or legacy qa field)
+    const existingSection = type === 'qa'
+        ? ((existingGrade.qa_grades || []).find(e => e.gradedBy === staff?.email)
+           || existingGrade.qa || {})
+        : (existingGrade[type] || {});
 
     const isQA = type === 'qa';
     const themeColor = isQA ? 'purple' : 'amber';
@@ -912,61 +1443,121 @@ export function openGradeModal(type, dataset, grades, monthKey) {
             try {
                 btn.textContent = 'Saving…'; btn.disabled = true;
 
-                if (gradeId) {
-                    await updateDoc(doc(db, 'tutor_grades', gradeId), { [type]: sectionData });
-                } else {
-                    const newDoc = {
-                        tutorId,
-                        tutorEmail,
-                        month: monthKey,
-                        [type]: sectionData
-                    };
-                    await addDoc(collection(db, 'tutor_grades'), newDoc);
-                }
-
-                // Re-fetch the grade doc to get latest qa+qc data
-                let freshGrade = {};
-                if (gradeId) {
-                    const freshSnap = await getDoc(doc(db, 'tutor_grades', gradeId));
-                    if (freshSnap.exists()) freshGrade = freshSnap.data();
-                } else {
-                    const freshQuery = await getDocs(
-                        query(collection(db, 'tutor_grades'),
-                              where('tutorId', '==', tutorId),
-                              where('month', '==', monthKey))
-                    );
-                    if (!freshQuery.empty) freshGrade = freshQuery.docs[0].data();
-                    else {
-                        const freshQuery2 = await getDocs(
-                            query(collection(db, 'tutor_grades'),
-                                  where('tutorEmail', '==', tutorEmail),
-                                  where('month', '==', monthKey))
-                        );
-                        if (!freshQuery2.empty) freshGrade = freshQuery2.docs[0].data();
+                // ── QA path (multi-grader) ───────────────────────────────
+                if (type === 'qa') {
+                    // Step 1: load current qa_grades array from Firestore
+                    let currentDoc = {};
+                    let resolvedGradeId = gradeId;
+                    if (gradeId) {
+                        const s = await getDoc(doc(db, 'tutor_grades', gradeId));
+                        if (s.exists()) currentDoc = s.data();
+                    } else {
+                        const q1 = await getDocs(query(collection(db, 'tutor_grades'),
+                            where('tutorId', '==', tutorId), where('month', '==', monthKey)));
+                        if (!q1.empty) {
+                            currentDoc        = q1.docs[0].data();
+                            resolvedGradeId   = q1.docs[0].id;
+                        } else {
+                            const q2 = await getDocs(query(collection(db, 'tutor_grades'),
+                                where('tutorEmail', '==', tutorEmail), where('month', '==', monthKey)));
+                            if (!q2.empty) {
+                                currentDoc      = q2.docs[0].data();
+                                resolvedGradeId = q2.docs[0].id;
+                            }
+                        }
                     }
-                }
 
-                // Merge just-saved section with freshGrade for combined score
-                const freshQA = type === 'qa' ? sectionData : (freshGrade.qa || null);
-                const freshQC = type === 'qc' ? sectionData : (freshGrade.qc || null);
-                const qaScore = freshQA?.score ?? null;
-                const qcScore = freshQC?.score ?? null;
-                const combined = (qaScore !== null && qcScore !== null)
-                    ? Math.round((qaScore + qcScore) / 2)
-                    : (qaScore !== null ? qaScore : qcScore);
+                    // Step 2: replace or append this grader's entry
+                    const qaGrades = [...(currentDoc.qa_grades || [])];
+                    const myIdx    = qaGrades.findIndex(e => e.gradedBy === staff.email);
+                    if (myIdx >= 0) {
+                        qaGrades[myIdx] = sectionData;   // update existing
+                    } else {
+                        qaGrades.push(sectionData);      // first time grading
+                    }
 
-                if (combined !== null) {
-                    const tutorDocRef = doc(db, 'tutors', tutorId);
+                    // Step 3: calculate new averaged QA score + concatenated notes
+                    const avgQaScore  = calcAvgQaScore(qaGrades);
+                    const allQaNotes  = concatQaNotes(qaGrades);
+                    // Keep qa field updated so existing display code still works
+                    const qaSummary   = {
+                        score:         avgQaScore,
+                        notes:         allQaNotes,
+                        gradedBy:      sectionData.gradedBy,
+                        gradedByName:  sectionData.gradedByName,
+                        gradedAt:      sectionData.gradedAt
+                    };
 
-                    await updateDoc(tutorDocRef, {
-                        performanceScore: combined,
-                        qaScore: qaScore,
-                        qcScore: qcScore,
-                        performanceMonth: monthKey,
-                        qaAdvice: type === 'qa' ? notes : (freshGrade.qa?.notes || ''),
-                        qcAdvice: type === 'qc' ? notes : (freshGrade.qc?.notes || ''),
-                        qaGradedByName: type === 'qa' ? sectionData.gradedByName : (freshGrade.qa?.gradedByName || ''),
-                        qcGradedByName: type === 'qc' ? sectionData.gradedByName : (freshGrade.qc?.gradedByName || '')
+                    // Step 4: write to Firestore
+                    if (resolvedGradeId) {
+                        await updateDoc(doc(db, 'tutor_grades', resolvedGradeId), {
+                            qa_grades: qaGrades,
+                            qa:        qaSummary
+                        });
+                    } else {
+                        await addDoc(collection(db, 'tutor_grades'), {
+                            tutorId, tutorEmail, month: monthKey,
+                            qa_grades: qaGrades,
+                            qa:        qaSummary
+                        });
+                    }
+
+                    // Step 5: update tutor doc with new averaged QA + combined score
+                    const freshQcSnap = await getDocs(query(collection(db, 'tutor_grades'),
+                        where('tutorId', '==', tutorId), where('month', '==', monthKey)));
+                    const freshQcDoc  = !freshQcSnap.empty ? freshQcSnap.docs[0].data() : currentDoc;
+                    const qaScore     = avgQaScore;
+                    const qcScore     = freshQcDoc.qc?.score ?? null;
+                    const combined    = qcScore !== null
+                        ? Math.round((qaScore + qcScore) / 2)
+                        : qaScore;
+                    await updateDoc(doc(db, 'tutors', tutorId), {
+                        performanceScore:  combined,
+                        qaScore:           qaScore,
+                        qcScore:           qcScore,
+                        performanceMonth:  monthKey,
+                        qaAdvice:          allQaNotes,
+                        qaGradedByName:    sectionData.gradedByName
+                    });
+
+                // ── QC path (single grader) ──────────────────────────────
+                } else {
+                    if (gradeId) {
+                        await updateDoc(doc(db, 'tutor_grades', gradeId), { qc: sectionData });
+                    } else {
+                        await addDoc(collection(db, 'tutor_grades'), {
+                            tutorId, tutorEmail, month: monthKey, qc: sectionData
+                        });
+                    }
+
+                    // Re-fetch to get current qa score for combined calculation
+                    let freshGrade = {};
+                    if (gradeId) {
+                        const s = await getDoc(doc(db, 'tutor_grades', gradeId));
+                        if (s.exists()) freshGrade = s.data();
+                    } else {
+                        const q1 = await getDocs(query(collection(db, 'tutor_grades'),
+                            where('tutorId', '==', tutorId), where('month', '==', monthKey)));
+                        if (!q1.empty) freshGrade = q1.docs[0].data();
+                        else {
+                            const q2 = await getDocs(query(collection(db, 'tutor_grades'),
+                                where('tutorEmail', '==', tutorEmail), where('month', '==', monthKey)));
+                            if (!q2.empty) freshGrade = q2.docs[0].data();
+                        }
+                    }
+                    const qcScore  = sectionData.score;
+                    // QA score for combined = average of qa_grades (or legacy qa.score)
+                    const qaScore  = calcAvgQaScore(freshGrade.qa_grades) ?? (freshGrade.qa?.score ?? null);
+                    const combined = qaScore !== null
+                        ? Math.round((qaScore + qcScore) / 2)
+                        : qcScore;
+                    await updateDoc(doc(db, 'tutors', tutorId), {
+                        performanceScore:  combined,
+                        qaScore:           qaScore,
+                        qcScore:           qcScore,
+                        performanceMonth:  monthKey,
+                        qcAdvice:          notes,
+                        qcGradedByName:    sectionData.gradedByName
                     });
                 }
 
