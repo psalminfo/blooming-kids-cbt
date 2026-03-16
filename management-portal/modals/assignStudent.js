@@ -33,7 +33,7 @@ window.showAssignStudentModal = async function() {
             const opts = activeTutors.map(t =>
                 `<div class="am-tutor-opt px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0"
                      data-email="${escapeHtml(t.email)}" data-name="${escapeHtml(t.name || t.email)}"
-                     data-label="${escapeHtml((t.name || t.email).toLowerCase())} ${escapeHtml((t.email || '').toLowerCase())}">
+                     data-label="${escapeHtml((t.name || t.email || "").toLowerCase())} ${escapeHtml((t.email || '').toLowerCase())}">
                     <span class="font-medium text-gray-800">${escapeHtml(t.name || t.email)}</span>
                     <span class="text-gray-400 text-xs ml-2">${escapeHtml(t.email || '')}</span>
                  </div>`
