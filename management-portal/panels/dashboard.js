@@ -33,7 +33,7 @@ export async function renderDashboardPanel(container) {
     const showTutorsCard = userPermissions.viewTutorManagement === true;
     const showStudentsCard = userPermissions.viewTutorManagement === true;
     const showPendingCard = userPermissions.viewPendingApprovals === true;
-    const showsCard = userPermissions.views === true;
+    const showsCard = userPermissions.viewEnrollments === true;
     
     // Count how many cards we'll show (for grid layout)
     const visibleCardsCount = [showTutorsCard, showStudentsCard, showPendingCard, showsCard]
