@@ -162,7 +162,7 @@ window.showArchiveStudentModal = async function() {
                         <button onclick="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             Cancel
                         </button>
-                        <button onclick="submitArchiveStudent()" class="px-5 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+                        <button onclick="submitArchiveStudent()" id="archive-submit-btn" class="px-5 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
                             <i class="fas fa-archive mr-2"></i> Archive Student
                         </button>
                     </div>
@@ -258,7 +258,7 @@ window.showMarkInactiveModal = async function() {
                         <button onclick="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                             Cancel
                         </button>
-                        <button onclick="submitMarkInactive()" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        <button onclick="submitMarkInactive()" id="inactive-submit-btn" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
                             <i class="fas fa-user-slash mr-2"></i> Mark Tutor Inactive
                         </button>
                     </div>
@@ -294,3 +294,187 @@ window.showMarkInactiveModal = async function() {
 // ======================================================
 // MODAL SUBMISSION FUNCTIONS
 // ======================================================
+
+window.submitArchiveStudent = async function() {
+    const studentIds = getMultiSelectValues('archive-student-multiselect');
+    const reasonEl   = document.getElementById('archive-reason');
+    const notesEl    = document.getElementById('archive-notes');
+
+    if (!reasonEl) {
+        alert('Archive modal is not open. Please click "Archive Student" to open it first.');
+        return;
+    }
+
+    const reason = reasonEl.value;
+    const notes  = notesEl?.value?.trim() ?? '';
+
+    if (studentIds.length === 0) {
+        alert('Please select at least one student to archive.');
+        return;
+    }
+    if (!reason) {
+        alert('Please select an archive reason.');
+        return;
+    }
+
+    const submitBtn    = document.getElementById('archive-submit-btn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Archiving...';
+    submitBtn.disabled  = true;
+
+    try {
+        const now             = new Date().toISOString();
+        const archivedBy      = window.userData?.uid   || 'system';
+        const archivedByEmail = window.userData?.email || 'system';
+
+        for (const studentId of studentIds) {
+            // Archive the student
+            await updateDoc(doc(db, "students", studentId), {
+                status:           'archived',
+                archiveReason:    reason,
+                archiveNotes:     notes,
+                archivedDate:     now,
+                archivedBy,
+                archivedByEmail,
+                lastModified:     now,
+            });
+
+            // Find and close any active tutor assignment
+            const assignmentsSnapshot = await getDocs(query(
+                collection(db, "tutorAssignments"),
+                where("studentId", "==", studentId),
+                where("status",    "==", "active")
+            ));
+
+            if (!assignmentsSnapshot.empty) {
+                const assignmentDoc  = assignmentsSnapshot.docs[0];
+                const assignmentData = assignmentDoc.data();
+
+                await updateDoc(doc(db, "tutorAssignments", assignmentDoc.id), {
+                    status:       'archived',
+                    endDate:      now,
+                    lastModified: now,
+                });
+
+                // Decrement the tutor's assigned student count
+                const tutorRef = doc(db, "tutors", assignmentData.tutorId);
+                const tutorDoc = await getDoc(tutorRef);
+                if (tutorDoc.exists()) {
+                    const currentCount = tutorDoc.data().assignedStudentsCount || 0;
+                    if (currentCount > 0) {
+                        await updateDoc(tutorRef, {
+                            assignedStudentsCount: currentCount - 1,
+                            lastModified:          now,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Invalidate relevant caches
+        invalidateCache('students');
+        invalidateCache('tutorAssignments');
+        invalidateCache('tutors');
+
+        closeModal();
+
+        const count = studentIds.length;
+        alert(`${count} student${count !== 1 ? 's' : ''} archived successfully!`);
+
+        if (typeof window.refreshAllDashboardData === 'function') {
+            await window.refreshAllDashboardData();
+        }
+
+    } catch (error) {
+        console.error('Error archiving student(s):', error);
+        alert('Failed to archive student(s). Please try again.');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled  = false;
+    }
+};
+
+window.submitMarkInactive = async function() {
+    const tutorIds = getMultiSelectValues('inactive-tutor-multiselect');
+    const reasonEl = document.getElementById('inactive-reason');
+    const notesEl  = document.getElementById('inactive-notes');
+
+    if (!reasonEl) {
+        alert('Mark Inactive modal is not open. Please click "Mark Tutor Inactive" to open it first.');
+        return;
+    }
+
+    const reason = reasonEl.value;
+    const notes  = notesEl?.value?.trim() ?? '';
+
+    if (tutorIds.length === 0) {
+        alert('Please select at least one tutor to mark inactive.');
+        return;
+    }
+    if (!reason) {
+        alert('Please select an inactive reason.');
+        return;
+    }
+
+    const submitBtn    = document.getElementById('inactive-submit-btn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+    submitBtn.disabled  = true;
+
+    try {
+        const now           = new Date().toISOString();
+        const markedBy      = window.userData?.uid   || 'system';
+        const markedByEmail = window.userData?.email || 'system';
+
+        for (const tutorId of tutorIds) {
+            // Mark the tutor inactive
+            await updateDoc(doc(db, "tutors", tutorId), {
+                status:                'inactive',
+                inactiveReason:        reason,
+                inactiveNotes:         notes,
+                inactiveDate:          now,
+                markedInactiveBy:      markedBy,
+                markedInactiveByEmail: markedByEmail,
+                lastModified:          now,
+            });
+
+            // Move all their active assignments to pending_reassignment
+            const assignmentsSnapshot = await getDocs(query(
+                collection(db, "tutorAssignments"),
+                where("tutorId", "==", tutorId),
+                where("status",  "==", "active")
+            ));
+
+            if (!assignmentsSnapshot.empty) {
+                const batch = writeBatch(db);
+                assignmentsSnapshot.docs.forEach(assignDoc => {
+                    batch.update(assignDoc.ref, {
+                        status:       'pending_reassignment',
+                        endDate:      now,
+                        lastModified: now,
+                    });
+                });
+                await batch.commit();
+            }
+        }
+
+        // Invalidate relevant caches
+        invalidateCache('tutors');
+        invalidateCache('tutorAssignments');
+        invalidateCache('students');
+
+        closeModal();
+
+        const count = tutorIds.length;
+        alert(`${count} tutor${count !== 1 ? 's' : ''} marked as inactive successfully! Their students now need reassignment.`);
+
+        if (typeof window.refreshAllDashboardData === 'function') {
+            await window.refreshAllDashboardData();
+        }
+
+    } catch (error) {
+        console.error('Error marking tutor(s) inactive:', error);
+        alert('Failed to mark tutor(s) as inactive. Please try again.');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled  = false;
+    }
+};
