@@ -179,28 +179,37 @@ export async function loadDashboardData() {
         
         // Load Active Tutors count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const tutorsSnapshot = await getDocsFromServer(query(collection(db, "tutors"), orderBy("name")));
-            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => !tutor.status || tutor.status === 'active');
-            saveToLocalStorage('tutors', activeTutors);
+            if (!sessionCache.tutors) {
+                const tutorsSnapshot = await getDocsFromServer(query(collection(db, "tutors"), orderBy("name")));
+                const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const activeTutors = allTutors.filter(tutor => 
+                    !tutor.status || tutor.status === 'active'
+                );
+                saveToLocalStorage('tutors', activeTutors);
+            }
+            const activeTutorsCount = (sessionCache.tutors || []).length;
             const tutorsElement = document.getElementById('dashboard-active-tutors');
-            if (tutorsElement) tutorsElement.textContent = activeTutors.length;
+            if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
         }
 
         // Load Active Students count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const studentsSnapshot = await getDocsFromServer(query(collection(db, "students")));
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student =>
-                (student.status === 'active' || student.status === 'approved') &&
-                !student.summerBreak &&
-                student.status !== 'archived' &&
-                student.status !== 'graduated' &&
-                student.status !== 'transferred'
-            );
-            saveToLocalStorage('students', activeStudents);
+            if (!sessionCache.students) {
+                const studentsSnapshot = await getDocsFromServer(query(collection(db, "students")));
+                const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Exclude break/archived/graduated students from active count
+                const activeStudents = allStudents.filter(student => 
+                    (!student.status || student.status === 'active' || student.status === 'approved') &&
+                    !student.summerBreak &&
+                    student.status !== 'archived' &&
+                    student.status !== 'graduated' &&
+                    student.status !== 'transferred'
+                );
+                saveToLocalStorage('students', activeStudents);
+            }
+            const activeStudentsCount = (sessionCache.students || []).length;
             const studentsElement = document.getElementById('dashboard-active-students');
-            if (studentsElement) studentsElement.textContent = activeStudents.length;
+            if (studentsElement) studentsElement.textContent = activeStudentsCount;
         }
 
         // Load Pending Approvals count (only if user has permission)
