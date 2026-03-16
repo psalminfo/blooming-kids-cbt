@@ -429,7 +429,7 @@ export async function renderMasterPortalPanel(container) {
     try {
         // Load all data in parallel
         const [tutorsSnap, studentsSnap, gradesSnap, cycleSnap] = await Promise.all([
-            getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+            getDocs(query(collection(db, 'tutors'), where('status', '==', 'active'), orderBy('name'))),
             getDocs(collection(db, 'students')),
             getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey))),
             getDoc(doc(db, 'gamification', 'current_cycle'))
@@ -927,7 +927,7 @@ export async function renderGradingActivityTab(container) {
         // ── Fetch all data in parallel ─────────────────────────────
         const [gradesSnap, tutorsSnap, staffSnap] = await Promise.all([
             getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey))),
-            getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+            getDocs(query(collection(db, 'tutors'), where('status', '==', 'active'), orderBy('name'))),
             getDocs(collection(db, 'tutors'))   // staff list (reuse tutors collection gate)
         ]);
 
