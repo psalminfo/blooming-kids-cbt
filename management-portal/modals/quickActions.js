@@ -47,7 +47,7 @@ window.showArchiveStudentModal = async function() {
                                 <option value="">-- Select a Student --</option>
                                 ${students.map(student => `
                                     <option value="${student.id}">
-                                        ${student.studentName || student.name || student.email || student.id}
+                                        ${student.name || student.email || student.id}
                                         ${student.parentEmail ? ` (${student.parentEmail})` : ''}
                                     </option>
                                 `).join('')}
