@@ -8,7 +8,7 @@ export { auth, db } from '/firebaseConfig.js';
 export {
     collection, getDocs, doc, getDoc, where, query, orderBy,
     Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc,
-    limit, startAfter, onSnapshot
+    limit, startAfter, onSnapshot, getDocsFromServer
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 export { onAuthStateChanged, signOut }
