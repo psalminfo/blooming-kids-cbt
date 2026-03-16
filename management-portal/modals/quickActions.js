@@ -14,6 +14,85 @@ import { escapeHtml, capitalize, formatNaira, buildGradeOptions, buildTimeOption
 import { sessionCache, saveToLocalStorage, invalidateCache } from '../core/cache.js';
 import { logManagementActivity } from '../notifications/activityLog.js';
 
+// ── Shared helper: render a searchable multi-select checklist ──────────────
+function buildMultiSelect(containerId, items, labelFn, subLabelFn = null) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="border border-gray-300 rounded-lg overflow-hidden">
+            <div class="p-2 border-b border-gray-200 bg-gray-50">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input
+                        type="text"
+                        placeholder="Type to search…"
+                        class="multi-select-search w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    />
+                </div>
+                <div class="flex items-center justify-between mt-1.5 px-0.5">
+                    <span class="multi-select-count text-xs text-gray-400">0 selected</span>
+                    <button type="button" class="multi-select-clear text-xs text-red-400 hover:text-red-600 hidden">Clear all</button>
+                </div>
+            </div>
+            <ul class="multi-select-list max-h-48 overflow-y-auto divide-y divide-gray-50">
+                ${items.map(item => `
+                    <li class="multi-select-item flex items-center gap-3 px-3 py-2 hover:bg-yellow-50 cursor-pointer transition-colors"
+                        data-id="${escapeHtml(item.id)}"
+                        data-label="${escapeHtml(labelFn(item).toLowerCase())}">
+                        <input type="checkbox" class="multi-select-checkbox accent-yellow-500 w-4 h-4 cursor-pointer flex-shrink-0" value="${escapeHtml(item.id)}" />
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-800 truncate">${escapeHtml(labelFn(item))}</div>
+                            ${subLabelFn ? `<div class="text-xs text-gray-400 truncate">${escapeHtml(subLabelFn(item))}</div>` : ''}
+                        </div>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    `;
+
+    const search   = container.querySelector('.multi-select-search');
+    const list     = container.querySelector('.multi-select-list');
+    const countEl  = container.querySelector('.multi-select-count');
+    const clearBtn = container.querySelector('.multi-select-clear');
+
+    function updateCount() {
+        const checked = container.querySelectorAll('.multi-select-checkbox:checked').length;
+        countEl.textContent = checked === 0 ? '0 selected' : `${checked} selected`;
+        clearBtn.classList.toggle('hidden', checked === 0);
+    }
+
+    // Click anywhere on the row toggles the checkbox
+    list.addEventListener('click', e => {
+        const li = e.target.closest('.multi-select-item');
+        if (!li) return;
+        const cb = li.querySelector('.multi-select-checkbox');
+        if (e.target !== cb) cb.checked = !cb.checked;
+        updateCount();
+    });
+
+    // Search filter
+    search.addEventListener('input', () => {
+        const term = search.value.toLowerCase().trim();
+        list.querySelectorAll('.multi-select-item').forEach(li => {
+            li.style.display = !term || li.dataset.label.includes(term) ? '' : 'none';
+        });
+    });
+
+    // Clear all
+    clearBtn.addEventListener('click', () => {
+        container.querySelectorAll('.multi-select-checkbox').forEach(cb => cb.checked = false);
+        updateCount();
+    });
+}
+
+// Returns array of selected IDs from a multi-select container
+function getMultiSelectValues(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    return [...container.querySelectorAll('.multi-select-checkbox:checked')].map(cb => cb.value);
+}
+
 window.showArchiveStudentModal = async function() {
     try {
         // Load active students
@@ -21,13 +100,12 @@ window.showArchiveStudentModal = async function() {
             const studentsSnapshot = await getDocs(query(collection(db, "students")));
             const activeStudents = studentsSnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(student => !student.status || student.status === 'active' || student.status === 'approved');
+                .filter(s => (s.status === 'active' || s.status === 'approved') && !s.summerBreak && !s.onBreak);
             sessionCache.students = activeStudents;
         }
 
         const students = sessionCache.students || [];
 
-        // Create modal HTML
         const modalHTML = `
             <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
@@ -38,25 +116,12 @@ window.showArchiveStudentModal = async function() {
                         </button>
                     </div>
                     
-                    <div class="p-6">
+                    <div class="p-6 max-h-[70vh] overflow-y-auto">
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Student to Archive <span class="text-red-500">*</span>
+                                Select Student(s) to Archive <span class="text-red-500">*</span>
                             </label>
-                            <select id="archive-student-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
-                                <option value="">-- Select a Student --</option>
-                                ${students.map(student => `
-                                    <option value="${student.id}">
-                                        ${student.name || student.email || student.id}
-                                        ${student.parentEmail ? ` (${student.parentEmail})` : ''}
-                                    </option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Parent Email</label>
-                            <input type="email" id="archive-parent-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" placeholder="parent@example.com" value="">
+                            <div id="archive-student-multiselect"></div>
                         </div>
                         
                         <div class="mb-6">
@@ -105,23 +170,17 @@ window.showArchiveStudentModal = async function() {
             </div>
         `;
 
-        // Add modal to DOM
         const modalContainer = document.createElement('div');
         modalContainer.id = 'archive-student-modal';
         modalContainer.innerHTML = modalHTML;
         document.body.appendChild(modalContainer);
-        
-        // Update parent email when student selection changes
-        document.getElementById('archive-student-select').addEventListener('change', function() {
-            const studentId = this.value;
-            const selectedStudent = students.find(s => s.id === studentId);
-            const parentEmailInput = document.getElementById('archive-parent-email');
-            if (selectedStudent && selectedStudent.parentEmail) {
-                parentEmailInput.value = selectedStudent.parentEmail;
-            } else {
-                parentEmailInput.value = '';
-            }
-        });
+
+        buildMultiSelect(
+            'archive-student-multiselect',
+            students,
+            s => s.studentName || s.email || s.id,
+            s => s.parentEmail || ''
+        );
         
     } catch (error) {
         console.error('Error showing archive student modal:', error);
@@ -131,18 +190,17 @@ window.showArchiveStudentModal = async function() {
 
 window.showMarkInactiveModal = async function() {
     try {
-        // Load active tutors
+        // Load active tutors (explicit allowlist only)
         if (!sessionCache.tutors) {
             const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
             const activeTutors = tutorsSnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(tutor => !tutor.status || tutor.status === 'active');
+                .filter(tutor => tutor.status === 'active');
             sessionCache.tutors = activeTutors;
         }
 
         const tutors = sessionCache.tutors || [];
 
-        // Create modal HTML
         const modalHTML = `
             <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
@@ -153,20 +211,12 @@ window.showMarkInactiveModal = async function() {
                         </button>
                     </div>
                     
-                    <div class="p-6">
+                    <div class="p-6 max-h-[70vh] overflow-y-auto">
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Tutor to Mark Inactive <span class="text-red-500">*</span>
+                                Select Tutor(s) to Mark Inactive <span class="text-red-500">*</span>
                             </label>
-                            <select id="inactive-tutor-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500">
-                                <option value="">-- Select a Tutor --</option>
-                                ${tutors.map(tutor => `
-                                    <option value="${tutor.id}">
-                                        ${tutor.name || tutor.email || tutor.id} 
-                                        ${tutor.assignedStudentsCount ? `(${tutor.assignedStudentsCount} students)` : ''}
-                                    </option>
-                                `).join('')}
-                            </select>
+                            <div id="inactive-tutor-multiselect"></div>
                         </div>
                         
                         <div class="mb-6">
@@ -216,12 +266,25 @@ window.showMarkInactiveModal = async function() {
             </div>
         `;
 
-        // Add modal to DOM
         const modalContainer = document.createElement('div');
         modalContainer.id = 'mark-inactive-modal';
         modalContainer.innerHTML = modalHTML;
         document.body.appendChild(modalContainer);
-        
+
+        // Use red accent for tutor multi-select
+        buildMultiSelect(
+            'inactive-tutor-multiselect',
+            tutors,
+            t => t.name || t.email || t.id,
+            t => t.assignedStudentsCount ? `${t.assignedStudentsCount} student${t.assignedStudentsCount !== 1 ? 's' : ''}` : ''
+        );
+
+        // Re-tint checkboxes to red after render
+        document.querySelectorAll('#inactive-tutor-multiselect .multi-select-checkbox')
+            .forEach(cb => cb.classList.replace('accent-yellow-500', 'accent-red-500'));
+        document.querySelectorAll('#inactive-tutor-multiselect .multi-select-search')
+            .forEach(el => el.classList.replace('focus:ring-yellow-400', 'focus:ring-red-400'));
+
     } catch (error) {
         console.error('Error showing mark inactive modal:', error);
         alert('Failed to load tutor data. Please try again.');
