@@ -258,6 +258,196 @@ export async function loadDashboardData() {
 
 
 // ======================================================
+// MODAL DISPLAY FUNCTIONS
+// ======================================================
+
+async function showAssignStudentModal() {
+    closeModal();
+
+    // Ensure we have tutors and students loaded
+    if (!sessionCache.tutors) await loadDashboardData();
+    if (!sessionCache.students) await loadDashboardData();
+
+    const tutors   = sessionCache.tutors   || [];
+    const students = sessionCache.students || [];
+
+    const tutorOptions   = tutors.map(t =>
+        `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || t.id)}</option>`).join('');
+    const studentOptions = students.map(s =>
+        `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name || s.id)}</option>`).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'assign-student-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800"><i class="fas fa-user-plus mr-2 text-blue-600"></i>Assign New Student</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tutor <span class="text-red-500">*</span></label>
+                    <select id="assign-tutor-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="">-- Select Tutor --</option>
+                        ${tutorOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Student <span class="text-red-500">*</span></label>
+                    <select id="assign-student-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="">-- Select Student --</option>
+                        ${studentOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                    <input type="email" id="assign-parent-email" placeholder="parent@example.com"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea id="assignment-notes" rows="2" placeholder="Optional notes..."
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="submitAssignment()"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
+                    <i class="fas fa-user-plus mr-2"></i>Assign
+                </button>
+                <button onclick="closeModal()"
+                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function showArchiveStudentModal() {
+    closeModal();
+
+    if (!sessionCache.students) await loadDashboardData();
+    const students = sessionCache.students || [];
+
+    const studentOptions = students.map(s =>
+        `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name || s.id)}</option>`).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'archive-student-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800"><i class="fas fa-archive mr-2 text-yellow-600"></i>Archive Student</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Student <span class="text-red-500">*</span></label>
+                    <select id="archive-student-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                        <option value="">-- Select Student --</option>
+                        ${studentOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                    <input type="email" id="archive-parent-email" placeholder="parent@example.com"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
+                    <select id="archive-reason" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                        <option value="">-- Select Reason --</option>
+                        <option value="graduated">Graduated</option>
+                        <option value="transferred">Transferred</option>
+                        <option value="withdrawn">Withdrawn</option>
+                        <option value="payment_issues">Payment Issues</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea id="archive-notes" rows="2" placeholder="Optional notes..."
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="submitArchiveStudent()"
+                    class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium">
+                    <i class="fas fa-archive mr-2"></i>Archive
+                </button>
+                <button onclick="closeModal()"
+                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function showMarkInactiveModal() {
+    closeModal();
+
+    if (!sessionCache.tutors) await loadDashboardData();
+    const tutors = sessionCache.tutors || [];
+
+    const tutorOptions = tutors.map(t =>
+        `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || t.id)}</option>`).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'mark-inactive-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800"><i class="fas fa-user-slash mr-2 text-red-600"></i>Mark Tutor Inactive</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tutor <span class="text-red-500">*</span></label>
+                    <select id="inactive-tutor-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400">
+                        <option value="">-- Select Tutor --</option>
+                        ${tutorOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
+                    <select id="inactive-reason" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400">
+                        <option value="">-- Select Reason --</option>
+                        <option value="resignation">Resignation</option>
+                        <option value="termination">Termination</option>
+                        <option value="leave_of_absence">Leave of Absence</option>
+                        <option value="contract_ended">Contract Ended</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea id="inactive-notes" rows="2" placeholder="Optional notes..."
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="submitMarkInactive()"
+                    class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium">
+                    <i class="fas fa-user-slash mr-2"></i>Mark Inactive
+                </button>
+                <button onclick="closeModal()"
+                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// ======================================================
 // MODAL SUBMISSION FUNCTIONS
 // ======================================================
 
