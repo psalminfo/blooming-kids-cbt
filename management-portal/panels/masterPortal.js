@@ -586,7 +586,7 @@ export async function renderMasterPortalPanel(container) {
 
         tutorsToRender.forEach((tutor, idx) => {
             const tutorStudents = studentsByTutor[tutor.email] || [];
-            const activeStudents = tutorStudents.filter(s => !s.summerBreak && !['archived','graduated','transferred'].includes(s.status));
+            const activeStudents = tutorStudents.filter(s => !s.summerBreak && !['archived','graduated','transferred','summer_break'].includes(s.status));
             const g = grades[tutor.id] || grades[tutor.email] || {};
             // QA score: average of all qa_grades; fall back to legacy g.qa?.score
             const qaScore = calcAvgQaScore(g.qa_grades) ?? (g.qa?.score ?? null);
