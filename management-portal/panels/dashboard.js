@@ -262,10 +262,20 @@ export async function loadDashboardData() {
 // ======================================================
 
 window.submitAssignment = async function() {
-    const tutorId = document.getElementById('assign-tutor-select').value;
-    const studentId = document.getElementById('assign-student-select').value;
-    const parentEmail = document.getElementById('assign-parent-email').value;
-    const notes = document.getElementById('assignment-notes').value;
+    const tutorIdEl     = document.getElementById('assign-tutor-select');
+    const studentIdEl   = document.getElementById('assign-student-select');
+    const parentEmailEl = document.getElementById('assign-parent-email');
+    const notesEl       = document.getElementById('assignment-notes');
+
+    if (!tutorIdEl || !studentIdEl) {
+        alert('Assignment modal is not open. Please click "Assign New Student" to open it first.');
+        return;
+    }
+
+    const tutorId     = tutorIdEl.value;
+    const studentId   = studentIdEl.value;
+    const parentEmail = parentEmailEl?.value ?? '';
+    const notes       = notesEl?.value ?? '';
     
     if (!tutorId || !studentId) {
         alert('Please select both a tutor and a student from the dropdown lists.');
@@ -346,10 +356,20 @@ window.submitAssignment = async function() {
 }
 
 window.submitArchiveStudent = async function() {
-    const studentId = document.getElementById('archive-student-select').value;
-    const parentEmail = document.getElementById('archive-parent-email').value;
-    const reason = document.getElementById('archive-reason').value;
-    const notes = document.getElementById('archive-notes').value;
+    const studentIdEl   = document.getElementById('archive-student-select');
+    const parentEmailEl = document.getElementById('archive-parent-email');
+    const reasonEl      = document.getElementById('archive-reason');
+    const notesEl       = document.getElementById('archive-notes');
+
+    if (!studentIdEl || !reasonEl) {
+        alert('Archive modal is not open. Please click "Archive Student" to open it first.');
+        return;
+    }
+
+    const studentId   = studentIdEl.value;
+    const parentEmail = parentEmailEl?.value ?? '';
+    const reason      = reasonEl.value;
+    const notes       = notesEl?.value ?? '';
     
     if (!studentId || !reason) {
         alert('Please select a student and provide a reason.');
@@ -440,9 +460,18 @@ window.submitArchiveStudent = async function() {
 }
 
 window.submitMarkInactive = async function() {
-    const tutorId = document.getElementById('inactive-tutor-select').value;
-    const reason = document.getElementById('inactive-reason').value;
-    const notes = document.getElementById('inactive-notes').value;
+    const tutorIdEl = document.getElementById('inactive-tutor-select');
+    const reasonEl  = document.getElementById('inactive-reason');
+    const notesEl   = document.getElementById('inactive-notes');
+
+    if (!tutorIdEl || !reasonEl) {
+        alert('Mark Inactive modal is not open. Please click "Mark Tutor Inactive" to open it first.');
+        return;
+    }
+
+    const tutorId = tutorIdEl.value;
+    const reason  = reasonEl.value;
+    const notes   = notesEl?.value ?? '';
     
     if (!tutorId || !reason) {
         alert('Please select a tutor and provide a reason.');
