@@ -1,4 +1,3 @@
-Tutors fixed!
 // ============================================================
 // panels/dashboard.js
 // Dashboard stats & quick-action cards
@@ -184,9 +183,8 @@ export async function loadDashboardData() {
             const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             const activeTutors = allTutors.filter(tutor => tutor.status === 'active');
             saveToLocalStorage('tutors', activeTutors);
-            const activeTutorsCount = activeTutors.length;
             const tutorsElement = document.getElementById('dashboard-active-tutors');
-            if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
+            if (tutorsElement) tutorsElement.textContent = activeTutors.length;
         }
 
         // Load Active Students count (only if user has permission)
