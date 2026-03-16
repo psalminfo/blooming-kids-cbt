@@ -33,7 +33,7 @@ export async function renderDashboardPanel(container) {
     const showTutorsCard = userPermissions.viewTutorManagement === true;
     const showStudentsCard = userPermissions.viewTutorManagement === true;
     const showPendingCard = userPermissions.viewPendingApprovals === true;
-    const showsCard = userPermissions.viewEnrollments === true;
+    const showsCard = userPermissions.views === true;
     
     // Count how many cards we'll show (for grid layout)
     const visibleCardsCount = [showTutorsCard, showStudentsCard, showPendingCard, showsCard]
@@ -112,7 +112,7 @@ export async function renderDashboardPanel(container) {
                             <i class="fas fa-file-signature text-white text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-purple-800">Total Enrollments</h3>
+                            <h3 class="text-lg font-semibold text-purple-800">Total s</h3>
                             <p class="text-sm text-purple-600">All enrollment applications</p>
                         </div>
                     </div>
@@ -179,28 +179,36 @@ export async function loadDashboardData() {
         
         // Load Active Tutors count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
-            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => !tutor.status || tutor.status === 'active');
-            saveToLocalStorage('tutors', activeTutors);
+            if (!sessionCache.tutors) {
+                const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+                const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const activeTutors = allTutors.filter(tutor => 
+                    tutor.status === 'active'
+                );
+                saveToLocalStorage('tutors', activeTutors);
+            }
+            const activeTutorsCount = (sessionCache.tutors || []).length;
             const tutorsElement = document.getElementById('dashboard-active-tutors');
-            if (tutorsElement) tutorsElement.textContent = activeTutors.length;
+            if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
         }
 
         // Load Active Students count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const studentsSnapshot = await getDocs(query(collection(db, "students")));
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student =>
-                (student.status === 'active' || student.status === 'approved') &&
-                !student.summerBreak &&
-                student.status !== 'archived' &&
-                student.status !== 'graduated' &&
-                student.status !== 'transferred'
-            );
-            saveToLocalStorage('students', activeStudents);
+            if (!sessionCache.students) {
+                const studentsSnapshot = await getDocs(query(collection(db, "students")));
+                const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Only explicitly active/approved, exclude all break and inactive statuses
+                const activeStudents = allStudents.filter(student => 
+                    (student.status === 'active' || student.status === 'approved') &&
+                    !student.summerBreak &&
+                    !student.onBreak &&
+                    student.status !== 'summer_break'
+                );
+                saveToLocalStorage('students', activeStudents);
+            }
+            const activeStudentsCount = (sessionCache.students || []).length;
             const studentsElement = document.getElementById('dashboard-active-students');
-            if (studentsElement) studentsElement.textContent = activeStudents.length;
+            if (studentsElement) studentsElement.textContent = activeStudentsCount;
         }
 
         // Load Pending Approvals count (only if user has permission)
@@ -337,168 +345,141 @@ export async function submitAssignment() {
 }
 
 export async function submitArchiveStudent() {
-    const studentId = document.getElementById('archive-student-select').value;
-    const parentEmail = document.getElementById('archive-parent-email').value;
+    const studentIds = [...document.querySelectorAll('#archive-student-multiselect .multi-select-checkbox:checked')]
+        .map(cb => cb.value);
     const reason = document.getElementById('archive-reason').value;
-    const notes = document.getElementById('archive-notes').value;
-    
-    if (!studentId || !reason) {
-        alert('Please select a student and provide a reason.');
+    const notes  = document.getElementById('archive-notes').value;
+
+    if (studentIds.length === 0 || !reason) {
+        alert('Please select at least one student and provide a reason.');
         return;
     }
-    
+
+    const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
+    const originalText = submitBtn.innerHTML;
+
     try {
-        // Show loading state
-        const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
-        const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Archiving...';
         submitBtn.disabled = true;
-        
-        // Prepare student update data
-        const studentUpdateData = {
-            status: 'archived',
-            archiveReason: reason,
-            archiveNotes: notes || '',
-            archivedDate: new Date().toISOString(),
-            archivedBy: window.userData?.uid || 'system',
-            archivedByEmail: window.userData?.email || 'system',
-            lastModified: new Date().toISOString()
-        };
-        
-        // Only update parentEmail if provided
-        if (parentEmail) {
-            studentUpdateData.parentEmail = parentEmail;
-        }
-        
-        // Update student status
-        const studentRef = doc(db, "students", studentId);
-        await updateDoc(studentRef, studentUpdateData);
-        
-        // Find and update any active assignment
-        const assignmentsQuery = query(
-            collection(db, "tutorAssignments"),
-            where("studentId", "==", studentId),
-            where("status", "==", "active")
-        );
-        const assignmentsSnapshot = await getDocs(assignmentsQuery);
-        
-        if (!assignmentsSnapshot.empty) {
-            const assignmentDoc = assignmentsSnapshot.docs[0];
-            await updateDoc(doc(db, "tutorAssignments", assignmentDoc.id), {
+
+        for (const studentId of studentIds) {
+            await updateDoc(doc(db, "students", studentId), {
                 status: 'archived',
-                endDate: new Date().toISOString(),
+                archiveReason: reason,
+                archiveNotes: notes || '',
+                archivedDate: new Date().toISOString(),
+                archivedBy: window.userData?.uid || 'system',
+                archivedByEmail: window.userData?.email || 'system',
                 lastModified: new Date().toISOString()
             });
-            
-            // Update tutor's assignedStudentsCount
-            const assignmentData = assignmentDoc.data();
-            const tutorRef = doc(db, "tutors", assignmentData.tutorId);
-            const tutorDoc = await getDoc(tutorRef);
-            if (tutorDoc.exists()) {
-                const currentCount = tutorDoc.data().assignedStudentsCount || 0;
-                if (currentCount > 0) {
-                    await updateDoc(tutorRef, {
-                        assignedStudentsCount: currentCount - 1,
-                        lastModified: new Date().toISOString()
-                    });
+
+            // Find and update any active assignment
+            const assignmentsSnapshot = await getDocs(query(
+                collection(db, "tutorAssignments"),
+                where("studentId", "==", studentId),
+                where("status", "==", "active")
+            ));
+
+            if (!assignmentsSnapshot.empty) {
+                const assignmentDoc = assignmentsSnapshot.docs[0];
+                await updateDoc(doc(db, "tutorAssignments", assignmentDoc.id), {
+                    status: 'archived',
+                    endDate: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
+                });
+
+                // Decrement tutor's assignedStudentsCount
+                const assignmentData = assignmentDoc.data();
+                const tutorRef = doc(db, "tutors", assignmentData.tutorId);
+                const tutorDoc = await getDoc(tutorRef);
+                if (tutorDoc.exists()) {
+                    const currentCount = tutorDoc.data().assignedStudentsCount || 0;
+                    if (currentCount > 0) {
+                        await updateDoc(tutorRef, {
+                            assignedStudentsCount: currentCount - 1,
+                            lastModified: new Date().toISOString()
+                        });
+                    }
                 }
             }
         }
-        
-        // Invalidate cache
+
         invalidateCache('students');
         invalidateCache('tutorAssignments');
         invalidateCache('tutors');
-        
-        // Close modal
+
         closeModal();
-        
-        // Show success message
-        alert('Student archived successfully!');
-        
-        // Refresh dashboard data
+        alert(`${studentIds.length} student${studentIds.length !== 1 ? 's' : ''} archived successfully!`);
         await refreshAllDashboardData();
-        
+
     } catch (error) {
         console.error('Error archiving student:', error);
         alert('Failed to archive student. Please try again.');
-        
-        // Reset button
-        const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
 }
 
 export async function submitMarkInactive() {
-    const tutorId = document.getElementById('inactive-tutor-select').value;
+    const tutorIds = [...document.querySelectorAll('#inactive-tutor-multiselect .multi-select-checkbox:checked')]
+        .map(cb => cb.value);
     const reason = document.getElementById('inactive-reason').value;
-    const notes = document.getElementById('inactive-notes').value;
-    
-    if (!tutorId || !reason) {
-        alert('Please select a tutor and provide a reason.');
+    const notes  = document.getElementById('inactive-notes').value;
+
+    if (tutorIds.length === 0 || !reason) {
+        alert('Please select at least one tutor and provide a reason.');
         return;
     }
-    
+
+    const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
+    const originalText = submitBtn.innerHTML;
+
     try {
-        // Show loading state
-        const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
-        const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
         submitBtn.disabled = true;
-        
-        // Update tutor status
-        const tutorRef = doc(db, "tutors", tutorId);
-        await updateDoc(tutorRef, {
-            status: 'inactive',
-            inactiveReason: reason,
-            inactiveNotes: notes || '',
-            inactiveDate: new Date().toISOString(),
-            markedInactiveBy: window.userData?.uid || 'system',
-            markedInactiveByEmail: window.userData?.email || 'system',
-            lastModified: new Date().toISOString()
-        });
-        
-        // Find and update active assignments
-        const assignmentsQuery = query(
-            collection(db, "tutorAssignments"),
-            where("tutorId", "==", tutorId),
-            where("status", "==", "active")
-        );
-        const assignmentsSnapshot = await getDocs(assignmentsQuery);
-        
-        if (!assignmentsSnapshot.empty) {
-            const batch = writeBatch(db);
-            assignmentsSnapshot.docs.forEach(doc => {
-                batch.update(doc.ref, {
-                    status: 'pending_reassignment',
-                    endDate: new Date().toISOString(),
-                    lastModified: new Date().toISOString()
-                });
+
+        for (const tutorId of tutorIds) {
+            await updateDoc(doc(db, "tutors", tutorId), {
+                status: 'inactive',
+                inactiveReason: reason,
+                inactiveNotes: notes || '',
+                inactiveDate: new Date().toISOString(),
+                markedInactiveBy: window.userData?.uid || 'system',
+                markedInactiveByEmail: window.userData?.email || 'system',
+                lastModified: new Date().toISOString()
             });
-            await batch.commit();
+
+            // Mark all active assignments as pending reassignment
+            const assignmentsSnapshot = await getDocs(query(
+                collection(db, "tutorAssignments"),
+                where("tutorId", "==", tutorId),
+                where("status", "==", "active")
+            ));
+
+            if (!assignmentsSnapshot.empty) {
+                const batch = writeBatch(db);
+                assignmentsSnapshot.docs.forEach(d => {
+                    batch.update(d.ref, {
+                        status: 'pending_reassignment',
+                        endDate: new Date().toISOString(),
+                        lastModified: new Date().toISOString()
+                    });
+                });
+                await batch.commit();
+            }
         }
-        
-        // Invalidate cache
+
         invalidateCache('tutors');
         invalidateCache('tutorAssignments');
         invalidateCache('students');
-        
-        // Close modal
+
         closeModal();
-        
-        // Show success message
-        alert('Tutor marked as inactive successfully! Their students now need reassignment.');
-        
-        // Refresh dashboard data
+        alert(`${tutorIds.length} tutor${tutorIds.length !== 1 ? 's' : ''} marked inactive. Their students need reassignment.`);
         await refreshAllDashboardData();
-        
+
     } catch (error) {
         console.error('Error marking tutor inactive:', error);
         alert('Failed to mark tutor as inactive. Please try again.');
-        
-        // Reset button
-        const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
@@ -507,6 +488,11 @@ export async function submitMarkInactive() {
 // ======================================================
 // UTILITY FUNCTIONS
 // ======================================================
+
+// Expose submit functions so inline onclick handlers can reach them
+window.submitAssignment     = submitAssignment;
+window.submitArchiveStudent = submitArchiveStudent;
+window.submitMarkInactive   = submitMarkInactive;
 
 window.closeModal = function() {
     const modals = ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'];
