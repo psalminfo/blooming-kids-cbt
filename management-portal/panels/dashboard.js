@@ -252,7 +252,7 @@ export async function loadDashboardData() {
 // MODAL SUBMISSION FUNCTIONS
 // ======================================================
 
-export async function submitAssignment() {
+window.submitAssignment = async function() {
     const tutorId = document.getElementById('assign-tutor-select').value;
     const studentId = document.getElementById('assign-student-select').value;
     const parentEmail = document.getElementById('assign-parent-email').value;
@@ -336,7 +336,7 @@ export async function submitAssignment() {
     }
 }
 
-export async function submitArchiveStudent() {
+window.submitArchiveStudent = async function() {
     const studentId = document.getElementById('archive-student-select').value;
     const parentEmail = document.getElementById('archive-parent-email').value;
     const reason = document.getElementById('archive-reason').value;
@@ -430,7 +430,7 @@ export async function submitArchiveStudent() {
     }
 }
 
-export async function submitMarkInactive() {
+window.submitMarkInactive = async function() {
     const tutorId = document.getElementById('inactive-tutor-select').value;
     const reason = document.getElementById('inactive-reason').value;
     const notes = document.getElementById('inactive-notes').value;
