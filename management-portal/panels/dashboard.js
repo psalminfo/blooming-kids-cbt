@@ -6,7 +6,7 @@
 import { db } from '../core/firebase.js';
 import {
          Timestamp, addDoc, collection, deleteDoc,
-         doc, getDoc, getDocs, limit,
+         doc, getDoc, getDocs, getDocsFromServer, limit,
          onSnapshot, orderBy, query, setDoc,
          startAfter, updateDoc, where, writeBatch
     } from '../core/firebase.js';
@@ -179,7 +179,7 @@ export async function loadDashboardData() {
         
         // Load Active Tutors count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
+            const tutorsSnapshot = await getDocsFromServer(query(collection(db, "tutors"), orderBy("name")));
             const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             const activeTutors = allTutors.filter(tutor => !tutor.status || tutor.status === 'active');
             saveToLocalStorage('tutors', activeTutors);
@@ -189,7 +189,7 @@ export async function loadDashboardData() {
 
         // Load Active Students count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const studentsSnapshot = await getDocs(query(collection(db, "students")));
+            const studentsSnapshot = await getDocsFromServer(query(collection(db, "students")));
             const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             const activeStudents = allStudents.filter(student =>
                 (student.status === 'active' || student.status === 'approved') &&
