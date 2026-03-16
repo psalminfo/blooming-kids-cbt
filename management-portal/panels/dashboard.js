@@ -104,7 +104,7 @@ export async function renderDashboardPanel(container) {
                 </div>
                 ` : ''}
 
-                <!-- Total Enrollments Card (only if user has permission) -->
+                <!-- Total s Card (only if user has permission) -->
                 ${showsCard ? `
                 <div class="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
@@ -179,37 +179,28 @@ export async function loadDashboardData() {
         
         // Load Active Tutors count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            if (!sessionCache.tutors) {
-                const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
-                const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const activeTutors = allTutors.filter(tutor => 
-                    !tutor.status || tutor.status === 'active'
-                );
-                saveToLocalStorage('tutors', activeTutors);
-            }
-            const activeTutorsCount = activeTutors.length;
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeTutors = allTutors.filter(tutor => tutor.status === 'active');
+            saveToLocalStorage('tutors', activeTutors);
             const tutorsElement = document.getElementById('dashboard-active-tutors');
-            if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
+            if (tutorsElement) tutorsElement.textContent = activeTutors.length;
         }
 
         // Load Active Students count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            if (!sessionCache.students) {
-                const studentsSnapshot = await getDocs(query(collection(db, "students")));
-                const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Exclude break/archived/graduated students from active count
-                const activeStudents = allStudents.filter(student => 
-                    (!student.status || student.status === 'active' || student.status === 'approved') &&
-                    !student.summerBreak &&
-                    student.status !== 'archived' &&
-                    student.status !== 'graduated' &&
-                    student.status !== 'transferred'
-                );
-                saveToLocalStorage('students', activeStudents);
-            }
-            const activeStudentsCount = activeStudents.length;
+            const studentsSnapshot = await getDocs(query(collection(db, "students")));
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student =>
+                (student.status === 'active' || student.status === 'approved') &&
+                !student.summerBreak &&
+                student.status !== 'archived' &&
+                student.status !== 'graduated' &&
+                student.status !== 'transferred'
+            );
+            saveToLocalStorage('students', activeStudents);
             const studentsElement = document.getElementById('dashboard-active-students');
-            if (studentsElement) studentsElement.textContent = activeStudentsCount;
+            if (studentsElement) studentsElement.textContent = activeStudents.length;
         }
 
         // Load Pending Approvals count (only if user has permission)
