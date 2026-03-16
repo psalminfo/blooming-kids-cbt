@@ -181,7 +181,7 @@ export async function loadDashboardData() {
         if (userPermissions.viewTutorManagement === true) {
             const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
             const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => tutor.status === 'active');
+            const activeTutors = allTutors.filter(tutor => !tutor.status || tutor.status === 'active');
             saveToLocalStorage('tutors', activeTutors);
             const tutorsElement = document.getElementById('dashboard-active-tutors');
             if (tutorsElement) tutorsElement.textContent = activeTutors.length;
