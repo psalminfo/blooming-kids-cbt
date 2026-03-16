@@ -179,8 +179,7 @@ export async function loadDashboardData() {
         
         // Load Active Tutors count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            // Always fetch fresh
-            {
+            if (!sessionCache.tutors) {
                 const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
                 const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 const activeTutors = allTutors.filter(tutor => 
@@ -195,14 +194,14 @@ export async function loadDashboardData() {
 
         // Load Active Students count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            // Always fetch fresh
-            {
+            if (!sessionCache.students) {
                 const studentsSnapshot = await getDocs(query(collection(db, "students")));
                 const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Exclude break/archived/graduated students from active count
+                // Exclude summer break, archived, graduated, and transferred students from active count
                 const activeStudents = allStudents.filter(student => 
                     (student.status === 'active' || student.status === 'approved') &&
                     !student.summerBreak &&
+                    student.status !== 'summer_break' &&
                     student.status !== 'archived' &&
                     student.status !== 'graduated' &&
                     student.status !== 'transferred'
