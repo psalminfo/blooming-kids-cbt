@@ -183,7 +183,7 @@ export async function loadDashboardData() {
                 const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
                 const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 const activeTutors = allTutors.filter(tutor => 
-                    !tutor.status || tutor.status === 'active'
+                    tutor.status === 'active'
                 );
                 saveToLocalStorage('tutors', activeTutors);
             }
@@ -197,10 +197,11 @@ export async function loadDashboardData() {
             if (!sessionCache.students) {
                 const studentsSnapshot = await getDocs(query(collection(db, "students")));
                 const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Exclude break/archived/graduated students from active count
+                // Exclude summer break, archived, graduated, and transferred students from active count
                 const activeStudents = allStudents.filter(student => 
-                    (!student.status || student.status === 'active' || student.status === 'approved') &&
+                    (student.status === 'active' || student.status === 'approved') &&
                     !student.summerBreak &&
+                    student.status !== 'summer_break' &&
                     student.status !== 'archived' &&
                     student.status !== 'graduated' &&
                     student.status !== 'transferred'
