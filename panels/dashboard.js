@@ -26,31 +26,28 @@ import { logManagementActivity } from '../notifications/activityLog.js';
 // ======================================================
 
 export async function renderDashboardPanel(container) {
-    // Get user permissions
     const userPermissions = window.userData?.permissions?.tabs || {};
-    
-    // Determine which cards to show based on permissions
-    const showTutorsCard = userPermissions.viewTutorManagement === true;
-    const showStudentsCard = userPermissions.viewTutorManagement === true;
-    const showPendingCard = userPermissions.viewPendingApprovals === true;
-    const showsCard = userPermissions.views === true;
-    
-    // Count how many cards we'll show (for grid layout)
+
+    const showTutorsCard   = userPermissions.viewTutorManagement === true;
+    const showStudentsCard  = userPermissions.viewTutorManagement === true;
+    const showPendingCard   = userPermissions.viewPendingApprovals === true;
+    const showsCard         = userPermissions.views === true;
+
     const visibleCardsCount = [showTutorsCard, showStudentsCard, showPendingCard, showsCard]
         .filter(Boolean).length;
-    
-    // Determine grid columns based on visible cards
+
     let gridCols = 'grid-cols-1';
-    if (visibleCardsCount === 2) gridCols = 'md:grid-cols-2';
+    if (visibleCardsCount === 2)      gridCols = 'md:grid-cols-2';
     else if (visibleCardsCount === 3) gridCols = 'md:grid-cols-3 lg:grid-cols-3';
-    else if (visibleCardsCount >= 4) gridCols = 'md:grid-cols-2 lg:grid-cols-4';
-    
+    else if (visibleCardsCount >= 4)  gridCols = 'md:grid-cols-2 lg:grid-cols-4';
+
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-6">Management Dashboard</h2>
-            
+
             <div class="grid ${gridCols} gap-6 mb-8">
-                <!-- Active Tutors Card (only if user has permission) -->
+
+                <!-- Tutors Card -->
                 ${showTutorsCard ? `
                 <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
@@ -58,17 +55,31 @@ export async function renderDashboardPanel(container) {
                             <i class="fas fa-chalkboard-teacher text-white text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-blue-800">Active Tutors</h3>
-                            <p class="text-sm text-blue-600">Tutors with 'active' status</p>
+                            <h3 class="text-lg font-semibold text-blue-800">Tutors</h3>
+                            <p class="text-sm text-blue-600">Active & Inactive</p>
                         </div>
                     </div>
+                    <!-- Tab buttons -->
+                    <div class="flex gap-2 mb-3">
+                        <button id="tutor-tab-active"
+                            onclick="switchTutorTab('active')"
+                            class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white transition-colors">
+                            Active
+                        </button>
+                        <button id="tutor-tab-inactive"
+                            onclick="switchTutorTab('inactive')"
+                            class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-white text-blue-600 border border-blue-300 transition-colors">
+                            Inactive
+                        </button>
+                    </div>
                     <div class="text-center">
-                        <p id="dashboard-active-tutors" class="text-4xl font-bold text-blue-700 mb-2">0</p>
+                        <p id="dashboard-active-tutors" class="text-4xl font-bold text-blue-700 mb-1">0</p>
+                        <p id="tutor-tab-label" class="text-xs text-blue-500">Active tutors</p>
                     </div>
                 </div>
                 ` : ''}
 
-                <!-- Active Students Card (only if user has permission) -->
+                <!-- Students Card -->
                 ${showStudentsCard ? `
                 <div class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
@@ -76,17 +87,31 @@ export async function renderDashboardPanel(container) {
                             <i class="fas fa-user-graduate text-white text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-green-800">Active Students</h3>
-                            <p class="text-sm text-green-600">Students with 'active' status</p>
+                            <h3 class="text-lg font-semibold text-green-800">Students</h3>
+                            <p class="text-sm text-green-600">Active & Archived</p>
                         </div>
                     </div>
+                    <!-- Tab buttons -->
+                    <div class="flex gap-2 mb-3">
+                        <button id="student-tab-active"
+                            onclick="switchStudentTab('active')"
+                            class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white transition-colors">
+                            Active
+                        </button>
+                        <button id="student-tab-archived"
+                            onclick="switchStudentTab('archived')"
+                            class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-white text-green-600 border border-green-300 transition-colors">
+                            Archived
+                        </button>
+                    </div>
                     <div class="text-center">
-                        <p id="dashboard-active-students" class="text-4xl font-bold text-green-700 mb-2">0</p>
+                        <p id="dashboard-active-students" class="text-4xl font-bold text-green-700 mb-1">0</p>
+                        <p id="student-tab-label" class="text-xs text-green-500">Active students</p>
                     </div>
                 </div>
                 ` : ''}
 
-                <!-- Pending Approvals Card (only if user has permission) -->
+                <!-- Pending Approvals Card -->
                 ${showPendingCard ? `
                 <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
@@ -104,7 +129,7 @@ export async function renderDashboardPanel(container) {
                 </div>
                 ` : ''}
 
-                <!-- Total s Card (only if user has permission) -->
+                <!-- Total Enrollments Card -->
                 ${showsCard ? `
                 <div class="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
@@ -112,7 +137,7 @@ export async function renderDashboardPanel(container) {
                             <i class="fas fa-file-signature text-white text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-purple-800">Total s</h3>
+                            <h3 class="text-lg font-semibold text-purple-800">Total Enrollments</h3>
                             <p class="text-sm text-purple-600">All enrollment applications</p>
                         </div>
                     </div>
@@ -123,7 +148,6 @@ export async function renderDashboardPanel(container) {
                 ` : ''}
             </div>
 
-            <!-- Show message if no cards are visible -->
             ${visibleCardsCount === 0 ? `
                 <div class="text-center py-8 bg-gray-50 rounded-lg border">
                     <i class="fas fa-chart-bar text-gray-400 text-4xl mb-4"></i>
@@ -133,7 +157,6 @@ export async function renderDashboardPanel(container) {
                 </div>
             ` : ''}
 
-            <!-- Quick Actions Section (only if user has Tutor Management permission) -->
             ${showTutorsCard ? `
             <div class="mt-8 p-6 bg-gray-50 rounded-xl border">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
@@ -151,7 +174,6 @@ export async function renderDashboardPanel(container) {
             </div>
             ` : ''}
 
-            <!-- Last Updated Info (only if at least one card is visible) -->
             ${visibleCardsCount > 0 ? `
             <div class="mt-6 text-center text-sm text-gray-500">
                 <p>Data loaded from cache.</p>
@@ -163,7 +185,6 @@ export async function renderDashboardPanel(container) {
         </div>
     `;
 
-    // Add event listeners for quick actions
     if (showTutorsCard) {
         document.getElementById('quick-action-assign')?.addEventListener('click', showAssignStudentModal);
         document.getElementById('quick-action-archive')?.addEventListener('click', showArchiveStudentModal);
@@ -173,89 +194,141 @@ export async function renderDashboardPanel(container) {
     loadDashboardData();
 }
 
+// ── Tab switchers ────────────────────────────────────────────
+
+window.switchTutorTab = function(tab) {
+    const countEl = document.getElementById('dashboard-active-tutors');
+    const labelEl = document.getElementById('tutor-tab-label');
+    const btnActive   = document.getElementById('tutor-tab-active');
+    const btnInactive = document.getElementById('tutor-tab-inactive');
+
+    if (tab === 'active') {
+        if (countEl) countEl.textContent = window._dashTutorActive ?? '0';
+        if (labelEl) labelEl.textContent = 'Active tutors';
+        btnActive?.classList.replace('bg-white', 'bg-blue-600');
+        btnActive?.classList.replace('text-blue-600', 'text-white');
+        btnInactive?.classList.replace('bg-blue-600', 'bg-white');
+        btnInactive?.classList.replace('text-white', 'text-blue-600');
+    } else {
+        if (countEl) countEl.textContent = window._dashTutorInactive ?? '0';
+        if (labelEl) labelEl.textContent = 'Inactive tutors';
+        btnInactive?.classList.replace('bg-white', 'bg-blue-600');
+        btnInactive?.classList.replace('text-blue-600', 'text-white');
+        btnActive?.classList.replace('bg-blue-600', 'bg-white');
+        btnActive?.classList.replace('text-white', 'text-blue-600');
+    }
+};
+
+window.switchStudentTab = function(tab) {
+    const countEl  = document.getElementById('dashboard-active-students');
+    const labelEl  = document.getElementById('student-tab-label');
+    const btnActive   = document.getElementById('student-tab-active');
+    const btnArchived = document.getElementById('student-tab-archived');
+
+    if (tab === 'active') {
+        if (countEl) countEl.textContent = window._dashStudentActive ?? '0';
+        if (labelEl) labelEl.textContent = 'Active students';
+        btnActive?.classList.replace('bg-white', 'bg-green-600');
+        btnActive?.classList.replace('text-green-600', 'text-white');
+        btnArchived?.classList.replace('bg-green-600', 'bg-white');
+        btnArchived?.classList.replace('text-white', 'text-green-600');
+    } else {
+        if (countEl) countEl.textContent = window._dashStudentArchived ?? '0';
+        if (labelEl) labelEl.textContent = 'Archived students';
+        btnArchived?.classList.replace('bg-white', 'bg-green-600');
+        btnArchived?.classList.replace('text-green-600', 'text-white');
+        btnActive?.classList.replace('bg-green-600', 'bg-white');
+        btnActive?.classList.replace('text-white', 'text-green-600');
+    }
+};
+
+// ── Data loader ──────────────────────────────────────────────
+
 export async function loadDashboardData() {
     try {
         const userPermissions = window.userData?.permissions?.tabs || {};
-        
-        // Load Active Tutors count (only if user has permission)
+
         if (userPermissions.viewTutorManagement === true) {
-            if (!sessionCache.tutors) {
-                const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
-                const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const activeTutors = allTutors.filter(tutor => 
-                    !tutor.status || tutor.status === 'active'
-                );
-                saveToLocalStorage('tutors', activeTutors);
+
+            // ── Tutors ──────────────────────────────────────────────
+            if (!sessionCache.allTutors) {
+                const snap = await getDocs(query(collection(db, 'tutors')));
+                const all  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                sessionCache.allTutors = all;
             }
-            const activeTutorsCount = (sessionCache.tutors || []).length;
-            const tutorsElement = document.getElementById('dashboard-active-tutors');
-            if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
+            const allTutors = sessionCache.allTutors || [];
+            const activeTutors   = allTutors.filter(t => !t.status || t.status === 'active');
+            const inactiveTutors = allTutors.filter(t => t.status === 'inactive' || t.status === 'on_leave');
+
+            // Store for tab switching
+            window._dashTutorActive   = activeTutors.length;
+            window._dashTutorInactive = inactiveTutors.length;
+
+            // Default view = active
+            const tutorsEl = document.getElementById('dashboard-active-tutors');
+            if (tutorsEl) tutorsEl.textContent = activeTutors.length;
+
+            // Also keep legacy cache key for other panels
+            saveToLocalStorage('tutors', activeTutors);
+
+            // ── Students ────────────────────────────────────────────
+            if (!sessionCache.allStudents) {
+                const snap = await getDocs(query(collection(db, 'students')));
+                const all  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                sessionCache.allStudents = all;
+            }
+            const allStudents = sessionCache.allStudents || [];
+            const activeStudents = allStudents.filter(s =>
+                (!s.status || s.status === 'active' || s.status === 'approved') &&
+                !s.summerBreak &&
+                s.status !== 'archived' &&
+                s.status !== 'graduated' &&
+                s.status !== 'transferred'
+            );
+            const archivedStudents = allStudents.filter(s =>
+                s.status === 'archived' ||
+                s.status === 'graduated' ||
+                s.status === 'transferred'
+            );
+
+            window._dashStudentActive   = activeStudents.length;
+            window._dashStudentArchived = archivedStudents.length;
+
+            const studentsEl = document.getElementById('dashboard-active-students');
+            if (studentsEl) studentsEl.textContent = activeStudents.length;
+
+            saveToLocalStorage('students', activeStudents);
         }
 
-        // Load Active Students count (only if user has permission)
-        if (userPermissions.viewTutorManagement === true) {
-            if (!sessionCache.students) {
-                const studentsSnapshot = await getDocs(query(collection(db, "students")));
-                const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Exclude break/archived/graduated students from active count
-                const activeStudents = allStudents.filter(student => 
-                    (!student.status || student.status === 'active' || student.status === 'approved') &&
-                    !student.summerBreak &&
-                    student.status !== 'archived' &&
-                    student.status !== 'graduated' &&
-                    student.status !== 'transferred'
-                );
-                saveToLocalStorage('students', activeStudents);
-            }
-            const activeStudentsCount = (sessionCache.students || []).length;
-            const studentsElement = document.getElementById('dashboard-active-students');
-            if (studentsElement) studentsElement.textContent = activeStudentsCount;
-        }
-
-        // Load Pending Approvals count (only if user has permission)
+        // ── Pending Approvals ───────────────────────────────────────
         if (userPermissions.viewPendingApprovals === true) {
             if (!sessionCache.pendingStudents) {
-                const pendingSnapshot = await getDocs(query(collection(db, "pending_students")));
-                const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                saveToLocalStorage('pendingStudents', pendingStudents);
+                const snap = await getDocs(query(collection(db, 'pending_students')));
+                saveToLocalStorage('pendingStudents', snap.docs.map(d => ({ id: d.id, ...d.data() })));
             }
-            const pendingApprovalsCount = (sessionCache.pendingStudents || []).length;
-            const pendingElement = document.getElementById('dashboard-pending-approvals');
-            if (pendingElement) pendingElement.textContent = pendingApprovalsCount;
+            const pendingEl = document.getElementById('dashboard-pending-approvals');
+            if (pendingEl) pendingEl.textContent = (sessionCache.pendingStudents || []).length;
         }
 
-        // Load Total Enrollments count (only if user has permission)
+        // ── Enrollments ─────────────────────────────────────────────
         if (userPermissions.viewEnrollments === true) {
             if (!sessionCache.enrollments) {
-                const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments")));
-                const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                saveToLocalStorage('enrollments', enrollmentsData);
+                const snap = await getDocs(query(collection(db, 'enrollments')));
+                saveToLocalStorage('enrollments', snap.docs.map(d => ({ id: d.id, ...d.data() })));
             }
-            const totalEnrollmentsCount = (sessionCache.enrollments || []).length;
-            const enrollmentsElement = document.getElementById('dashboard-total-enrollments');
-            if (enrollmentsElement) enrollmentsElement.textContent = totalEnrollmentsCount;
+            const enrollmentsEl = document.getElementById('dashboard-total-enrollments');
+            if (enrollmentsEl) enrollmentsEl.textContent = (sessionCache.enrollments || []).length;
         }
 
     } catch (error) {
-        console.error("Error loading dashboard data:", error);
-        
-        // Set error state only for visible cards
-        const tutorsElement = document.getElementById('dashboard-active-tutors');
-        const studentsElement = document.getElementById('dashboard-active-students');
-        const pendingElement = document.getElementById('dashboard-pending-approvals');
-        const enrollmentsElement = document.getElementById('dashboard-total-enrollments');
-        
-        if (tutorsElement) tutorsElement.textContent = 'Error';
-        if (studentsElement) studentsElement.textContent = 'Error';
-        if (pendingElement) pendingElement.textContent = 'Error';
-        if (enrollmentsElement) enrollmentsElement.textContent = 'Error';
+        console.error('Error loading dashboard data:', error);
+        ['dashboard-active-tutors','dashboard-active-students',
+         'dashboard-pending-approvals','dashboard-total-enrollments'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = 'Error';
+        });
     }
 }
-
-// ======================================================
-
-
-
 
 // ======================================================
 // MODAL SUBMISSION FUNCTIONS
@@ -266,23 +339,20 @@ export async function submitAssignment() {
     const studentId = document.getElementById('assign-student-select').value;
     const parentEmail = document.getElementById('assign-parent-email').value;
     const notes = document.getElementById('assignment-notes').value;
-    
+
     if (!tutorId || !studentId) {
         alert('Please select both a tutor and a student from the dropdown lists.');
         return;
     }
-    
+
     try {
-        // Show loading state
         const submitBtn = document.querySelector('#assign-student-modal button[onclick="submitAssignment()"]');
         const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Assigning...';
         submitBtn.disabled = true;
-        
-        // Create assignment data
+
         const assignmentData = {
-            tutorId: tutorId,
-            studentId: studentId,
+            tutorId, studentId,
             parentEmail: parentEmail || '',
             assignedBy: window.userData?.uid || 'system',
             assignedByEmail: window.userData?.email || 'system',
@@ -291,54 +361,30 @@ export async function submitAssignment() {
             notes: notes || '',
             lastModified: new Date().toISOString()
         };
-        
-        // Add assignment to Firestore
-        const assignmentRef = await addDoc(collection(db, "tutorAssignments"), assignmentData);
-        
-        // Update tutor's assignedStudentsCount
-        const tutorRef = doc(db, "tutors", tutorId);
+
+        await addDoc(collection(db, 'tutorAssignments'), assignmentData);
+
+        const tutorRef = doc(db, 'tutors', tutorId);
         const tutorDoc = await getDoc(tutorRef);
         if (tutorDoc.exists()) {
             const currentCount = tutorDoc.data().assignedStudentsCount || 0;
-            await updateDoc(tutorRef, {
-                assignedStudentsCount: currentCount + 1,
-                lastModified: new Date().toISOString()
-            });
+            await updateDoc(tutorRef, { assignedStudentsCount: currentCount + 1, lastModified: new Date().toISOString() });
         }
-        
-        // Update student's tutorId and parentEmail
-        const studentRef = doc(db, "students", studentId);
-        const studentUpdateData = {
-            tutorId: tutorId,
-            lastModified: new Date().toISOString()
-        };
-        
-        // Only update parentEmail if provided
-        if (parentEmail) {
-            studentUpdateData.parentEmail = parentEmail;
-        }
-        
-        await updateDoc(studentRef, studentUpdateData);
-        
-        // Invalidate cache
+
+        const studentUpdateData = { tutorId, lastModified: new Date().toISOString() };
+        if (parentEmail) studentUpdateData.parentEmail = parentEmail;
+        await updateDoc(doc(db, 'students', studentId), studentUpdateData);
+
         invalidateCache('tutorAssignments');
         invalidateCache('tutors');
         invalidateCache('students');
-        
-        // Close modal
         closeModal();
-        
-        // Show success message
         alert('Student assigned successfully!');
-        
-        // Refresh dashboard data
         await refreshAllDashboardData();
-        
+
     } catch (error) {
         console.error('Error assigning student:', error);
         alert('Failed to assign student. Please try again.');
-        
-        // Reset button
         const submitBtn = document.querySelector('#assign-student-modal button[onclick="submitAssignment()"]');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
@@ -346,24 +392,22 @@ export async function submitAssignment() {
 }
 
 export async function submitArchiveStudent() {
-    const studentId = document.getElementById('archive-student-select').value;
+    const studentId   = document.getElementById('archive-student-select').value;
     const parentEmail = document.getElementById('archive-parent-email').value;
-    const reason = document.getElementById('archive-reason').value;
-    const notes = document.getElementById('archive-notes').value;
-    
+    const reason      = document.getElementById('archive-reason').value;
+    const notes       = document.getElementById('archive-notes').value;
+
     if (!studentId || !reason) {
         alert('Please select a student and provide a reason.');
         return;
     }
-    
+
     try {
-        // Show loading state
         const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
         const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Archiving...';
         submitBtn.disabled = true;
-        
-        // Prepare student update data
+
         const studentUpdateData = {
             status: 'archived',
             archiveReason: reason,
@@ -373,66 +417,38 @@ export async function submitArchiveStudent() {
             archivedByEmail: window.userData?.email || 'system',
             lastModified: new Date().toISOString()
         };
-        
-        // Only update parentEmail if provided
-        if (parentEmail) {
-            studentUpdateData.parentEmail = parentEmail;
-        }
-        
-        // Update student status
-        const studentRef = doc(db, "students", studentId);
-        await updateDoc(studentRef, studentUpdateData);
-        
-        // Find and update any active assignment
-        const assignmentsQuery = query(
-            collection(db, "tutorAssignments"),
-            where("studentId", "==", studentId),
-            where("status", "==", "active")
-        );
-        const assignmentsSnapshot = await getDocs(assignmentsQuery);
-        
+        if (parentEmail) studentUpdateData.parentEmail = parentEmail;
+        await updateDoc(doc(db, 'students', studentId), studentUpdateData);
+
+        const assignmentsSnapshot = await getDocs(query(
+            collection(db, 'tutorAssignments'),
+            where('studentId', '==', studentId),
+            where('status', '==', 'active')
+        ));
+
         if (!assignmentsSnapshot.empty) {
             const assignmentDoc = assignmentsSnapshot.docs[0];
-            await updateDoc(doc(db, "tutorAssignments", assignmentDoc.id), {
-                status: 'archived',
-                endDate: new Date().toISOString(),
-                lastModified: new Date().toISOString()
+            await updateDoc(doc(db, 'tutorAssignments', assignmentDoc.id), {
+                status: 'archived', endDate: new Date().toISOString(), lastModified: new Date().toISOString()
             });
-            
-            // Update tutor's assignedStudentsCount
-            const assignmentData = assignmentDoc.data();
-            const tutorRef = doc(db, "tutors", assignmentData.tutorId);
+            const tutorRef = doc(db, 'tutors', assignmentDoc.data().tutorId);
             const tutorDoc = await getDoc(tutorRef);
             if (tutorDoc.exists()) {
                 const currentCount = tutorDoc.data().assignedStudentsCount || 0;
-                if (currentCount > 0) {
-                    await updateDoc(tutorRef, {
-                        assignedStudentsCount: currentCount - 1,
-                        lastModified: new Date().toISOString()
-                    });
-                }
+                if (currentCount > 0) await updateDoc(tutorRef, { assignedStudentsCount: currentCount - 1, lastModified: new Date().toISOString() });
             }
         }
-        
-        // Invalidate cache
+
         invalidateCache('students');
         invalidateCache('tutorAssignments');
         invalidateCache('tutors');
-        
-        // Close modal
         closeModal();
-        
-        // Show success message
         alert('Student archived successfully!');
-        
-        // Refresh dashboard data
         await refreshAllDashboardData();
-        
+
     } catch (error) {
         console.error('Error archiving student:', error);
         alert('Failed to archive student. Please try again.');
-        
-        // Reset button
         const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
@@ -441,24 +457,21 @@ export async function submitArchiveStudent() {
 
 export async function submitMarkInactive() {
     const tutorId = document.getElementById('inactive-tutor-select').value;
-    const reason = document.getElementById('inactive-reason').value;
-    const notes = document.getElementById('inactive-notes').value;
-    
+    const reason  = document.getElementById('inactive-reason').value;
+    const notes   = document.getElementById('inactive-notes').value;
+
     if (!tutorId || !reason) {
         alert('Please select a tutor and provide a reason.');
         return;
     }
-    
+
     try {
-        // Show loading state
         const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
         const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
         submitBtn.disabled = true;
-        
-        // Update tutor status
-        const tutorRef = doc(db, "tutors", tutorId);
-        await updateDoc(tutorRef, {
+
+        await updateDoc(doc(db, 'tutors', tutorId), {
             status: 'inactive',
             inactiveReason: reason,
             inactiveNotes: notes || '',
@@ -467,46 +480,31 @@ export async function submitMarkInactive() {
             markedInactiveByEmail: window.userData?.email || 'system',
             lastModified: new Date().toISOString()
         });
-        
-        // Find and update active assignments
-        const assignmentsQuery = query(
-            collection(db, "tutorAssignments"),
-            where("tutorId", "==", tutorId),
-            where("status", "==", "active")
-        );
-        const assignmentsSnapshot = await getDocs(assignmentsQuery);
-        
+
+        const assignmentsSnapshot = await getDocs(query(
+            collection(db, 'tutorAssignments'),
+            where('tutorId', '==', tutorId),
+            where('status', '==', 'active')
+        ));
+
         if (!assignmentsSnapshot.empty) {
             const batch = writeBatch(db);
-            assignmentsSnapshot.docs.forEach(doc => {
-                batch.update(doc.ref, {
-                    status: 'pending_reassignment',
-                    endDate: new Date().toISOString(),
-                    lastModified: new Date().toISOString()
-                });
+            assignmentsSnapshot.docs.forEach(d => {
+                batch.update(d.ref, { status: 'pending_reassignment', endDate: new Date().toISOString(), lastModified: new Date().toISOString() });
             });
             await batch.commit();
         }
-        
-        // Invalidate cache
+
         invalidateCache('tutors');
         invalidateCache('tutorAssignments');
         invalidateCache('students');
-        
-        // Close modal
         closeModal();
-        
-        // Show success message
         alert('Tutor marked as inactive successfully! Their students now need reassignment.');
-        
-        // Refresh dashboard data
         await refreshAllDashboardData();
-        
+
     } catch (error) {
         console.error('Error marking tutor inactive:', error);
         alert('Failed to mark tutor as inactive. Please try again.');
-        
-        // Reset button
         const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
@@ -518,57 +516,39 @@ export async function submitMarkInactive() {
 // ======================================================
 
 window.closeModal = function() {
-    const modals = ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'];
-    modals.forEach(modalId => {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.remove();
-        }
+    ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'].forEach(id => {
+        document.getElementById(id)?.remove();
     });
 };
 
-// Close modal when clicking outside
 document.addEventListener('click', function(event) {
-    const modals = ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'];
-    modals.forEach(modalId => {
-        const modal = document.getElementById(modalId);
-        if (modal && event.target === modal) {
-            closeModal();
-        }
+    ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'].forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal && event.target === modal) closeModal();
     });
 });
 
-// Close modal with Escape key
 document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        closeModal();
-    }
+    if (event.key === 'Escape') closeModal();
 });
 
-// Refresh All Dashboard Data function
 window.refreshAllDashboardData = async function() {
-    // Invalidate all cache
     invalidateCache('tutors');
     invalidateCache('students');
     invalidateCache('pendingStudents');
     invalidateCache('enrollments');
     invalidateCache('tutorAssignments');
-    
-    // Show loading state
-    const tutorsElement = document.getElementById('dashboard-active-tutors');
-    const studentsElement = document.getElementById('dashboard-active-students');
-    const pendingElement = document.getElementById('dashboard-pending-approvals');
-    const enrollmentsElement = document.getElementById('dashboard-total-enrollments');
-    
-    if (tutorsElement) tutorsElement.textContent = '...';
-    if (studentsElement) studentsElement.textContent = '...';
-    if (pendingElement) pendingElement.textContent = '...';
-    if (enrollmentsElement) enrollmentsElement.textContent = '...';
-    
-    // Reload data
+    // Clear extended caches too
+    delete sessionCache.allTutors;
+    delete sessionCache.allStudents;
+
+    ['dashboard-active-tutors','dashboard-active-students',
+     'dashboard-pending-approvals','dashboard-total-enrollments'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '...';
+    });
+
     await loadDashboardData();
-    
-    // Show success message
     alert('Dashboard data refreshed successfully!');
 };
 
