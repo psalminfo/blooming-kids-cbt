@@ -179,7 +179,7 @@ export async function loadDashboardData() {
         
         // Load Active Tutors count (only if user has permission)
         if (userPermissions.viewTutorManagement === true) {
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
             const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             const activeTutors = allTutors.filter(tutor => !tutor.status || tutor.status === 'active');
             saveToLocalStorage('tutors', activeTutors);
