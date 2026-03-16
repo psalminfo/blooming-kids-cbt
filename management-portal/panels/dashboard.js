@@ -187,7 +187,7 @@ export async function loadDashboardData() {
                 );
                 saveToLocalStorage('tutors', activeTutors);
             }
-            const activeTutorsCount = (sessionCache.tutors || []).length;
+            const activeTutorsCount = activeTutors.length;
             const tutorsElement = document.getElementById('dashboard-active-tutors');
             if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
         }
@@ -208,7 +208,7 @@ export async function loadDashboardData() {
                 );
                 saveToLocalStorage('students', activeStudents);
             }
-            const activeStudentsCount = (sessionCache.students || []).length;
+            const activeStudentsCount = activeStudents.length;
             const studentsElement = document.getElementById('dashboard-active-students');
             if (studentsElement) studentsElement.textContent = activeStudentsCount;
         }
