@@ -1153,8 +1153,22 @@ class EnrollmentApp {
         }
     }
 
-    // NEW: Calculate proration for any monthly fee
-    calculateProratedMonthlyFee(actualMonthlyFee, startDate, selectedDays = []) {
+    // Helper: count how many times the given weekday names occur between fromDay and toDay (inclusive) in a given month
+    countDayOccurrences(year, monthIndex, fromDay, toDay, dayNames) {
+        const dayNameToIndex = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+        const targetIndices = dayNames.map(d => dayNameToIndex[d]).filter(i => i !== undefined);
+        let count = 0;
+        for (let d = fromDay; d <= toDay; d++) {
+            const date = new Date(year, monthIndex, d);
+            if (targetIndices.includes(date.getDay())) count++;
+        }
+        return count;
+    }
+
+    // Calculate proration based on sessions, not calendar days.
+    // - sessionsPerWeek (number): for academic fees — sessions spread evenly across the month (2, 3, or 5)
+    // - selectedDays (array of day name strings): for extracurricular/test prep — counts actual weekday occurrences
+    calculateProratedMonthlyFee(actualMonthlyFee, startDate, { sessionsPerWeek = null, selectedDays = [] } = {}) {
         if (!startDate || actualMonthlyFee === 0) {
             return {
                 toPay: actualMonthlyFee,
@@ -1194,25 +1208,55 @@ class EnrollmentApp {
                 };
             }
             
-            // Starting from 7th onward: Calculate proration
+            // Starting from 7th onward: Calculate session-based proration
             const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-            
-            // Calculate days remaining from start date to end of month (inclusive)
-            const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
-            
-            // For monthly fees without specific days per week, prorate by actual days
-            const proratedAmount = Math.round((actualMonthlyFee / daysInMonth) * daysRemainingInMonth);
+
+            let totalSessions, remainingSessions;
+
+            if (sessionsPerWeek) {
+                // Academic: sessions spread evenly — no specific days known
+                // Total sessions in a full month = sessionsPerWeek × 4 weeks
+                // Remaining sessions = proportional share of days left in the month
+                totalSessions = sessionsPerWeek * CONFIG.CONSTANTS.WEEKS_PER_MONTH;
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                remainingSessions = Math.round(daysRemaining * sessionsPerWeek / 7);
+            } else if (selectedDays && selectedDays.length > 0) {
+                // Extracurricular / Test Prep: count actual occurrences of the chosen weekdays
+                totalSessions = this.countDayOccurrences(year, monthIndex, 1, daysInMonth, selectedDays);
+                remainingSessions = this.countDayOccurrences(year, monthIndex, dayOfMonth, daysInMonth, selectedDays);
+            } else {
+                // Fallback: calendar day proration (no session info available)
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                const proratedAmount = Math.round((actualMonthlyFee / daysInMonth) * daysRemaining);
+                const deduction = actualMonthlyFee - proratedAmount;
+                return {
+                    toPay: proratedAmount,
+                    deduction,
+                    dayOfMonth,
+                    explanation: `Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)}. Prorated for ${daysRemaining}/${daysInMonth} days`
+                };
+            }
+
+            // Guard: if no sessions exist in the full month, charge full fee
+            if (totalSessions === 0) {
+                return {
+                    toPay: actualMonthlyFee,
+                    deduction: 0,
+                    dayOfMonth,
+                    explanation: "Full month fee (no sessions found in month)"
+                };
+            }
+
+            const proratedAmount = Math.round((actualMonthlyFee / totalSessions) * remainingSessions);
             const deduction = actualMonthlyFee - proratedAmount;
-            
-            let explanation = `Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)}. Prorated from ₦${actualMonthlyFee.toLocaleString()} for ${daysRemainingInMonth}/${daysInMonth} days`;
-            
+
             return {
                 toPay: proratedAmount,
-                deduction: deduction,
-                daysInMonth: daysInMonth,
-                daysRemaining: daysRemainingInMonth,
-                dayOfMonth: dayOfMonth,
-                explanation: explanation
+                deduction,
+                dayOfMonth,
+                totalSessions,
+                remainingSessions,
+                explanation: `Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)}. Prorated: ${remainingSessions}/${totalSessions} sessions (₦${actualMonthlyFee.toLocaleString()} full month)`
             };
         } catch (error) {
             console.error('Proration calculation error:', error);
@@ -1233,9 +1277,9 @@ class EnrollmentApp {
         const monthlyHours = weeklyHours * CONFIG.CONSTANTS.WEEKS_PER_MONTH;
         const fullMonthFee = monthlyHours * ratePerHour;
         
-        // Apply proration if starting mid-month
+        // Apply proration based on actual session days remaining in the month
         if (startDate) {
-            const proration = this.calculateProratedMonthlyFee(fullMonthFee, startDate);
+            const proration = this.calculateProratedMonthlyFee(fullMonthFee, startDate, { selectedDays });
             return proration.toPay;
         }
         
@@ -1268,9 +1312,9 @@ class EnrollmentApp {
             // It's about frequency (once or twice per week)
         }
         
-        // Apply proration if starting mid-month
+        // Apply proration based on actual session days remaining in the month
         if (startDate) {
-            const proration = this.calculateProratedMonthlyFee(baseFee, startDate);
+            const proration = this.calculateProratedMonthlyFee(baseFee, startDate, { selectedDays });
             return proration.toPay;
         }
         
@@ -1332,12 +1376,12 @@ class EnrollmentApp {
                 
                 totalActualAcademicFee += studentActualAcademicFee;
                 
-                // FIX (Bug 1 & 3): Prorate this student's academic fee using their own start date.
-                // Previously, one "earliest start date" was used for the combined total of all students,
-                // so if Student A starts the 1st and Student B starts the 15th, Student B was never
-                // prorated. Now each student is handled independently, matching the same pattern
-                // already used correctly for extracurricular and test prep fees.
-                const studentAcademicProration = this.calculateProratedMonthlyFee(studentActualAcademicFee, startDate);
+                // Prorate per student using their own start date and session plan.
+                // Sessions per week is derived from the plan key ('twice'=2, 'three'=3, 'five'=5)
+                // and spread evenly across the month since no specific days are fixed for academic.
+                const sessionMap = { twice: 2, three: 3, five: 5 };
+                const sessionsPerWeek = sessionMap[sessions] || null;
+                const studentAcademicProration = this.calculateProratedMonthlyFee(studentActualAcademicFee, startDate, { sessionsPerWeek });
                 proratedAcademicTotal += studentAcademicProration.toPay;
                 prorationDeduction += studentAcademicProration.deduction;
                 if (studentAcademicProration.deduction > 0 && studentAcademicProration.explanation) {
