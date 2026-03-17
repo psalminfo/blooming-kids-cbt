@@ -1376,12 +1376,10 @@ class EnrollmentApp {
                 
                 totalActualAcademicFee += studentActualAcademicFee;
                 
-                // Prorate per student using their own start date and session plan.
-                // Sessions per week is derived from the plan key ('twice'=2, 'three'=3, 'five'=5)
-                // and spread evenly across the month since no specific days are fixed for academic.
-                const sessionMap = { twice: 2, three: 3, five: 5 };
-                const sessionsPerWeek = sessionMap[sessions] || null;
-                const studentAcademicProration = this.calculateProratedMonthlyFee(studentActualAcademicFee, startDate, { sessionsPerWeek });
+                // Prorate per student using their own start date and actual selected academic days.
+                // countDayOccurrences counts real weekday occurrences in the month — same logic
+                // already used for extracurricular and test prep.
+                const studentAcademicProration = this.calculateProratedMonthlyFee(studentActualAcademicFee, startDate, { selectedDays: selectedAcademicDays });
                 proratedAcademicTotal += studentAcademicProration.toPay;
                 prorationDeduction += studentAcademicProration.deduction;
                 if (studentAcademicProration.deduction > 0 && studentAcademicProration.explanation) {
