@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Record Merger — Blooming Kids House</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --green: #3fb950;
+    --green-dim: #1a4a25;
+    --amber: #d29922;
+    --amber-dim: #3d2c00;
+    --red: #f85149;
+    --red-dim: #3d0c09;
+    --blue: #58a6ff;
+    --blue-dim: #0d2340;
+    --purple: #bc8cff;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-dimmer: #484f58;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0 0 60px;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo-badge {
+    background: var(--green);
+    color: #000;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header p { font-size: 12px; color: var(--text-dim); margin-top: 2px; font-family: 'DM Mono', monospace; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .env-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid var(--amber);
+  }
+
+  /* MAIN */
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  /* STEP BAR */
+  .steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .step {
+    flex: 1;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dimmer);
+    border-right: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .step:last-child { border-right: none; }
+  .step.active { color: var(--text); background: var(--surface2); }
+  .step.done { color: var(--green); }
+  .step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .step.active .step-num { background: var(--blue); color: #000; }
+  .step.done .step-num { background: var(--green); color: #000; }
+
+  /* PANELS */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  .panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--blue); color: #000; }
+  .btn-primary:hover:not(:disabled) { background: #79c0ff; }
+  .btn-success { background: var(--green); color: #000; }
+  .btn-success:hover:not(:disabled) { background: #56d364; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
+
+  /* LOADING */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* STATS ROW */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .stat-val {
+    font-size: 28px;
+    font-weight: 800;
+    font-family: 'DM Mono', monospace;
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 6px;
+  }
+  .stat-val.green { color: var(--green); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.blue { color: var(--blue); }
+
+  /* DUPLICATE GROUP */
+  .dup-group {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .dup-group.selected-group { border-color: var(--amber); }
+  .dup-group.merged-group { border-color: var(--green); opacity: 0.6; }
+
+  .dup-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+  .dup-header:hover { background: var(--surface2); }
+  .dup-phone {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--purple);
+  }
+  .dup-count {
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+  .dup-names { font-size: 12px; color: var(--text-dim); margin-left: 4px; }
+  .dup-toggle { margin-left: auto; color: var(--text-dimmer); font-size: 12px; }
+
+  .dup-body { padding: 16px 18px; }
+
+  /* STUDENT ROW */
+  .student-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg);
+  }
+  .student-row:hover { border-color: var(--text-dimmer); }
+  .student-row.is-primary { border-color: var(--green); background: var(--green-dim); }
+  .student-row.is-secondary { border-color: var(--amber); background: var(--amber-dim); }
+
+  .radio-ring {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .radio-ring.filled { border-color: var(--green); background: var(--green); }
+  .radio-ring.filled::after {
+    content: '';
+    width: 6px; height: 6px;
+    background: #000;
+    border-radius: 50%;
+  }
+  .radio-ring.secondary { border-color: var(--amber); }
+
+  .student-info { flex: 1; }
+  .student-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .student-name { font-weight: 700; font-size: 15px; }
+  .tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+  .tag-primary { background: var(--green); color: #000; }
+  .tag-secondary { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber); }
+  .tag-merged { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
+
+  .student-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-family: 'DM Mono', monospace;
+  }
+  .meta-item { display: flex; align-items: center; gap: 5px; }
+  .meta-label { color: var(--text-dimmer); }
+
+  .merge-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .merge-hint { font-size: 11px; color: var(--text-dimmer); margin-left: auto; font-style: italic; }
+
+  /* PROGRESS */
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  /* LOG */
+  .log {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+  .log-ok { color: var(--green); }
+  .log-warn { color: var(--amber); }
+  .log-err { color: var(--red); }
+  .log-info { color: var(--blue); }
+
+  /* ALERT */
+  .alert {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert-warn { background: var(--amber-dim); border: 1px solid var(--amber); color: var(--amber); }
+  .alert-info { background: var(--blue-dim); border: 1px solid var(--blue); color: var(--blue); }
+  .alert-success { background: var(--green-dim); border: 1px solid var(--green); color: var(--green); }
+
+  /* EMPTY STATE */
+  .empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-dimmer);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--text-dim); margin-bottom: 8px; }
+
+  /* SEARCH */
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    align-items: center;
+  }
+  .search-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    padding: 9px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--blue); }
+  .search-input::placeholder { color: var(--text-dimmer); }
+
+  select.search-input { cursor: pointer; }
+
+  /* SECTION VIEW toggle */
+  #view-scan, #view-results { }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo-badge">BKH</span>
+  <div>
+    <h1>Student Record Merger</h1>
+    <p>Admin tool — detect and consolidate duplicate student records</p>
+  </div>
+  <div class="header-right">
+    <span class="env-badge" id="env-label">DETECTING ENV…</span>
+    <button class="btn btn-ghost" id="logout-btn" style="display:none">Sign out</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- STEP BAR -->
+  <div class="steps">
+    <div class="step active" id="step1"><div class="step-num">1</div> Scan Records</div>
+    <div class="step" id="step2"><div class="step-num">2</div> Review Duplicates</div>
+    <div class="step" id="step3"><div class="step-num">3</div> Merge & Fix</div>
+  </div>
+
+  <!-- AUTH GATE -->
+  <div id="auth-panel" class="panel">
+    <div class="panel-title">Authentication Required</div>
+    <div class="alert alert-warn">⚠️ This tool makes permanent changes to your database. You must be an admin to proceed.</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <input id="auth-email" type="email" class="search-input" placeholder="Admin email" style="max-width:280px;">
+      <input id="auth-pass" type="password" class="search-input" placeholder="Password" style="max-width:220px;">
+      <button class="btn btn-primary" id="auth-btn">Sign In</button>
+    </div>
+    <div id="auth-error" style="color:var(--red);font-size:12px;margin-top:10px;"></div>
+  </div>
+
+  <!-- MAIN TOOL (hidden until auth) -->
+  <div id="tool-panel" style="display:none">
+
+    <!-- STEP 1: SCAN -->
+    <div id="view-scan">
+      <div class="panel">
+        <div class="panel-title">Scan Settings</div>
+        <div class="alert alert-info">ℹ️ The scanner groups students by parent phone number. Same last-10 digits = potential duplicate. It also checks for very similar student names within a phone group.</div>
+        <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-primary" id="scan-btn">
+            <span class="spinner" style="display:none" id="scan-spin"></span>
+            🔍 Scan All Students
+          </button>
+          <span id="scan-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+        </div>
+        <div class="progress-bar" style="display:none" id="scan-progress-wrap">
+          <div class="progress-fill" id="scan-progress" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 & 3: RESULTS -->
+    <div id="view-results" style="display:none">
+
+      <!-- STATS -->
+      <div class="stats">
+        <div class="stat"><div class="stat-val blue" id="stat-total">–</div><div class="stat-label">Total Students</div></div>
+        <div class="stat"><div class="stat-val amber" id="stat-groups">–</div><div class="stat-label">Duplicate Groups</div></div>
+        <div class="stat"><div class="stat-val red" id="stat-dupes">–</div><div class="stat-label">Duplicate Docs</div></div>
+        <div class="stat"><div class="stat-val green" id="stat-merged">0</div><div class="stat-label">Merged So Far</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Duplicate Groups</div>
+        <div class="alert alert-warn">⚠️ For each group: click a row to mark it as <strong>Primary</strong> (the master record that stays). All others become secondaries. Then click <strong>Merge Group</strong>.</div>
+
+        <div class="search-bar">
+          <input type="search" class="search-input" id="filter-input" placeholder="Filter by name or phone…" style="max-width:320px;">
+          <select class="search-input" id="filter-status" style="max-width:180px;">
+            <option value="all">All groups</option>
+            <option value="pending">Pending only</option>
+            <option value="merged">Merged only</option>
+          </select>
+          <button class="btn btn-ghost" id="expand-all-btn" style="margin-left:auto;">Expand All</button>
+        </div>
+
+        <div id="dup-list"></div>
+      </div>
+
+      <!-- MERGE LOG -->
+      <div class="panel" id="log-panel" style="display:none">
+        <div class="panel-title">Merge Log</div>
+        <div class="log" id="merge-log"></div>
+        <div style="margin-top:14px;display:flex;gap:12px;">
+          <button class="btn btn-ghost" id="copy-log-btn">Copy Log</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</main>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<script>
+// ─── FIREBASE CONFIG (matches firebaseConfig.js) ─────────────────────────────
+const mainConfig = {
+  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+  authDomain: "bloomingkidsassessment.firebaseapp.com",
+  projectId: "bloomingkidsassessment",
+  storageBucket: "bloomingkidsassessment.appspot.com",
+  messagingSenderId: "238975054977",
+  appId: "1:238975054977:web:87c70b4db044998a204980"
+};
+const devConfig = {
+  apiKey: "AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",
+  authDomain: "blooming-kids-dev.firebaseapp.com",
+  projectId: "blooming-kids-dev",
+  storageBucket: "blooming-kids-dev.firebasestorage.app",
+  messagingSenderId: "336022609689",
+  appId: "1:336022609689:web:ad5a0a74dcac011f21ef88"
+};
+const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.includes('bkhdevelop');
+const cfg = isDev ? devConfig : mainConfig;
+firebase.initializeApp(cfg);
+const db   = firebase.firestore();
+const auth = firebase.auth();
+
+document.getElementById('env-label').textContent = isDev ? '🛠 DEV' : '🚀 PRODUCTION';
+document.getElementById('env-label').style.background = isDev ? 'var(--green-dim)' : 'var(--amber-dim)';
+document.getElementById('env-label').style.color = isDev ? 'var(--green)' : 'var(--amber)';
+document.getElementById('env-label').style.borderColor = isDev ? 'var(--green)' : 'var(--amber)';
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let allStudents = [];
+let dupGroups   = [];           // [{phone, ids:[...], students:[...], merged:false, primaryId:null}]
+let mergedCount = 0;
+let expandedAll = false;
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+auth.onAuthStateChanged(user => {
+  if (user) {
+    document.getElementById('auth-panel').style.display = 'none';
+    document.getElementById('tool-panel').style.display = 'block';
+    document.getElementById('logout-btn').style.display = 'flex';
+  } else {
+    document.getElementById('auth-panel').style.display = 'block';
+    document.getElementById('tool-panel').style.display = 'none';
+    document.getElementById('logout-btn').style.display = 'none';
+  }
+});
+
+document.getElementById('auth-btn').onclick = async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const err   = document.getElementById('auth-error');
+  err.textContent = '';
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch(e) {
+    err.textContent = e.message;
+  }
+};
+document.getElementById('logout-btn').onclick = () => auth.signOut();
+
+// ─── PHONE NORMALISE ─────────────────────────────────────────────────────────
+function normPhone(p) {
+  if (!p) return null;
+  const digits = String(p).replace(/\D/g,'');
+  if (digits.length < 7) return null;
+  return digits.slice(-10);
+}
+
+// ─── SCAN ─────────────────────────────────────────────────────────────────────
+document.getElementById('scan-btn').onclick = scanStudents;
+
+async function scanStudents() {
+  const btn  = document.getElementById('scan-btn');
+  const spin = document.getElementById('scan-spin');
+  const stat = document.getElementById('scan-status');
+  const wrap = document.getElementById('scan-progress-wrap');
+  const bar  = document.getElementById('scan-progress');
+
+  btn.disabled = true;
+  spin.style.display = 'inline-block';
+  wrap.style.display = 'block';
+  bar.style.width = '10%';
+  stat.textContent = 'Loading students…';
+
+  try {
+    const snap = await db.collection('students').get();
+    allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    bar.style.width = '40%';
+    stat.textContent = `Loaded ${allStudents.length} students. Grouping…`;
+
+    // Group by phone
+    const phoneMap = {};
+    allStudents.forEach(s => {
+      const p = normPhone(s.parentPhone);
+      if (!p) return;
+      if (!phoneMap[p]) phoneMap[p] = [];
+      phoneMap[p].push(s);
+    });
+    bar.style.width = '70%';
+
+    // Only groups with 2+ records
+    dupGroups = Object.entries(phoneMap)
+      .filter(([,arr]) => arr.length > 1)
+      .map(([phone, students]) => ({
+        phone,
+        students,
+        merged: false,
+        primaryId: null,
+        collapsed: true
+      }));
+
+    bar.style.width = '100%';
+    stat.textContent = `Done. Found ${dupGroups.length} duplicate groups.`;
+
+    updateStats();
+    renderGroups();
+
+    document.getElementById('view-scan').style.display = 'none';
+    document.getElementById('view-results').style.display = 'block';
+    setStep(2);
+
+  } catch(e) {
+    stat.textContent = '❌ Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    spin.style.display = 'none';
+    setTimeout(() => wrap.style.display = 'none', 1000);
+  }
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('stat-total').textContent  = allStudents.length;
+  document.getElementById('stat-groups').textContent = dupGroups.length;
+  const totalDupes = dupGroups.reduce((a, g) => a + Math.max(0, g.students.length - 1), 0);
+  document.getElementById('stat-dupes').textContent  = totalDupes;
+  document.getElementById('stat-merged').textContent = mergedCount;
+}
+
+// ─── RENDER GROUPS ────────────────────────────────────────────────────────────
+function renderGroups() {
+  const list      = document.getElementById('dup-list');
+  const filterVal = document.getElementById('filter-input').value.toLowerCase();
+  const statusFilter = document.getElementById('filter-status').value;
+
+  let visible = dupGroups.filter(g => {
+    if (statusFilter === 'pending' && g.merged) return false;
+    if (statusFilter === 'merged'  && !g.merged) return false;
+    if (filterVal) {
+      const names = g.students.map(s => (s.studentName||'').toLowerCase()).join(' ');
+      if (!names.includes(filterVal) && !g.phone.includes(filterVal)) return false;
+    }
+    return true;
+  });
+
+  if (visible.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No groups match your filter</div></div>`;
+    return;
+  }
+
+  list.innerHTML = visible.map((g, gi) => {
+    const gIdx = dupGroups.indexOf(g);
+    const names = [...new Set(g.students.map(s => s.studentName||'?'))].join(', ');
+    const collapsed = g.collapsed;
+
+    const rows = g.students.map((s, si) => {
+      const isPrimary   = g.primaryId === s.id;
+      const isSecondary = g.primaryId && g.primaryId !== s.id;
+      const cls = isPrimary ? 'is-primary' : isSecondary ? 'is-secondary' : '';
+      const radioClass = isPrimary ? 'filled' : isSecondary ? 'secondary' : '';
+      const tag = isPrimary
+        ? '<span class="tag tag-primary">PRIMARY</span>'
+        : isSecondary
+          ? '<span class="tag tag-secondary">SECONDARY</span>'
+          : '';
+      const alreadyMerged = s.primaryStudentId ? '<span class="tag tag-merged">ALREADY LINKED</span>' : '';
+      const hasUid = s.studentUid ? '🔑 Has Login' : '';
+      const subs = Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || '–');
+
+      return `
+        <div class="student-row ${cls}" onclick="selectPrimary(${gIdx}, '${s.id}')">
+          <div class="radio-ring ${radioClass}"></div>
+          <div class="student-info">
+            <div class="student-name-row">
+              <span class="student-name">${s.studentName || 'Unnamed'}</span>
+              ${tag}${alreadyMerged}
+              ${hasUid ? `<span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">${hasUid}</span>` : ''}
+            </div>
+            <div class="student-meta">
+              <span class="meta-item"><span class="meta-label">tutor:</span> ${s.tutorEmail || s.tutorName || '–'}</span>
+              <span class="meta-item"><span class="meta-label">subjects:</span> ${subs}</span>
+              <span class="meta-item"><span class="meta-label">grade:</span> ${s.grade || '–'}</span>
+              <span class="meta-item"><span class="meta-label">days:</span> ${s.days || '–'}</span>
+              <span class="meta-item"><span class="meta-label">id:</span> ${s.id.substring(0,10)}…</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const canMerge = g.primaryId && !g.merged;
+    const secondaryCount = g.students.length - 1;
+
+    return `
+      <div class="dup-group ${g.merged ? 'merged-group' : g.primaryId ? 'selected-group' : ''}" id="group-${gIdx}">
+        <div class="dup-header" onclick="toggleGroup(${gIdx})">
+          <span class="dup-phone">+…${g.phone.slice(-7)}</span>
+          <span class="dup-count">${g.students.length} records</span>
+          <span class="dup-names">${names}</span>
+          ${g.merged ? '<span class="tag tag-merged" style="margin-left:8px;">MERGED ✓</span>' : ''}
+          <span class="dup-toggle">${collapsed ? '▶ expand' : '▼ collapse'}</span>
+        </div>
+        ${!collapsed ? `
+        <div class="dup-body">
+          <p style="font-size:12px;color:var(--text-dimmer);margin-bottom:12px;">
+            Click a row to set it as the <strong style="color:var(--green)">Primary</strong> (master) record.
+            The tutor who teaches the student for the most subjects or has their login is usually best.
+          </p>
+          ${rows}
+          <div class="merge-actions">
+            <button class="btn btn-success" onclick="mergeGroup(${gIdx})" ${!canMerge ? 'disabled' : ''}>
+              ✨ Merge ${secondaryCount} duplicate${secondaryCount > 1 ? 's' : ''} into Primary
+            </button>
+            <button class="btn btn-ghost" onclick="clearSelection(${gIdx})">Clear Selection</button>
+            <span class="merge-hint">Primary keeps its ID · secondary docs are linked</span>
+          </div>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ─── INTERACTIONS ─────────────────────────────────────────────────────────────
+function toggleGroup(gIdx) {
+  dupGroups[gIdx].collapsed = !dupGroups[gIdx].collapsed;
+  renderGroups();
+}
+
+function selectPrimary(gIdx, studentId) {
+  if (dupGroups[gIdx].merged) return;
+  dupGroups[gIdx].primaryId = studentId;
+  renderGroups();
+}
+
+function clearSelection(gIdx) {
+  dupGroups[gIdx].primaryId = null;
+  renderGroups();
+}
+
+document.getElementById('expand-all-btn').onclick = () => {
+  expandedAll = !expandedAll;
+  dupGroups.forEach(g => g.collapsed = !expandedAll);
+  document.getElementById('expand-all-btn').textContent = expandedAll ? 'Collapse All' : 'Expand All';
+  renderGroups();
+};
+
+document.getElementById('filter-input').oninput = renderGroups;
+document.getElementById('filter-status').onchange = renderGroups;
+
+// ─── MERGE ────────────────────────────────────────────────────────────────────
+async function mergeGroup(gIdx) {
+  const g = dupGroups[gIdx];
+  if (!g.primaryId || g.merged) return;
+
+  const primaryId    = g.primaryId;
+  const secondaryIds = g.students.filter(s => s.id !== primaryId).map(s => s.id);
+  const primaryDoc   = g.students.find(s => s.id === primaryId);
+
+  document.getElementById('log-panel').style.display = 'block';
+  const log = document.getElementById('merge-log');
+
+  function addLog(msg, cls='') {
+    log.innerHTML += `<div class="${cls}">${msg}</div>`;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  addLog(`\n─── Merging group: ${g.phone} ───`, 'log-info');
+  addLog(`Primary: ${primaryDoc.studentName} (${primaryId})`, 'log-ok');
+  secondaryIds.forEach(id => {
+    const s = g.students.find(x => x.id === id);
+    addLog(`Secondary: ${s.studentName} (${id})`, 'log-warn');
+  });
+
+  try {
+    // 1. Merge subjects from all secondary docs into primary
+    const allSubjects = new Set(Array.isArray(primaryDoc.subjects) ? primaryDoc.subjects : []);
+    const allTutors   = [];
+
+    // Build tutors array — preserve each tutor's assignments
+    if (primaryDoc.tutorEmail) {
+      allTutors.push({
+        tutorEmail: primaryDoc.tutorEmail,
+        tutorName:  primaryDoc.tutorName  || '',
+        subjects:   Array.isArray(primaryDoc.subjects) ? primaryDoc.subjects : [],
+        days:       primaryDoc.days        || '',
+        studentFee: primaryDoc.studentFee  || 0
+      });
+    }
+
+    secondaryIds.forEach(id => {
+      const s = g.students.find(x => x.id === id);
+      if (s.tutorEmail && !allTutors.find(t => t.tutorEmail === s.tutorEmail)) {
+        allTutors.push({
+          tutorEmail: s.tutorEmail,
+          tutorName:  s.tutorName  || '',
+          subjects:   Array.isArray(s.subjects) ? s.subjects : [],
+          days:       s.days        || '',
+          studentFee: s.studentFee  || 0
+        });
+      }
+      (Array.isArray(s.subjects) ? s.subjects : []).forEach(sub => allSubjects.add(sub));
+    });
+
+    // 2. Update primary doc — add linkedStudentIds + merged subjects + tutors array
+    await db.collection('students').doc(primaryId).update({
+      linkedStudentIds: secondaryIds,
+      allSubjects:      Array.from(allSubjects),
+      tutors:           allTutors,
+      mergedAt:         firebase.firestore.FieldValue.serverTimestamp()
+    });
+    addLog(`✓ Updated primary doc with linkedStudentIds + tutors array`, 'log-ok');
+
+    // 3. Update each secondary doc — mark as merged
+    for (const secId of secondaryIds) {
+      const s = g.students.find(x => x.id === secId);
+      await db.collection('students').doc(secId).update({
+        primaryStudentId: primaryId,
+        isMergedRecord:   true,
+        mergedAt:         firebase.firestore.FieldValue.serverTimestamp()
+      });
+      addLog(`✓ Marked secondary doc ${s.studentName} (${secId.substring(0,10)}…) as merged`, 'log-ok');
+    }
+
+    // 4. Re-point all homework_assignments from secondary IDs → primary
+    const COLLECTIONS_TO_FIX = [
+      'homework_assignments',
+      'conversations',
+      'course_materials',
+      'daily_topics',
+      'student_results',
+      'student_notifications',
+      'recall_requests'
+    ];
+
+    for (const colName of COLLECTIONS_TO_FIX) {
+      let totalFixed = 0;
+      for (const secId of secondaryIds) {
+        try {
+          const q    = await db.collection(colName).where('studentId','==',secId).get();
+          if (q.empty) continue;
+          const batch = db.batch();
+          q.docs.forEach(d => batch.update(d.ref, { studentId: primaryId }));
+          await batch.commit();
+          totalFixed += q.docs.length;
+        } catch(e) {
+          addLog(`⚠ Could not fix ${colName} for ${secId}: ${e.message}`, 'log-warn');
+        }
+      }
+      if (totalFixed > 0) addLog(`✓ Fixed ${totalFixed} docs in ${colName}`, 'log-ok');
+    }
+
+    // 5. Fix conversations that use studentId differently (some use it as a direct field)
+    for (const secId of secondaryIds) {
+      try {
+        const q = await db.collection('conversations').where('studentId','==',secId).get();
+        if (!q.empty) {
+          const batch = db.batch();
+          q.docs.forEach(d => batch.update(d.ref, { studentId: primaryId }));
+          await batch.commit();
+          addLog(`✓ Fixed ${q.docs.length} conversation docs`, 'log-ok');
+        }
+      } catch(e) { /* already handled above */ }
+    }
+
+    g.merged    = true;
+    g.collapsed = true;
+    mergedCount++;
+    updateStats();
+    renderGroups();
+    setStep(3);
+    addLog(`\n✅ Group merged successfully.\n`, 'log-ok');
+
+  } catch(e) {
+    addLog(`❌ Merge failed: ${e.message}`, 'log-err');
+  }
+}
+
+// ─── COPY LOG ─────────────────────────────────────────────────────────────────
+document.getElementById('copy-log-btn').onclick = () => {
+  const log = document.getElementById('merge-log');
+  navigator.clipboard.writeText(log.innerText).then(() => {
+    document.getElementById('copy-log-btn').textContent = '✓ Copied!';
+    setTimeout(() => document.getElementById('copy-log-btn').textContent = 'Copy Log', 2000);
+  });
+};
+
+// ─── STEPS ────────────────────────────────────────────────────────────────────
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById(`step${i}`);
+    el.className = 'step ' + (i < n ? 'done' : i === n ? 'active' : '');
+  });
+}
+</script>
+</body>
+</html>
