@@ -696,10 +696,6 @@ function downloadPDF(){
   doc.text('Student Duplicate Review', W/2, y, {align:'center'});
   y+=6;
 
-  doc.setFontSize(9);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}   ·   ${visible.length} group${visible.length!==1?'s':''} flagged for review`, W/2, y, {align:'center'});
-  y+=5;
-
   // thin rule under heading
   doc.setDrawColor(0); doc.setLineWidth(0.4);
   doc.line(M, y, W-M, y);
