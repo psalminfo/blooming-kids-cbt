@@ -661,7 +661,20 @@ function renderReportGroups(){
 }
 
 // ─── PDF DOWNLOAD ──────────────────────────────────────────────────────────────
-document.getElementById('download-pdf-btn').onclick=downloadPDF;
+document.getElementById('download-pdf-btn').onclick = function(){
+  const btn = document.getElementById('download-pdf-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating…';
+  // Yield to browser first — avoids blocking the click handler
+  setTimeout(function(){
+    try { downloadPDF(); }
+    catch(e){ console.error('PDF error:', e); }
+    finally {
+      btn.disabled = false;
+      btn.textContent = '⬇ Download PDF';
+    }
+  }, 30);
+};
 
 function downloadPDF(){
   const {jsPDF}=window.jspdf;
