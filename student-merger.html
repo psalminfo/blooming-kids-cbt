@@ -3,457 +3,263 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Student Record Merger — Blooming Kids House</title>
+<title>Student Record Manager — Blooming Kids House</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<!-- jsPDF for PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface2: #21262d;
-    --border: #30363d;
-    --green: #3fb950;
-    --green-dim: #1a4a25;
-    --amber: #d29922;
-    --amber-dim: #3d2c00;
-    --red: #f85149;
-    --red-dim: #3d0c09;
-    --blue: #58a6ff;
-    --blue-dim: #0d2340;
-    --purple: #bc8cff;
-    --text: #e6edf3;
-    --text-dim: #8b949e;
-    --text-dimmer: #484f58;
-    --radius: 8px;
+    --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+    --green:#3fb950;--green-dim:#1a4a25;--amber:#d29922;--amber-dim:#3d2c00;
+    --red:#f85149;--red-dim:#3d0c09;--blue:#58a6ff;--blue-dim:#0d2340;
+    --purple:#bc8cff;--orange:#f0883e;--orange-dim:#3d1f00;
+    --text:#e6edf3;--text-dim:#8b949e;--text-dimmer:#484f58;--radius:8px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Sora', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 0 0 60px;
-  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:60px;}
 
   /* HEADER */
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 20px 32px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .logo-badge {
-    background: var(--green);
-    color: #000;
-    font-weight: 800;
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    letter-spacing: 1px;
-  }
-  header h1 { font-size: 18px; font-weight: 700; }
-  header p { font-size: 12px; color: var(--text-dim); margin-top: 2px; font-family: 'DM Mono', monospace; }
-  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  .env-badge {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 4px;
-    background: var(--amber-dim);
-    color: var(--amber);
-    border: 1px solid var(--amber);
-  }
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;}
+  .logo-badge{background:var(--green);color:#000;font-weight:800;font-size:11px;padding:3px 10px;border-radius:20px;letter-spacing:1px;}
+  header h1{font-size:17px;font-weight:700;}
+  header p{font-size:11px;color:var(--text-dim);margin-top:1px;font-family:'DM Mono',monospace;}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .env-badge{font-family:'DM Mono',monospace;font-size:11px;padding:3px 10px;border-radius:4px;background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
 
-  /* MAIN */
-  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  /* TABS */
+  .tab-bar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;}
+  .tab{padding:14px 22px;font-size:13px;font-weight:600;color:var(--text-dimmer);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;display:flex;align-items:center;gap:8px;}
+  .tab:hover{color:var(--text-dim);}
+  .tab.active{color:var(--text);border-bottom-color:var(--blue);}
 
-  /* STEP BAR */
-  .steps {
-    display: flex;
-    gap: 0;
-    margin-bottom: 40px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .step {
-    flex: 1;
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-dimmer);
-    border-right: 1px solid var(--border);
-    transition: all 0.2s;
-  }
-  .step:last-child { border-right: none; }
-  .step.active { color: var(--text); background: var(--surface2); }
-  .step.done { color: var(--green); }
-  .step-num {
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-  .step.active .step-num { background: var(--blue); color: #000; }
-  .step.done .step-num { background: var(--green); color: #000; }
+  main{max-width:1100px;margin:0 auto;padding:28px 22px;}
 
-  /* PANELS */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 28px;
-    margin-bottom: 24px;
-  }
-  .panel-title {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-bottom: 18px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .panel-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
+  /* PANEL */
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
+  .panel-title{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--text-dim);text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+  .panel-title::after{content:'';flex:1;height:1px;background:var(--border);}
 
   /* BUTTONS */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    border-radius: var(--radius);
-    font-family: 'Sora', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    transition: all 0.15s;
-  }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-primary { background: var(--blue); color: #000; }
-  .btn-primary:hover:not(:disabled) { background: #79c0ff; }
-  .btn-success { background: var(--green); color: #000; }
-  .btn-success:hover:not(:disabled) { background: #56d364; }
-  .btn-danger { background: var(--red); color: #fff; }
-  .btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
-  .btn-ghost {
-    background: transparent;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-  }
-  .btn-ghost:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-primary{background:var(--blue);color:#000;}
+  .btn-primary:hover:not(:disabled){background:#79c0ff;}
+  .btn-success{background:var(--green);color:#000;}
+  .btn-success:hover:not(:disabled){background:#56d364;}
+  .btn-orange{background:var(--orange);color:#000;}
+  .btn-orange:hover:not(:disabled){filter:brightness(1.1);}
+  .btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  .btn-ghost:hover:not(:disabled){border-color:var(--text-dim);color:var(--text);}
 
-  /* LOADING */
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2px solid transparent;
-    border-top-color: currentColor;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    display: inline-block;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner{width:16px;height:16px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
 
-  /* STATS ROW */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-  .stat {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px 20px;
-  }
-  .stat-val {
-    font-size: 28px;
-    font-weight: 800;
-    font-family: 'DM Mono', monospace;
-    line-height: 1;
-  }
-  .stat-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-top: 6px;
-  }
-  .stat-val.green { color: var(--green); }
-  .stat-val.amber { color: var(--amber); }
-  .stat-val.red { color: var(--red); }
-  .stat-val.blue { color: var(--blue); }
+  /* STATS */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+  .stat-val{font-size:26px;font-weight:800;font-family:'DM Mono',monospace;line-height:1;}
+  .stat-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;margin-top:5px;}
+  .green{color:var(--green);}.amber{color:var(--amber);}.red{color:var(--red);}.blue{color:var(--blue);}.orange{color:var(--orange);}
 
-  /* DUPLICATE GROUP */
-  .dup-group {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 16px;
-    overflow: hidden;
-    transition: border-color 0.2s;
-  }
-  .dup-group.selected-group { border-color: var(--amber); }
-  .dup-group.merged-group { border-color: var(--green); opacity: 0.6; }
+  /* CONFIDENCE BADGE */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-family:'DM Mono',monospace;padding:2px 9px;border-radius:10px;font-weight:500;letter-spacing:.3px;}
+  .badge-high{background:#3d0c09;color:#ff7b72;border:1px solid #f85149;}
+  .badge-medium{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
+  .badge-low{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue);}
 
-  .dup-header {
-    padding: 14px 18px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    user-select: none;
-  }
-  .dup-header:hover { background: var(--surface2); }
-  .dup-phone {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--purple);
-  }
-  .dup-count {
-    background: var(--amber-dim);
-    color: var(--amber);
-    border: 1px solid var(--amber);
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-family: 'DM Mono', monospace;
-  }
-  .dup-names { font-size: 12px; color: var(--text-dim); margin-left: 4px; }
-  .dup-toggle { margin-left: auto; color: var(--text-dimmer); font-size: 12px; }
+  /* GROUP CARD */
+  .group-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;}
+  .group-card.high-conf{border-left:3px solid var(--red);}
+  .group-card.med-conf{border-left:3px solid var(--amber);}
+  .group-card.low-conf{border-left:3px solid var(--blue);}
 
-  .dup-body { padding: 16px 18px; }
+  .group-header{padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .group-phone{font-family:'DM Mono',monospace;font-size:12px;color:var(--purple);}
+  .group-parent{font-size:12px;color:var(--text-dim);}
 
-  /* STUDENT ROW */
-  .student-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 14px;
-    border: 2px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: all 0.15s;
-    background: var(--bg);
-  }
-  .student-row:hover { border-color: var(--text-dimmer); }
-  .student-row.is-primary { border-color: var(--green); background: var(--green-dim); }
-  .student-row.is-secondary { border-color: var(--amber); background: var(--amber-dim); }
+  .student-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:0 16px 14px;}
+  .student-card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;}
+  .student-card-name{font-weight:700;font-size:14px;margin-bottom:6px;}
+  .student-card-meta{font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;line-height:1.9;}
+  .meta-key{color:var(--text-dimmer);}
 
-  .radio-ring {
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    flex-shrink: 0;
-    margin-top: 2px;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
-  }
-  .radio-ring.filled { border-color: var(--green); background: var(--green); }
-  .radio-ring.filled::after {
-    content: '';
-    width: 6px; height: 6px;
-    background: #000;
-    border-radius: 50%;
-  }
-  .radio-ring.secondary { border-color: var(--amber); }
-
-  .student-info { flex: 1; }
-  .student-name-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
-  }
-  .student-name { font-weight: 700; font-size: 15px; }
-  .tag {
-    font-size: 10px;
-    padding: 2px 7px;
-    border-radius: 10px;
-    font-family: 'DM Mono', monospace;
-    letter-spacing: 0.5px;
-    font-weight: 500;
-  }
-  .tag-primary { background: var(--green); color: #000; }
-  .tag-secondary { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber); }
-  .tag-merged { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
-
-  .student-meta {
-    font-size: 12px;
-    color: var(--text-dim);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    font-family: 'DM Mono', monospace;
-  }
-  .meta-item { display: flex; align-items: center; gap: 5px; }
-  .meta-label { color: var(--text-dimmer); }
-
-  .merge-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .merge-hint { font-size: 11px; color: var(--text-dimmer); margin-left: auto; font-style: italic; }
-
-  /* PROGRESS */
-  .progress-bar {
-    width: 100%;
-    height: 6px;
-    background: var(--surface2);
-    border-radius: 3px;
-    overflow: hidden;
-    margin: 12px 0;
-  }
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--green), var(--blue));
-    border-radius: 3px;
-    transition: width 0.3s ease;
-  }
-
-  /* LOG */
-  .log {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px 16px;
-    max-height: 200px;
-    overflow-y: auto;
-    line-height: 1.8;
-  }
-  .log-ok { color: var(--green); }
-  .log-warn { color: var(--amber); }
-  .log-err { color: var(--red); }
-  .log-info { color: var(--blue); }
-
-  /* ALERT */
-  .alert {
-    padding: 12px 16px;
-    border-radius: var(--radius);
-    font-size: 13px;
-    margin-bottom: 16px;
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-  }
-  .alert-warn { background: var(--amber-dim); border: 1px solid var(--amber); color: var(--amber); }
-  .alert-info { background: var(--blue-dim); border: 1px solid var(--blue); color: var(--blue); }
-  .alert-success { background: var(--green-dim); border: 1px solid var(--green); color: var(--green); }
-
-  /* EMPTY STATE */
-  .empty {
-    text-align: center;
-    padding: 48px 24px;
-    color: var(--text-dimmer);
-  }
-  .empty-icon { font-size: 48px; margin-bottom: 12px; }
-  .empty-title { font-size: 16px; font-weight: 600; color: var(--text-dim); margin-bottom: 8px; }
+  .reason-row{padding:8px 16px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .reason-text{font-size:11px;color:var(--text-dim);font-style:italic;}
 
   /* SEARCH */
-  .search-bar {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    align-items: center;
-  }
-  .search-input {
-    flex: 1;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
-    font-family: 'Sora', sans-serif;
-    font-size: 13px;
-    padding: 9px 14px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .search-input:focus { border-color: var(--blue); }
-  .search-input::placeholder { color: var(--text-dimmer); }
+  .search-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+  .s-input{flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Sora',sans-serif;font-size:13px;padding:8px 13px;outline:none;transition:border-color .15s;}
+  .s-input:focus{border-color:var(--blue);}
+  .s-input::placeholder{color:var(--text-dimmer);}
+  select.s-input{cursor:pointer;}
 
-  select.search-input { cursor: pointer; }
+  /* ALERT */
+  .alert{padding:11px 15px;border-radius:var(--radius);font-size:12px;margin-bottom:14px;display:flex;gap:9px;align-items:flex-start;}
+  .alert-info{background:var(--blue-dim);border:1px solid var(--blue);color:var(--blue);}
+  .alert-warn{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);}
 
-  /* SECTION VIEW toggle */
-  #view-scan, #view-results { }
+  /* PROGRESS */
+  .progress-bar{width:100%;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:10px 0;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:3px;transition:width .3s ease;}
+
+  /* EMPTY */
+  .empty{text-align:center;padding:44px 24px;color:var(--text-dimmer);}
+  .empty-icon{font-size:44px;margin-bottom:10px;}
+  .empty-title{font-size:15px;font-weight:600;color:var(--text-dim);margin-bottom:6px;}
+
+  /* AUTH */
+  #auth-panel{max-width:500px;margin:40px auto;}
+
+  /* MERGE TOOL styles (same as before) */
+  .steps{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:28px;}
+  .step{flex:1;padding:13px 18px;display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--text-dimmer);border-right:1px solid var(--border);transition:all .2s;}
+  .step:last-child{border-right:none;}
+  .step.active{color:var(--text);background:var(--surface2);}
+  .step.done{color:var(--green);}
+  .step-num{width:22px;height:22px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;flex-shrink:0;}
+  .step.active .step-num{background:var(--blue);color:#000;}
+  .step.done .step-num{background:var(--green);color:#000;}
+  .dup-group{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;transition:border-color .2s;}
+  .dup-group.selected-group{border-color:var(--amber);}
+  .dup-group.merged-group{border-color:var(--green);opacity:.6;}
+  .dup-header{padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--surface);border-bottom:1px solid var(--border);user-select:none;}
+  .dup-header:hover{background:var(--surface2);}
+  .dup-phone{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--purple);}
+  .dup-count{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);font-size:10px;padding:2px 7px;border-radius:10px;font-family:'DM Mono',monospace;}
+  .dup-names{font-size:12px;color:var(--text-dim);margin-left:2px;}
+  .dup-toggle{margin-left:auto;color:var(--text-dimmer);font-size:11px;}
+  .dup-body{padding:14px 16px;}
+  .student-row{display:flex;align-items:flex-start;gap:12px;padding:12px;border:2px solid var(--border);border-radius:6px;margin-bottom:9px;cursor:pointer;transition:all .15s;background:var(--bg);}
+  .student-row:hover{border-color:var(--text-dimmer);}
+  .student-row.is-primary{border-color:var(--green);background:var(--green-dim);}
+  .student-row.is-secondary{border-color:var(--amber);background:var(--amber-dim);}
+  .radio-ring{width:17px;height:17px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+  .radio-ring.filled{border-color:var(--green);background:var(--green);}
+  .radio-ring.filled::after{content:'';width:5px;height:5px;background:#000;border-radius:50%;}
+  .radio-ring.secondary{border-color:var(--amber);}
+  .student-info{flex:1;}
+  .student-name-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+  .student-name{font-weight:700;font-size:14px;}
+  .tag{font-size:10px;padding:2px 6px;border-radius:8px;font-family:'DM Mono',monospace;letter-spacing:.4px;font-weight:500;}
+  .tag-primary{background:var(--green);color:#000;}
+  .tag-secondary{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
+  .tag-merged{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue);}
+  .student-meta{font-size:11px;color:var(--text-dim);display:flex;flex-wrap:wrap;gap:12px;font-family:'DM Mono',monospace;}
+  .meta-item{display:flex;align-items:center;gap:4px;}
+  .meta-label{color:var(--text-dimmer);}
+  .merge-actions{display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap;}
+  .merge-hint{font-size:10px;color:var(--text-dimmer);margin-left:auto;font-style:italic;}
+  .log{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 15px;max-height:180px;overflow-y:auto;line-height:1.8;}
+  .log-ok{color:var(--green);}.log-warn{color:var(--amber);}.log-err{color:var(--red);}.log-info{color:var(--blue);}
 </style>
 </head>
 <body>
 
 <header>
   <span class="logo-badge">BKH</span>
-  <div>
-    <h1>Student Record Merger</h1>
-    <p>Admin tool — detect and consolidate duplicate student records</p>
-  </div>
+  <div><h1>Student Record Manager</h1><p>Review duplicates · Download PDF · Merge records</p></div>
   <div class="header-right">
-    <span class="env-badge" id="env-label">DETECTING ENV…</span>
+    <span class="env-badge" id="env-label">DETECTING…</span>
     <button class="btn btn-ghost" id="logout-btn" style="display:none">Sign out</button>
   </div>
 </header>
 
-<main>
-
-  <!-- STEP BAR -->
-  <div class="steps">
-    <div class="step active" id="step1"><div class="step-num">1</div> Scan Records</div>
-    <div class="step" id="step2"><div class="step-num">2</div> Review Duplicates</div>
-    <div class="step" id="step3"><div class="step-num">3</div> Merge & Fix</div>
-  </div>
-
-  <!-- AUTH GATE -->
-  <div id="auth-panel" class="panel">
-    <div class="panel-title">Authentication Required</div>
-    <div class="alert alert-warn">⚠️ This tool makes permanent changes to your database. You must be an admin to proceed.</div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;">
-      <input id="auth-email" type="email" class="search-input" placeholder="Admin email" style="max-width:280px;">
-      <input id="auth-pass" type="password" class="search-input" placeholder="Password" style="max-width:220px;">
-      <button class="btn btn-primary" id="auth-btn">Sign In</button>
+<!-- AUTH -->
+<div id="auth-wrap">
+  <main>
+    <div id="auth-panel" class="panel">
+      <div class="panel-title">Authentication Required</div>
+      <div class="alert alert-warn">⚠️ Admin login required — this tool modifies your database.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input id="auth-email" type="email" class="s-input" placeholder="Admin email" style="max-width:260px;">
+        <input id="auth-pass" type="password" class="s-input" placeholder="Password" style="max-width:200px;">
+        <button class="btn btn-primary" id="auth-btn">Sign In</button>
+      </div>
+      <div id="auth-error" style="color:var(--red);font-size:12px;margin-top:9px;"></div>
     </div>
-    <div id="auth-error" style="color:var(--red);font-size:12px;margin-top:10px;"></div>
+  </main>
+</div>
+
+<!-- MAIN TOOL -->
+<div id="tool-wrap" style="display:none">
+
+  <div class="tab-bar">
+    <div class="tab active" id="tab-report" onclick="switchTab('report')">📋 Review Report</div>
+    <div class="tab" id="tab-merge" onclick="switchTab('merge')">🔀 Merge Tool</div>
   </div>
 
-  <!-- MAIN TOOL (hidden until auth) -->
-  <div id="tool-panel" style="display:none">
+  <!-- ═══════════════════════════════════════════════════════
+       TAB 1: REVIEW REPORT
+  ═══════════════════════════════════════════════════════ -->
+  <div id="pane-report">
+  <main>
 
-    <!-- STEP 1: SCAN -->
+    <div class="panel">
+      <div class="panel-title">Generate Review Report</div>
+      <div class="alert alert-info">ℹ️ This scan only shows groups where student names are similar enough to be the same child. Different-named siblings under the same parent are automatically excluded. Download the PDF, give it to your staff to review before merging.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary" id="rpt-scan-btn">
+          <span class="spinner" style="display:none" id="rpt-spin"></span>
+          🔍 Scan Students
+        </button>
+        <span id="rpt-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+      </div>
+      <div class="progress-bar" style="display:none" id="rpt-progress-wrap">
+        <div class="progress-fill" id="rpt-progress" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="rpt-results" style="display:none">
+
+      <div class="stats">
+        <div class="stat"><div class="stat-val blue" id="rpt-stat-total">–</div><div class="stat-label">Total Students</div></div>
+        <div class="stat"><div class="stat-val red" id="rpt-stat-high">–</div><div class="stat-label">Very Likely Same</div></div>
+        <div class="stat"><div class="stat-val amber" id="rpt-stat-med">–</div><div class="stat-label">Possibly Same</div></div>
+        <div class="stat"><div class="stat-val blue" id="rpt-stat-low">–</div><div class="stat-label">Worth Checking</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Suspicious Groups</div>
+
+        <div class="search-row">
+          <input type="search" class="s-input" id="rpt-filter" placeholder="Filter by name or phone…" style="max-width:280px;">
+          <select class="s-input" id="rpt-conf-filter" style="max-width:200px;">
+            <option value="all">All confidence levels</option>
+            <option value="high">🔴 Very Likely Same Child</option>
+            <option value="medium">🟡 Possibly Same Child</option>
+            <option value="low">🔵 Worth Checking</option>
+          </select>
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <button class="btn btn-orange" id="download-pdf-btn">⬇ Download PDF</button>
+            <button class="btn btn-ghost" id="rpt-rescan-btn">Re-scan</button>
+          </div>
+        </div>
+
+        <div id="rpt-group-list"></div>
+      </div>
+
+    </div>
+  </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       TAB 2: MERGE TOOL
+  ═══════════════════════════════════════════════════════ -->
+  <div id="pane-merge" style="display:none">
+  <main>
+
+    <div class="steps">
+      <div class="step active" id="step1"><div class="step-num">1</div> Scan</div>
+      <div class="step" id="step2"><div class="step-num">2</div> Review</div>
+      <div class="step" id="step3"><div class="step-num">3</div> Merge</div>
+    </div>
+
     <div id="view-scan">
       <div class="panel">
-        <div class="panel-title">Scan Settings</div>
-        <div class="alert alert-info">ℹ️ The scanner groups students by parent phone number. Same last-10 digits = potential duplicate. It also checks for very similar student names within a phone group.</div>
-        <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;align-items:center;">
+        <div class="panel-title">Scan All Students</div>
+        <div class="alert alert-warn">⚠️ Complete the Review Report first so you know exactly which groups to merge.</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
           <button class="btn btn-primary" id="scan-btn">
             <span class="spinner" style="display:none" id="scan-spin"></span>
             🔍 Scan All Students
@@ -466,454 +272,673 @@
       </div>
     </div>
 
-    <!-- STEP 2 & 3: RESULTS -->
     <div id="view-results" style="display:none">
-
-      <!-- STATS -->
       <div class="stats">
         <div class="stat"><div class="stat-val blue" id="stat-total">–</div><div class="stat-label">Total Students</div></div>
         <div class="stat"><div class="stat-val amber" id="stat-groups">–</div><div class="stat-label">Duplicate Groups</div></div>
         <div class="stat"><div class="stat-val red" id="stat-dupes">–</div><div class="stat-label">Duplicate Docs</div></div>
         <div class="stat"><div class="stat-val green" id="stat-merged">0</div><div class="stat-label">Merged So Far</div></div>
       </div>
-
       <div class="panel">
-        <div class="panel-title">Duplicate Groups</div>
-        <div class="alert alert-warn">⚠️ For each group: click a row to mark it as <strong>Primary</strong> (the master record that stays). All others become secondaries. Then click <strong>Merge Group</strong>.</div>
-
-        <div class="search-bar">
-          <input type="search" class="search-input" id="filter-input" placeholder="Filter by name or phone…" style="max-width:320px;">
-          <select class="search-input" id="filter-status" style="max-width:180px;">
+        <div class="panel-title">All Phone Groups</div>
+        <div class="search-row">
+          <input type="search" class="s-input" id="filter-input" placeholder="Filter by name or phone…" style="max-width:280px;">
+          <select class="s-input" id="filter-status" style="max-width:180px;">
             <option value="all">All groups</option>
             <option value="pending">Pending only</option>
             <option value="merged">Merged only</option>
           </select>
           <button class="btn btn-ghost" id="expand-all-btn" style="margin-left:auto;">Expand All</button>
         </div>
-
         <div id="dup-list"></div>
       </div>
-
-      <!-- MERGE LOG -->
       <div class="panel" id="log-panel" style="display:none">
         <div class="panel-title">Merge Log</div>
         <div class="log" id="merge-log"></div>
-        <div style="margin-top:14px;display:flex;gap:12px;">
+        <div style="margin-top:12px;display:flex;gap:10px;">
           <button class="btn btn-ghost" id="copy-log-btn">Copy Log</button>
         </div>
       </div>
-
     </div>
 
+  </main>
   </div>
 
-</main>
+</div><!-- /tool-wrap -->
 
-<!-- Firebase SDKs -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
 <script>
-// ─── FIREBASE CONFIG (matches firebaseConfig.js) ─────────────────────────────
-const mainConfig = {
-  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-  authDomain: "bloomingkidsassessment.firebaseapp.com",
-  projectId: "bloomingkidsassessment",
-  storageBucket: "bloomingkidsassessment.appspot.com",
-  messagingSenderId: "238975054977",
-  appId: "1:238975054977:web:87c70b4db044998a204980"
-};
-const devConfig = {
-  apiKey: "AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",
-  authDomain: "blooming-kids-dev.firebaseapp.com",
-  projectId: "blooming-kids-dev",
-  storageBucket: "blooming-kids-dev.firebasestorage.app",
-  messagingSenderId: "336022609689",
-  appId: "1:336022609689:web:ad5a0a74dcac011f21ef88"
-};
-const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.includes('bkhdevelop');
-const cfg = isDev ? devConfig : mainConfig;
-firebase.initializeApp(cfg);
-const db   = firebase.firestore();
-const auth = firebase.auth();
+// ─── FIREBASE ─────────────────────────────────────────────────────────────────
+const mainCfg={apiKey:"AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",authDomain:"bloomingkidsassessment.firebaseapp.com",projectId:"bloomingkidsassessment",storageBucket:"bloomingkidsassessment.appspot.com",messagingSenderId:"238975054977",appId:"1:238975054977:web:87c70b4db044998a204980"};
+const devCfg={apiKey:"AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",authDomain:"blooming-kids-dev.firebaseapp.com",projectId:"blooming-kids-dev",storageBucket:"blooming-kids-dev.firebasestorage.app",messagingSenderId:"336022609689",appId:"1:336022609689:web:ad5a0a74dcac011f21ef88"};
+const isDev=location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.hostname.includes('bkhdevelop');
+firebase.initializeApp(isDev?devCfg:mainCfg);
+const db=firebase.firestore(), auth=firebase.auth();
 
-document.getElementById('env-label').textContent = isDev ? '🛠 DEV' : '🚀 PRODUCTION';
-document.getElementById('env-label').style.background = isDev ? 'var(--green-dim)' : 'var(--amber-dim)';
-document.getElementById('env-label').style.color = isDev ? 'var(--green)' : 'var(--amber)';
-document.getElementById('env-label').style.borderColor = isDev ? 'var(--green)' : 'var(--amber)';
+const envEl=document.getElementById('env-label');
+envEl.textContent=isDev?'🛠 DEV':'🚀 PRODUCTION';
+envEl.style.cssText=isDev?'background:var(--green-dim);color:var(--green);border-color:var(--green)':'background:var(--amber-dim);color:var(--amber);border-color:var(--amber)';
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let allStudents = [];
-let dupGroups   = [];           // [{phone, ids:[...], students:[...], merged:false, primaryId:null}]
-let mergedCount = 0;
-let expandedAll = false;
-
-// ─── AUTH ─────────────────────────────────────────────────────────────────────
-auth.onAuthStateChanged(user => {
-  if (user) {
-    document.getElementById('auth-panel').style.display = 'none';
-    document.getElementById('tool-panel').style.display = 'block';
-    document.getElementById('logout-btn').style.display = 'flex';
-  } else {
-    document.getElementById('auth-panel').style.display = 'block';
-    document.getElementById('tool-panel').style.display = 'none';
-    document.getElementById('logout-btn').style.display = 'none';
-  }
+// ─── AUTH ──────────────────────────────────────────────────────────────────────
+auth.onAuthStateChanged(u=>{
+  document.getElementById('auth-wrap').style.display = u ? 'none' : 'block';
+  document.getElementById('tool-wrap').style.display = u ? 'block' : 'none';
+  document.getElementById('logout-btn').style.display = u ? 'flex' : 'none';
 });
-
-document.getElementById('auth-btn').onclick = async () => {
-  const email = document.getElementById('auth-email').value.trim();
-  const pass  = document.getElementById('auth-pass').value;
-  const err   = document.getElementById('auth-error');
-  err.textContent = '';
-  try {
-    await auth.signInWithEmailAndPassword(email, pass);
-  } catch(e) {
-    err.textContent = e.message;
-  }
+document.getElementById('auth-btn').onclick=async()=>{
+  const e=document.getElementById('auth-email').value.trim();
+  const p=document.getElementById('auth-pass').value;
+  const err=document.getElementById('auth-error');
+  err.textContent='';
+  try{await auth.signInWithEmailAndPassword(e,p);}catch(ex){err.textContent=ex.message;}
 };
-document.getElementById('logout-btn').onclick = () => auth.signOut();
+document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
-// ─── PHONE NORMALISE ─────────────────────────────────────────────────────────
-function normPhone(p) {
-  if (!p) return null;
-  const digits = String(p).replace(/\D/g,'');
-  if (digits.length < 7) return null;
-  return digits.slice(-10);
+// ─── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(t){
+  ['report','merge'].forEach(id=>{
+    document.getElementById('tab-'+id).className='tab'+(id===t?' active':'');
+    document.getElementById('pane-'+id).style.display=id===t?'block':'none';
+  });
 }
 
-// ─── SCAN ─────────────────────────────────────────────────────────────────────
-document.getElementById('scan-btn').onclick = scanStudents;
+// ═══════════════════════════════════════════════════════════════════════════════
+// NAME SIMILARITY ENGINE
+// ═══════════════════════════════════════════════════════════════════════════════
 
-async function scanStudents() {
-  const btn  = document.getElementById('scan-btn');
-  const spin = document.getElementById('scan-spin');
-  const stat = document.getElementById('scan-status');
-  const wrap = document.getElementById('scan-progress-wrap');
-  const bar  = document.getElementById('scan-progress');
+function normName(n){
+  return (n||'').toLowerCase().trim().replace(/[^a-z\s]/g,'').replace(/\s+/g,' ');
+}
 
-  btn.disabled = true;
-  spin.style.display = 'inline-block';
-  wrap.style.display = 'block';
-  bar.style.width = '10%';
-  stat.textContent = 'Loading students…';
+function tokenise(n){
+  return normName(n).split(' ').filter(Boolean);
+}
 
-  try {
-    const snap = await db.collection('students').get();
-    allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    bar.style.width = '40%';
-    stat.textContent = `Loaded ${allStudents.length} students. Grouping…`;
+// Levenshtein distance (for catching typos like "Kayode" vs "Kayode")
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i===0?j:j===0?i:0));
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+    dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+function stringSimilarity(a,b){
+  a=normName(a); b=normName(b);
+  if(a===b) return 1;
+  const maxLen=Math.max(a.length,b.length);
+  if(maxLen===0) return 1;
+  return 1 - levenshtein(a,b)/maxLen;
+}
+
+// First-token (first name) comparison
+function firstNameMatch(a,b){
+  const ta=tokenise(a), tb=tokenise(b);
+  if(!ta.length||!tb.length) return 0;
+  return stringSimilarity(ta[0],tb[0]);
+}
+
+// Token overlap: how many tokens from A appear in B (handles reversed names)
+function tokenOverlap(a,b){
+  const ta=new Set(tokenise(a)), tb=new Set(tokenise(b));
+  if(!ta.size||!tb.size) return 0;
+  let shared=0;
+  ta.forEach(t=>{ if(tb.has(t)||[...tb].some(t2=>levenshtein(t,t2)<=1)) shared++; });
+  return shared/Math.max(ta.size,tb.size);
+}
+
+// One name is a subset of the other (e.g. "Kayode" inside "Kayode Adebisi")
+function isSubset(a,b){
+  const ta=tokenise(a), tb=tokenise(b);
+  if(!ta.length||!tb.length) return false;
+  const smaller=ta.length<=tb.length?ta:tb;
+  const larger =ta.length<=tb.length?tb:ta;
+  return smaller.every(t=>larger.some(t2=>t===t2||levenshtein(t,t2)<=1));
+}
+
+// Clearly different first names?  "Tunde" vs "Bayo" → siblings
+function clearlyDifferentFirstNames(a,b){
+  const fa=tokenise(a)[0]||'', fb=tokenise(b)[0]||'';
+  return fa!==fb && levenshtein(fa,fb)>2 && fa.length>2 && fb.length>2;
+}
+
+/**
+ * Returns {confidence:'high'|'medium'|'low'|'skip', reason:string}
+ * 'skip' means clearly different children — don't show in report.
+ */
+function assessPair(nameA, nameB){
+  if(!nameA||!nameB) return {confidence:'skip',reason:''};
+
+  // Identical after normalisation
+  if(normName(nameA)===normName(nameB))
+    return {confidence:'high', reason:'Names are identical'};
+
+  // Clearly different first names — siblings, skip
+  if(clearlyDifferentFirstNames(nameA,nameB))
+    return {confidence:'skip', reason:''};
+
+  const firstSim  = firstNameMatch(nameA,nameB);
+  const overlap   = tokenOverlap(nameA,nameB);
+  const subset    = isSubset(nameA,nameB);
+  const fullSim   = stringSimilarity(nameA,nameB);
+
+  // Very likely: same first name (≥0.85) + one is subset of other
+  if(firstSim>=0.85 && subset)
+    return {confidence:'high', reason:`Same first name — "${nameA}" appears to be a shorter version of "${nameB}" or vice versa`};
+
+  // Very likely: very high full similarity
+  if(fullSim>=0.88)
+    return {confidence:'high', reason:`Names are ${Math.round(fullSim*100)}% similar — likely a spelling variation`};
+
+  // Medium: good first name match + decent overlap
+  if(firstSim>=0.75 && overlap>=0.5)
+    return {confidence:'medium', reason:`First names are similar (${Math.round(firstSim*100)}% match) with ${Math.round(overlap*100)}% word overlap`};
+
+  // Medium: high token overlap (same words, different order)
+  if(overlap>=0.7)
+    return {confidence:'medium', reason:`Same words in different order — could be same child with name reversed`};
+
+  // Low: first name alone is similar but not much else
+  if(firstSim>=0.7)
+    return {confidence:'low', reason:`First names are similar (${Math.round(firstSim*100)}% match) — worth checking`};
+
+  // Low: moderate full similarity
+  if(fullSim>=0.65)
+    return {confidence:'low', reason:`Names are moderately similar (${Math.round(fullSim*100)}%) — could be same child`};
+
+  return {confidence:'skip', reason:''};
+}
+
+// For a GROUP of names, find the best (highest) confidence across all pairs
+function assessGroup(students){
+  const names=students.map(s=>s.studentName||'');
+  let best=null;
+  for(let i=0;i<names.length;i++){
+    for(let j=i+1;j<names.length;j++){
+      const r=assessPair(names[i],names[j]);
+      if(r.confidence==='skip') continue;
+      const order={high:3,medium:2,low:1};
+      if(!best||order[r.confidence]>order[best.confidence])
+        best={...r,nameA:names[i],nameB:names[j]};
+    }
+  }
+  return best; // null means skip whole group
+}
+
+function normPhone(p){
+  if(!p) return null;
+  const d=String(p).replace(/\D/g,'');
+  return d.length<7?null:d.slice(-10);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 1: REVIEW REPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+let reportGroups=[];
+let allStudentsCache=[];
+
+document.getElementById('rpt-scan-btn').onclick=runReportScan;
+document.getElementById('rpt-rescan-btn').onclick=runReportScan;
+document.getElementById('rpt-filter').oninput=renderReportGroups;
+document.getElementById('rpt-conf-filter').onchange=renderReportGroups;
+
+async function runReportScan(){
+  const btn=document.getElementById('rpt-scan-btn');
+  const spin=document.getElementById('rpt-spin');
+  const stat=document.getElementById('rpt-status');
+  const wrap=document.getElementById('rpt-progress-wrap');
+  const bar=document.getElementById('rpt-progress');
+
+  btn.disabled=true; spin.style.display='inline-block';
+  wrap.style.display='block'; bar.style.width='10%';
+  stat.textContent='Loading students…';
+
+  try{
+    const snap=await db.collection('students').get();
+    allStudentsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    bar.style.width='50%';
+    stat.textContent=`Loaded ${allStudentsCache.length} students. Analysing names…`;
 
     // Group by phone
-    const phoneMap = {};
-    allStudents.forEach(s => {
-      const p = normPhone(s.parentPhone);
-      if (!p) return;
-      if (!phoneMap[p]) phoneMap[p] = [];
+    const phoneMap={};
+    allStudentsCache.forEach(s=>{
+      const p=normPhone(s.parentPhone);
+      if(!p) return;
+      if(!phoneMap[p]) phoneMap[p]=[];
       phoneMap[p].push(s);
     });
-    bar.style.width = '70%';
+    bar.style.width='75%';
 
-    // Only groups with 2+ records
-    dupGroups = Object.entries(phoneMap)
-      .filter(([,arr]) => arr.length > 1)
-      .map(([phone, students]) => ({
-        phone,
-        students,
-        merged: false,
-        primaryId: null,
-        collapsed: true
-      }));
+    // Filter: only groups where 2+ students AND name similarity passes
+    reportGroups=[];
+    Object.entries(phoneMap).forEach(([phone,students])=>{
+      if(students.length<2) return;
+      const assessment=assessGroup(students);
+      if(!assessment) return; // all name pairs are clearly different siblings
+      reportGroups.push({phone,students,assessment});
+    });
 
-    bar.style.width = '100%';
-    stat.textContent = `Done. Found ${dupGroups.length} duplicate groups.`;
+    // Sort: high first, then medium, then low
+    const order={high:3,medium:2,low:1};
+    reportGroups.sort((a,b)=>order[b.assessment.confidence]-order[a.assessment.confidence]);
 
-    updateStats();
-    renderGroups();
+    bar.style.width='100%';
+    stat.textContent=`Found ${reportGroups.length} groups needing review.`;
 
-    document.getElementById('view-scan').style.display = 'none';
-    document.getElementById('view-results').style.display = 'block';
-    setStep(2);
+    updateReportStats();
+    renderReportGroups();
+    document.getElementById('rpt-results').style.display='block';
 
-  } catch(e) {
-    stat.textContent = '❌ Error: ' + e.message;
-  } finally {
-    btn.disabled = false;
-    spin.style.display = 'none';
-    setTimeout(() => wrap.style.display = 'none', 1000);
+  }catch(e){
+    stat.textContent='❌ Error: '+e.message;
+  }finally{
+    btn.disabled=false; spin.style.display='none';
+    setTimeout(()=>wrap.style.display='none',1000);
   }
 }
 
-// ─── STATS ────────────────────────────────────────────────────────────────────
-function updateStats() {
-  document.getElementById('stat-total').textContent  = allStudents.length;
-  document.getElementById('stat-groups').textContent = dupGroups.length;
-  const totalDupes = dupGroups.reduce((a, g) => a + Math.max(0, g.students.length - 1), 0);
-  document.getElementById('stat-dupes').textContent  = totalDupes;
-  document.getElementById('stat-merged').textContent = mergedCount;
+function updateReportStats(){
+  document.getElementById('rpt-stat-total').textContent=allStudentsCache.length;
+  document.getElementById('rpt-stat-high').textContent=reportGroups.filter(g=>g.assessment.confidence==='high').length;
+  document.getElementById('rpt-stat-med').textContent=reportGroups.filter(g=>g.assessment.confidence==='medium').length;
+  document.getElementById('rpt-stat-low').textContent=reportGroups.filter(g=>g.assessment.confidence==='low').length;
 }
 
-// ─── RENDER GROUPS ────────────────────────────────────────────────────────────
-function renderGroups() {
-  const list      = document.getElementById('dup-list');
-  const filterVal = document.getElementById('filter-input').value.toLowerCase();
-  const statusFilter = document.getElementById('filter-status').value;
+function renderReportGroups(){
+  const list=document.getElementById('rpt-group-list');
+  const filterVal=document.getElementById('rpt-filter').value.toLowerCase();
+  const confFilter=document.getElementById('rpt-conf-filter').value;
 
-  let visible = dupGroups.filter(g => {
-    if (statusFilter === 'pending' && g.merged) return false;
-    if (statusFilter === 'merged'  && !g.merged) return false;
-    if (filterVal) {
-      const names = g.students.map(s => (s.studentName||'').toLowerCase()).join(' ');
-      if (!names.includes(filterVal) && !g.phone.includes(filterVal)) return false;
+  let visible=reportGroups.filter(g=>{
+    if(confFilter!=='all' && g.assessment.confidence!==confFilter) return false;
+    if(filterVal){
+      const names=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');
+      if(!names.includes(filterVal)&&!g.phone.includes(filterVal)) return false;
     }
     return true;
   });
 
-  if (visible.length === 0) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No groups match your filter</div></div>`;
+  if(!visible.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No groups match</div></div>`;
     return;
   }
 
-  list.innerHTML = visible.map((g, gi) => {
-    const gIdx = dupGroups.indexOf(g);
-    const names = [...new Set(g.students.map(s => s.studentName||'?'))].join(', ');
-    const collapsed = g.collapsed;
+  const badgeMap={
+    high:`<span class="badge badge-high">🔴 Very Likely Same Child</span>`,
+    medium:`<span class="badge badge-medium">🟡 Possibly Same Child</span>`,
+    low:`<span class="badge badge-low">🔵 Worth Checking</span>`
+  };
+  const confClass={high:'high-conf',medium:'med-conf',low:'low-conf'};
 
-    const rows = g.students.map((s, si) => {
-      const isPrimary   = g.primaryId === s.id;
-      const isSecondary = g.primaryId && g.primaryId !== s.id;
-      const cls = isPrimary ? 'is-primary' : isSecondary ? 'is-secondary' : '';
-      const radioClass = isPrimary ? 'filled' : isSecondary ? 'secondary' : '';
-      const tag = isPrimary
-        ? '<span class="tag tag-primary">PRIMARY</span>'
-        : isSecondary
-          ? '<span class="tag tag-secondary">SECONDARY</span>'
-          : '';
-      const alreadyMerged = s.primaryStudentId ? '<span class="tag tag-merged">ALREADY LINKED</span>' : '';
-      const hasUid = s.studentUid ? '🔑 Has Login' : '';
-      const subs = Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || '–');
-
+  list.innerHTML=visible.map((g,i)=>{
+    const cards=g.students.map(s=>{
+      const subs=Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–');
+      const hasLogin=s.studentUid?'🔑 Has Login':'No Login';
       return `
-        <div class="student-row ${cls}" onclick="selectPrimary(${gIdx}, '${s.id}')">
-          <div class="radio-ring ${radioClass}"></div>
-          <div class="student-info">
-            <div class="student-name-row">
-              <span class="student-name">${s.studentName || 'Unnamed'}</span>
-              ${tag}${alreadyMerged}
-              ${hasUid ? `<span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">${hasUid}</span>` : ''}
-            </div>
-            <div class="student-meta">
-              <span class="meta-item"><span class="meta-label">tutor:</span> ${s.tutorEmail || s.tutorName || '–'}</span>
-              <span class="meta-item"><span class="meta-label">subjects:</span> ${subs}</span>
-              <span class="meta-item"><span class="meta-label">grade:</span> ${s.grade || '–'}</span>
-              <span class="meta-item"><span class="meta-label">days:</span> ${s.days || '–'}</span>
-              <span class="meta-item"><span class="meta-label">id:</span> ${s.id.substring(0,10)}…</span>
-            </div>
+        <div class="student-card">
+          <div class="student-card-name">${s.studentName||'Unnamed'}</div>
+          <div class="student-card-meta">
+            <div><span class="meta-key">Tutor: </span>${s.tutorEmail||s.tutorName||'–'}</div>
+            <div><span class="meta-key">Subjects: </span>${subs}</div>
+            <div><span class="meta-key">Grade: </span>${s.grade||'–'} &nbsp;·&nbsp; <span class="meta-key">Days: </span>${s.days||'–'}</div>
+            <div><span class="meta-key">Parent: </span>${s.parentName||'–'}</div>
+            <div><span class="meta-key">Login: </span>${hasLogin}</div>
+            <div><span class="meta-key">Doc ID: </span>${s.id.substring(0,12)}…</div>
           </div>
         </div>`;
     }).join('');
 
-    const canMerge = g.primaryId && !g.merged;
-    const secondaryCount = g.students.length - 1;
-
     return `
-      <div class="dup-group ${g.merged ? 'merged-group' : g.primaryId ? 'selected-group' : ''}" id="group-${gIdx}">
-        <div class="dup-header" onclick="toggleGroup(${gIdx})">
-          <span class="dup-phone">+…${g.phone.slice(-7)}</span>
-          <span class="dup-count">${g.students.length} records</span>
-          <span class="dup-names">${names}</span>
-          ${g.merged ? '<span class="tag tag-merged" style="margin-left:8px;">MERGED ✓</span>' : ''}
-          <span class="dup-toggle">${collapsed ? '▶ expand' : '▼ collapse'}</span>
+      <div class="group-card ${confClass[g.assessment.confidence]}">
+        <div class="group-header">
+          ${badgeMap[g.assessment.confidence]}
+          <span class="group-phone">+…${g.phone.slice(-7)}</span>
+          <span class="group-parent">${g.students[0]?.parentName||''}</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--text-dimmer);font-family:'DM Mono',monospace;">${g.students.length} records</span>
         </div>
-        ${!collapsed ? `
-        <div class="dup-body">
-          <p style="font-size:12px;color:var(--text-dimmer);margin-bottom:12px;">
-            Click a row to set it as the <strong style="color:var(--green)">Primary</strong> (master) record.
-            The tutor who teaches the student for the most subjects or has their login is usually best.
-          </p>
-          ${rows}
-          <div class="merge-actions">
-            <button class="btn btn-success" onclick="mergeGroup(${gIdx})" ${!canMerge ? 'disabled' : ''}>
-              ✨ Merge ${secondaryCount} duplicate${secondaryCount > 1 ? 's' : ''} into Primary
-            </button>
-            <button class="btn btn-ghost" onclick="clearSelection(${gIdx})">Clear Selection</button>
-            <span class="merge-hint">Primary keeps its ID · secondary docs are linked</span>
-          </div>
-        </div>` : ''}
+        <div class="reason-row">
+          <span style="font-size:10px;color:var(--text-dimmer);">REASON:</span>
+          <span class="reason-text">${g.assessment.reason}</span>
+        </div>
+        <div class="student-cards">${cards}</div>
       </div>`;
   }).join('');
 }
 
-// ─── INTERACTIONS ─────────────────────────────────────────────────────────────
-function toggleGroup(gIdx) {
-  dupGroups[gIdx].collapsed = !dupGroups[gIdx].collapsed;
-  renderGroups();
-}
+// ─── PDF DOWNLOAD ──────────────────────────────────────────────────────────────
+document.getElementById('download-pdf-btn').onclick=downloadPDF;
 
-function selectPrimary(gIdx, studentId) {
-  if (dupGroups[gIdx].merged) return;
-  dupGroups[gIdx].primaryId = studentId;
-  renderGroups();
-}
+function downloadPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth();
+  const confFilter=document.getElementById('rpt-conf-filter').value;
+  const filterVal=document.getElementById('rpt-filter').value.toLowerCase();
 
-function clearSelection(gIdx) {
-  dupGroups[gIdx].primaryId = null;
-  renderGroups();
-}
-
-document.getElementById('expand-all-btn').onclick = () => {
-  expandedAll = !expandedAll;
-  dupGroups.forEach(g => g.collapsed = !expandedAll);
-  document.getElementById('expand-all-btn').textContent = expandedAll ? 'Collapse All' : 'Expand All';
-  renderGroups();
-};
-
-document.getElementById('filter-input').oninput = renderGroups;
-document.getElementById('filter-status').onchange = renderGroups;
-
-// ─── MERGE ────────────────────────────────────────────────────────────────────
-async function mergeGroup(gIdx) {
-  const g = dupGroups[gIdx];
-  if (!g.primaryId || g.merged) return;
-
-  const primaryId    = g.primaryId;
-  const secondaryIds = g.students.filter(s => s.id !== primaryId).map(s => s.id);
-  const primaryDoc   = g.students.find(s => s.id === primaryId);
-
-  document.getElementById('log-panel').style.display = 'block';
-  const log = document.getElementById('merge-log');
-
-  function addLog(msg, cls='') {
-    log.innerHTML += `<div class="${cls}">${msg}</div>`;
-    log.scrollTop = log.scrollHeight;
-  }
-
-  addLog(`\n─── Merging group: ${g.phone} ───`, 'log-info');
-  addLog(`Primary: ${primaryDoc.studentName} (${primaryId})`, 'log-ok');
-  secondaryIds.forEach(id => {
-    const s = g.students.find(x => x.id === id);
-    addLog(`Secondary: ${s.studentName} (${id})`, 'log-warn');
+  let visible=reportGroups.filter(g=>{
+    if(confFilter!=='all'&&g.assessment.confidence!==confFilter) return false;
+    if(filterVal){
+      const names=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');
+      if(!names.includes(filterVal)&&!g.phone.includes(filterVal)) return false;
+    }
+    return true;
   });
 
-  try {
-    // 1. Merge subjects from all secondary docs into primary
-    const allSubjects = new Set(Array.isArray(primaryDoc.subjects) ? primaryDoc.subjects : []);
-    const allTutors   = [];
+  // COVER
+  doc.setFillColor(13,17,23); doc.rect(0,0,W,297,'F');
+  doc.setFillColor(26,74,37); doc.rect(0,0,W,42,'F');
+  doc.setFontSize(20); doc.setTextColor(63,185,80); doc.setFont('helvetica','bold');
+  doc.text('Blooming Kids House',W/2,18,{align:'center'});
+  doc.setFontSize(13); doc.setTextColor(230,237,243);
+  doc.text('Student Duplicate Review Report',W/2,28,{align:'center'});
+  doc.setFontSize(9); doc.setTextColor(139,148,158);
+  doc.text(`Generated: ${new Date().toLocaleString()}  ·  Filter: ${confFilter==='all'?'All Levels':confFilter}  ·  ${visible.length} groups`,W/2,36,{align:'center'});
 
-    // Build tutors array — preserve each tutor's assignments
-    if (primaryDoc.tutorEmail) {
-      allTutors.push({
-        tutorEmail: primaryDoc.tutorEmail,
-        tutorName:  primaryDoc.tutorName  || '',
-        subjects:   Array.isArray(primaryDoc.subjects) ? primaryDoc.subjects : [],
-        days:       primaryDoc.days        || '',
-        studentFee: primaryDoc.studentFee  || 0
-      });
-    }
+  // LEGEND
+  doc.setFontSize(9); doc.setTextColor(230,237,243); doc.setFont('helvetica','bold');
+  doc.text('HOW TO USE THIS REPORT',14,52);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(139,148,158);
+  const legend=[
+    '🔴 VERY LIKELY SAME CHILD — Names are identical or one is a short form of the other. Almost certainly the same student.',
+    '🟡 POSSIBLY SAME CHILD — First names match but full names differ. Check with the parent or tutor to confirm.',
+    '🔵 WORTH CHECKING — Some similarity detected. May be same child or just a coincidence.',
+    '',
+    'Instructions: Review each group below. Circle groups that ARE the same child. Cross out groups that are siblings.',
+    'Hand this to the admin who will do the merging in the system.'
+  ];
+  let ly=58;
+  legend.forEach(l=>{doc.text(l,14,ly,{maxWidth:W-28}); ly+=l?5:3;});
 
-    secondaryIds.forEach(id => {
-      const s = g.students.find(x => x.id === id);
-      if (s.tutorEmail && !allTutors.find(t => t.tutorEmail === s.tutorEmail)) {
-        allTutors.push({
-          tutorEmail: s.tutorEmail,
-          tutorName:  s.tutorName  || '',
-          subjects:   Array.isArray(s.subjects) ? s.subjects : [],
-          days:       s.days        || '',
-          studentFee: s.studentFee  || 0
-        });
-      }
-      (Array.isArray(s.subjects) ? s.subjects : []).forEach(sub => allSubjects.add(sub));
+  // SUMMARY BOX
+  doc.setFillColor(22,27,34);
+  doc.roundedRect(14,ly+2,W-28,16,2,2,'F');
+  doc.setFontSize(8); doc.setTextColor(230,237,243); doc.setFont('helvetica','bold');
+  doc.text(`Total Students Scanned: ${allStudentsCache.length}`,20,ly+9);
+  const high=reportGroups.filter(g=>g.assessment.confidence==='high').length;
+  const med=reportGroups.filter(g=>g.assessment.confidence==='medium').length;
+  const low=reportGroups.filter(g=>g.assessment.confidence==='low').length;
+  doc.setTextColor(248,81,73); doc.text(`🔴 Very Likely: ${high}`,70,ly+9);
+  doc.setTextColor(210,153,34); doc.text(`🟡 Possibly: ${med}`,110,ly+9);
+  doc.setTextColor(88,166,255); doc.text(`🔵 Check: ${low}`,145,ly+9);
+  ly+=22;
+
+  const confLabel={high:'🔴 VERY LIKELY SAME CHILD',medium:'🟡 POSSIBLY SAME CHILD',low:'🔵 WORTH CHECKING'};
+  const confRGB={high:[248,81,73],medium:[210,153,34],low:[88,166,255]};
+
+  visible.forEach((g,gi)=>{
+    if(ly>250){doc.addPage(); doc.setFillColor(13,17,23); doc.rect(0,0,W,297,'F'); ly=18;}
+
+    // Group header bar
+    const rgb=confRGB[g.assessment.confidence];
+    doc.setFillColor(22,27,34);
+    doc.rect(14,ly,W-28,8,'F');
+    doc.setDrawColor(...rgb);
+    doc.rect(14,ly,3,8,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.setTextColor(...rgb);
+    doc.text(confLabel[g.assessment.confidence],20,ly+5.5);
+    doc.setTextColor(188,140,255);
+    doc.text(`Phone: +…${g.phone.slice(-7)}`,95,ly+5.5);
+    doc.setTextColor(139,148,158);
+    doc.text(`Parent: ${g.students[0]?.parentName||'N/A'}`,130,ly+5.5);
+    // Checkbox for staff
+    doc.setDrawColor(100,110,120); doc.setFillColor(13,17,23);
+    doc.rect(W-20,ly+1.5,5,5);
+    doc.setFontSize(6); doc.setTextColor(139,148,158);
+    doc.text('MERGE?',W-21,ly+9.5);
+    ly+=12;
+
+    // Reason
+    doc.setFontSize(7); doc.setFont('helvetica','italic'); doc.setTextColor(139,148,158);
+    doc.text(`Reason: ${g.assessment.reason}`,18,ly); ly+=6;
+
+    // Student table
+    const tableData=g.students.map(s=>([
+      s.studentName||'–',
+      s.tutorEmail||s.tutorName||'–',
+      Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–'),
+      s.grade||'–',
+      s.days||'–',
+      s.studentUid?'✓ Yes':'No'
+    ]));
+
+    doc.autoTable({
+      startY:ly,
+      head:[['Student Name','Tutor','Subjects','Grade','Days','Has Login']],
+      body:tableData,
+      margin:{left:14,right:14},
+      styles:{
+        fontSize:8, cellPadding:2.5,
+        textColor:[230,237,243], fillColor:[22,27,34],
+        lineColor:[48,54,61], lineWidth:0.3
+      },
+      headStyles:{fillColor:[33,38,45],textColor:[139,148,158],fontStyle:'bold',fontSize:7},
+      alternateRowStyles:{fillColor:[13,17,23]},
+      columnStyles:{0:{fontStyle:'bold',cellWidth:40},1:{cellWidth:42},2:{cellWidth:42},3:{cellWidth:13},4:{cellWidth:13},5:{cellWidth:18}},
+      theme:'grid'
     });
 
-    // 2. Update primary doc — add linkedStudentIds + merged subjects + tutors array
-    await db.collection('students').doc(primaryId).update({
-      linkedStudentIds: secondaryIds,
-      allSubjects:      Array.from(allSubjects),
-      tutors:           allTutors,
-      mergedAt:         firebase.firestore.FieldValue.serverTimestamp()
+    ly=doc.lastAutoTable.finalY+10;
+
+    // Separator
+    doc.setDrawColor(48,54,61); doc.line(14,ly-4,W-14,ly-4);
+  });
+
+  // Footer on each page
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFontSize(7); doc.setTextColor(72,79,88); doc.setFont('helvetica','normal');
+    doc.text(`Blooming Kids House — Confidential — Page ${i} of ${pageCount}`,W/2,292,{align:'center'});
+  }
+
+  const dateStr=new Date().toISOString().slice(0,10);
+  doc.save(`BKH-Duplicate-Review-${dateStr}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 2: MERGE TOOL (same logic as before)
+// ═══════════════════════════════════════════════════════════════════════════════
+let allStudents=[], dupGroups=[], mergedCount=0, expandedAll=false;
+
+document.getElementById('scan-btn').onclick=scanStudents;
+
+async function scanStudents(){
+  const btn=document.getElementById('scan-btn');
+  const spin=document.getElementById('scan-spin');
+  const stat=document.getElementById('scan-status');
+  const wrap=document.getElementById('scan-progress-wrap');
+  const bar=document.getElementById('scan-progress');
+
+  btn.disabled=true; spin.style.display='inline-block';
+  wrap.style.display='block'; bar.style.width='10%';
+  stat.textContent='Loading students…';
+
+  try{
+    const snap=await db.collection('students').get();
+    allStudents=snap.docs.map(d=>({id:d.id,...d.data()}));
+    bar.style.width='40%';
+    stat.textContent=`Loaded ${allStudents.length} students. Grouping…`;
+
+    const phoneMap={};
+    allStudents.forEach(s=>{
+      const p=normPhone(s.parentPhone);
+      if(!p) return;
+      if(!phoneMap[p]) phoneMap[p]=[];
+      phoneMap[p].push(s);
     });
-    addLog(`✓ Updated primary doc with linkedStudentIds + tutors array`, 'log-ok');
+    bar.style.width='70%';
 
-    // 3. Update each secondary doc — mark as merged
-    for (const secId of secondaryIds) {
-      const s = g.students.find(x => x.id === secId);
-      await db.collection('students').doc(secId).update({
-        primaryStudentId: primaryId,
-        isMergedRecord:   true,
-        mergedAt:         firebase.firestore.FieldValue.serverTimestamp()
-      });
-      addLog(`✓ Marked secondary doc ${s.studentName} (${secId.substring(0,10)}…) as merged`, 'log-ok');
-    }
+    dupGroups=Object.entries(phoneMap)
+      .filter(([,arr])=>arr.length>1)
+      .map(([phone,students])=>({phone,students,merged:false,primaryId:null,collapsed:true}));
 
-    // 4. Re-point all homework_assignments from secondary IDs → primary
-    const COLLECTIONS_TO_FIX = [
-      'homework_assignments',
-      'conversations',
-      'course_materials',
-      'daily_topics',
-      'student_results',
-      'student_notifications',
-      'recall_requests'
-    ];
+    bar.style.width='100%';
+    stat.textContent=`Done. Found ${dupGroups.length} groups.`;
 
-    for (const colName of COLLECTIONS_TO_FIX) {
-      let totalFixed = 0;
-      for (const secId of secondaryIds) {
-        try {
-          const q    = await db.collection(colName).where('studentId','==',secId).get();
-          if (q.empty) continue;
-          const batch = db.batch();
-          q.docs.forEach(d => batch.update(d.ref, { studentId: primaryId }));
-          await batch.commit();
-          totalFixed += q.docs.length;
-        } catch(e) {
-          addLog(`⚠ Could not fix ${colName} for ${secId}: ${e.message}`, 'log-warn');
-        }
-      }
-      if (totalFixed > 0) addLog(`✓ Fixed ${totalFixed} docs in ${colName}`, 'log-ok');
-    }
-
-    // 5. Fix conversations that use studentId differently (some use it as a direct field)
-    for (const secId of secondaryIds) {
-      try {
-        const q = await db.collection('conversations').where('studentId','==',secId).get();
-        if (!q.empty) {
-          const batch = db.batch();
-          q.docs.forEach(d => batch.update(d.ref, { studentId: primaryId }));
-          await batch.commit();
-          addLog(`✓ Fixed ${q.docs.length} conversation docs`, 'log-ok');
-        }
-      } catch(e) { /* already handled above */ }
-    }
-
-    g.merged    = true;
-    g.collapsed = true;
-    mergedCount++;
-    updateStats();
-    renderGroups();
-    setStep(3);
-    addLog(`\n✅ Group merged successfully.\n`, 'log-ok');
-
-  } catch(e) {
-    addLog(`❌ Merge failed: ${e.message}`, 'log-err');
+    updateMergeStats(); renderGroups();
+    document.getElementById('view-scan').style.display='none';
+    document.getElementById('view-results').style.display='block';
+    setStep(2);
+  }catch(e){
+    stat.textContent='❌ '+e.message;
+  }finally{
+    btn.disabled=false; spin.style.display='none';
+    setTimeout(()=>wrap.style.display='none',1000);
   }
 }
 
-// ─── COPY LOG ─────────────────────────────────────────────────────────────────
-document.getElementById('copy-log-btn').onclick = () => {
-  const log = document.getElementById('merge-log');
-  navigator.clipboard.writeText(log.innerText).then(() => {
-    document.getElementById('copy-log-btn').textContent = '✓ Copied!';
-    setTimeout(() => document.getElementById('copy-log-btn').textContent = 'Copy Log', 2000);
+function updateMergeStats(){
+  document.getElementById('stat-total').textContent=allStudents.length;
+  document.getElementById('stat-groups').textContent=dupGroups.length;
+  document.getElementById('stat-dupes').textContent=dupGroups.reduce((a,g)=>a+Math.max(0,g.students.length-1),0);
+  document.getElementById('stat-merged').textContent=mergedCount;
+}
+
+function renderGroups(){
+  const list=document.getElementById('dup-list');
+  const fv=document.getElementById('filter-input').value.toLowerCase();
+  const sf=document.getElementById('filter-status').value;
+
+  let vis=dupGroups.filter(g=>{
+    if(sf==='pending'&&g.merged) return false;
+    if(sf==='merged'&&!g.merged) return false;
+    if(fv){const n=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');if(!n.includes(fv)&&!g.phone.includes(fv)) return false;}
+    return true;
+  });
+
+  if(!vis.length){list.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No groups match</div></div>`;return;}
+
+  list.innerHTML=vis.map(g=>{
+    const gi=dupGroups.indexOf(g);
+    const names=[...new Set(g.students.map(s=>s.studentName||'?'))].join(', ');
+    const rows=g.students.map(s=>{
+      const ip=g.primaryId===s.id, is=g.primaryId&&g.primaryId!==s.id;
+      return `<div class="student-row ${ip?'is-primary':is?'is-secondary':''}" onclick="selectPrimary(${gi},'${s.id}')">
+        <div class="radio-ring ${ip?'filled':is?'secondary':''}"></div>
+        <div class="student-info">
+          <div class="student-name-row">
+            <span class="student-name">${s.studentName||'Unnamed'}</span>
+            ${ip?'<span class="tag tag-primary">PRIMARY</span>':is?'<span class="tag tag-secondary">SECONDARY</span>':''}
+            ${s.studentUid?'<span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">🔑 Has Login</span>':''}
+            ${s.primaryStudentId?'<span class="tag tag-merged">ALREADY LINKED</span>':''}
+          </div>
+          <div class="student-meta">
+            <span class="meta-item"><span class="meta-label">tutor:</span>${s.tutorEmail||'–'}</span>
+            <span class="meta-item"><span class="meta-label">subjects:</span>${Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–')}</span>
+            <span class="meta-item"><span class="meta-label">grade:</span>${s.grade||'–'}</span>
+            <span class="meta-item"><span class="meta-label">id:</span>${s.id.substring(0,10)}…</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const canMerge=g.primaryId&&!g.merged;
+    return `<div class="dup-group ${g.merged?'merged-group':g.primaryId?'selected-group':''}" id="group-${gi}">
+      <div class="dup-header" onclick="toggleGroup(${gi})">
+        <span class="dup-phone">+…${g.phone.slice(-7)}</span>
+        <span class="dup-count">${g.students.length} records</span>
+        <span class="dup-names">${names}</span>
+        ${g.merged?'<span class="tag tag-merged" style="margin-left:6px;">MERGED ✓</span>':''}
+        <span class="dup-toggle">${g.collapsed?'▶ expand':'▼ collapse'}</span>
+      </div>
+      ${!g.collapsed?`<div class="dup-body">
+        ${rows}
+        <div class="merge-actions">
+          <button class="btn btn-success" onclick="mergeGroup(${gi})" ${!canMerge?'disabled':''}>
+            ✨ Merge ${g.students.length-1} duplicate${g.students.length>2?'s':''} into Primary
+          </button>
+          <button class="btn btn-ghost" onclick="clearSel(${gi})">Clear</button>
+          <span class="merge-hint">Primary keeps its ID · secondaries are linked</span>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function toggleGroup(i){dupGroups[i].collapsed=!dupGroups[i].collapsed;renderGroups();}
+function selectPrimary(i,id){if(dupGroups[i].merged) return;dupGroups[i].primaryId=id;renderGroups();}
+function clearSel(i){dupGroups[i].primaryId=null;renderGroups();}
+
+document.getElementById('expand-all-btn').onclick=()=>{
+  expandedAll=!expandedAll;
+  dupGroups.forEach(g=>g.collapsed=!expandedAll);
+  document.getElementById('expand-all-btn').textContent=expandedAll?'Collapse All':'Expand All';
+  renderGroups();
+};
+document.getElementById('filter-input').oninput=renderGroups;
+document.getElementById('filter-status').onchange=renderGroups;
+
+async function mergeGroup(gi){
+  const g=dupGroups[gi];
+  if(!g.primaryId||g.merged) return;
+  const primaryId=g.primaryId;
+  const secondaryIds=g.students.filter(s=>s.id!==primaryId).map(s=>s.id);
+  const primaryDoc=g.students.find(s=>s.id===primaryId);
+
+  document.getElementById('log-panel').style.display='block';
+  const log=document.getElementById('merge-log');
+  function addLog(m,c=''){log.innerHTML+=`<div class="${c}">${m}</div>`;log.scrollTop=log.scrollHeight;}
+
+  addLog(`\n─── Merging: ${g.phone} ───`,'log-info');
+  addLog(`Primary: ${primaryDoc.studentName} (${primaryId})`,'log-ok');
+  secondaryIds.forEach(id=>{const s=g.students.find(x=>x.id===id);addLog(`Secondary: ${s.studentName} (${id})`,'log-warn');});
+
+  try{
+    const allSubjects=new Set(Array.isArray(primaryDoc.subjects)?primaryDoc.subjects:[]);
+    const allTutors=[];
+    if(primaryDoc.tutorEmail) allTutors.push({tutorEmail:primaryDoc.tutorEmail,tutorName:primaryDoc.tutorName||'',subjects:Array.isArray(primaryDoc.subjects)?primaryDoc.subjects:[],days:primaryDoc.days||'',studentFee:primaryDoc.studentFee||0});
+
+    secondaryIds.forEach(id=>{
+      const s=g.students.find(x=>x.id===id);
+      if(s.tutorEmail&&!allTutors.find(t=>t.tutorEmail===s.tutorEmail)) allTutors.push({tutorEmail:s.tutorEmail,tutorName:s.tutorName||'',subjects:Array.isArray(s.subjects)?s.subjects:[],days:s.days||'',studentFee:s.studentFee||0});
+      (Array.isArray(s.subjects)?s.subjects:[]).forEach(sub=>allSubjects.add(sub));
+    });
+
+    await db.collection('students').doc(primaryId).update({linkedStudentIds:secondaryIds,allSubjects:Array.from(allSubjects),tutors:allTutors,mergedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    addLog('✓ Updated primary doc','log-ok');
+
+    for(const secId of secondaryIds){
+      await db.collection('students').doc(secId).update({primaryStudentId:primaryId,isMergedRecord:true,mergedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      addLog(`✓ Marked secondary as merged`,'log-ok');
+    }
+
+    const cols=['homework_assignments','conversations','course_materials','daily_topics','student_results','student_notifications','recall_requests'];
+    for(const col of cols){
+      let fixed=0;
+      for(const secId of secondaryIds){
+        try{
+          const q=await db.collection(col).where('studentId','==',secId).get();
+          if(q.empty) continue;
+          const batch=db.batch();
+          q.docs.forEach(d=>batch.update(d.ref,{studentId:primaryId}));
+          await batch.commit(); fixed+=q.docs.length;
+        }catch(e){addLog(`⚠ ${col}: ${e.message}`,'log-warn');}
+      }
+      if(fixed>0) addLog(`✓ Fixed ${fixed} docs in ${col}`,'log-ok');
+    }
+
+    g.merged=true; g.collapsed=true; mergedCount++;
+    updateMergeStats(); renderGroups(); setStep(3);
+    addLog(`\n✅ Done!\n`,'log-ok');
+  }catch(e){addLog('❌ '+e.message,'log-err');}
+}
+
+document.getElementById('copy-log-btn').onclick=()=>{
+  navigator.clipboard.writeText(document.getElementById('merge-log').innerText).then(()=>{
+    document.getElementById('copy-log-btn').textContent='✓ Copied!';
+    setTimeout(()=>document.getElementById('copy-log-btn').textContent='Copy Log',2000);
   });
 };
 
-// ─── STEPS ────────────────────────────────────────────────────────────────────
-function setStep(n) {
-  [1,2,3].forEach(i => {
-    const el = document.getElementById(`step${i}`);
-    el.className = 'step ' + (i < n ? 'done' : i === n ? 'active' : '');
+function setStep(n){
+  [1,2,3].forEach(i=>{
+    const el=document.getElementById(`step${i}`);
+    el.className='step '+(i<n?'done':i===n?'active':'');
   });
 }
 </script>
