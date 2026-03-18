@@ -191,9 +191,55 @@
     <div class="tab"        id="tab-fix-students" onclick="switchTab('fix-students')">🪪 Fix Student IDs</div>
     <div class="tab"        id="tab-merge"        onclick="switchTab('merge')">🔀 Merge Tool</div>
     <div class="tab"        id="tab-split"        onclick="switchTab('split')">✂️ Split Group Docs</div>
+  <!-- ═══════════════════════════════════════════════════════
+       TAB 1: REVIEW REPORT
+  ═══════════════════════════════════════════════════════ -->
+  <div id="pane-report">
+  <main>
+
+    <div class="panel">
+      <div class="panel-title">Generate Review Report</div>
+      <div class="alert alert-info">ℹ️ This scan only shows groups where student names are similar enough to be the same child. Different-named siblings under the same parent are automatically excluded. Download the PDF, give it to your staff to review before merging.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary" id="rpt-scan-btn">
+          <span class="spinner" style="display:none" id="rpt-spin"></span>
+          🔍 Scan Students
+        </button>
+        <span id="rpt-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+      </div>
+      <div class="progress-bar" style="display:none" id="rpt-progress-wrap">
+        <div class="progress-fill" id="rpt-progress" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="rpt-results" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="stat-val blue"  id="rpt-stat-total">–</div><div class="stat-label">Total Students</div></div>
+        <div class="stat"><div class="stat-val red"   id="rpt-stat-high">–</div><div class="stat-label">Very Likely Same</div></div>
+        <div class="stat"><div class="stat-val amber" id="rpt-stat-med">–</div><div class="stat-label">Possibly Same</div></div>
+        <div class="stat"><div class="stat-val blue"  id="rpt-stat-low">–</div><div class="stat-label">Worth Checking</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Suspicious Groups</div>
+        <div class="search-row">
+          <input type="search" class="s-input" id="rpt-filter" placeholder="Filter by name or phone…" style="max-width:280px;">
+          <select class="s-input" id="rpt-conf-filter" style="max-width:200px;">
+            <option value="all">All confidence levels</option>
+            <option value="high">🔴 Very Likely Same Child</option>
+            <option value="medium">🟡 Possibly Same Child</option>
+            <option value="low">🔵 Worth Checking</option>
+          </select>
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <button class="btn btn-orange" id="download-pdf-btn">⬇ Download PDF</button>
+            <button class="btn btn-ghost"  id="rpt-rescan-btn">Re-scan</button>
+          </div>
+        </div>
+        <div id="rpt-group-list"></div>
+      </div>
+    </div>
+
+  </main>
   </div>
-
-
 
   <!-- ═══════════════════════════════════════════════════════
        TAB 2: FIX PARENTS
