@@ -616,6 +616,7 @@ function downloadPDF(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth();
+  const M=20; // left margin
   const confFilter=document.getElementById('rpt-conf-filter').value;
   const filterVal=document.getElementById('rpt-filter').value.toLowerCase();
 
@@ -628,112 +629,97 @@ function downloadPDF(){
     return true;
   });
 
-  // COVER
-  doc.setFillColor(13,17,23); doc.rect(0,0,W,297,'F');
-  doc.setFillColor(26,74,37); doc.rect(0,0,W,42,'F');
-  doc.setFontSize(20); doc.setTextColor(63,185,80); doc.setFont('helvetica','bold');
-  doc.text('Blooming Kids House',W/2,18,{align:'center'});
-  doc.setFontSize(13); doc.setTextColor(230,237,243);
-  doc.text('Student Duplicate Review Report',W/2,28,{align:'center'});
-  doc.setFontSize(9); doc.setTextColor(139,148,158);
-  doc.text(`Generated: ${new Date().toLocaleString()}  ·  Filter: ${confFilter==='all'?'All Levels':confFilter}  ·  ${visible.length} groups`,W/2,36,{align:'center'});
+  // jsPDF doesn't embed Raleway natively — we use helvetica (closest clean sans-serif available)
+  // and note Raleway in the title area. For true Raleway you'd need to embed the font file.
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(0,0,0);
 
-  // LEGEND
-  doc.setFontSize(9); doc.setTextColor(230,237,243); doc.setFont('helvetica','bold');
-  doc.text('HOW TO USE THIS REPORT',14,52);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(139,148,158);
-  const legend=[
-    '🔴 VERY LIKELY SAME CHILD — Names are identical or one is a short form of the other. Almost certainly the same student.',
-    '🟡 POSSIBLY SAME CHILD — First names match but full names differ. Check with the parent or tutor to confirm.',
-    '🔵 WORTH CHECKING — Some similarity detected. May be same child or just a coincidence.',
-    '',
-    'Instructions: Review each group below. Circle groups that ARE the same child. Cross out groups that are siblings.',
-    'Hand this to the admin who will do the merging in the system.'
-  ];
-  let ly=58;
-  legend.forEach(l=>{doc.text(l,14,ly,{maxWidth:W-28}); ly+=l?5:3;});
+  let y=24;
 
-  // SUMMARY BOX
-  doc.setFillColor(22,27,34);
-  doc.roundedRect(14,ly+2,W-28,16,2,2,'F');
-  doc.setFontSize(8); doc.setTextColor(230,237,243); doc.setFont('helvetica','bold');
-  doc.text(`Total Students Scanned: ${allStudentsCache.length}`,20,ly+9);
-  const high=reportGroups.filter(g=>g.assessment.confidence==='high').length;
-  const med=reportGroups.filter(g=>g.assessment.confidence==='medium').length;
-  const low=reportGroups.filter(g=>g.assessment.confidence==='low').length;
-  doc.setTextColor(248,81,73); doc.text(`🔴 Very Likely: ${high}`,70,ly+9);
-  doc.setTextColor(210,153,34); doc.text(`🟡 Possibly: ${med}`,110,ly+9);
-  doc.setTextColor(88,166,255); doc.text(`🔵 Check: ${low}`,145,ly+9);
-  ly+=22;
+  // ── HEADING ────────────────────────────────────────────────────────────────
+  doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.text('Blooming Kids House', W/2, y, {align:'center'});
+  y+=8;
 
-  const confLabel={high:'🔴 VERY LIKELY SAME CHILD',medium:'🟡 POSSIBLY SAME CHILD',low:'🔵 WORTH CHECKING'};
-  const confRGB={high:[248,81,73],medium:[210,153,34],low:[88,166,255]};
+  doc.setFontSize(12); doc.setFont('helvetica','normal');
+  doc.text('Student Duplicate Review', W/2, y, {align:'center'});
+  y+=6;
 
-  visible.forEach((g,gi)=>{
-    if(ly>250){doc.addPage(); doc.setFillColor(13,17,23); doc.rect(0,0,W,297,'F'); ly=18;}
+  doc.setFontSize(9);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}   ·   ${visible.length} group${visible.length!==1?'s':''} flagged for review`, W/2, y, {align:'center'});
+  y+=5;
 
-    // Group header bar
-    const rgb=confRGB[g.assessment.confidence];
-    doc.setFillColor(22,27,34);
-    doc.rect(14,ly,W-28,8,'F');
-    doc.setDrawColor(...rgb);
-    doc.rect(14,ly,3,8,'F');
-    doc.setFontSize(8); doc.setFont('helvetica','bold');
-    doc.setTextColor(...rgb);
-    doc.text(confLabel[g.assessment.confidence],20,ly+5.5);
-    doc.setTextColor(188,140,255);
-    doc.text(`Phone: +…${g.phone.slice(-7)}`,95,ly+5.5);
-    doc.setTextColor(139,148,158);
-    doc.text(`Parent: ${g.students[0]?.parentName||'N/A'}`,130,ly+5.5);
-    // Checkbox for staff
-    doc.setDrawColor(100,110,120); doc.setFillColor(13,17,23);
-    doc.rect(W-20,ly+1.5,5,5);
-    doc.setFontSize(6); doc.setTextColor(139,148,158);
-    doc.text('MERGE?',W-21,ly+9.5);
-    ly+=12;
+  // thin rule under heading
+  doc.setDrawColor(0); doc.setLineWidth(0.4);
+  doc.line(M, y, W-M, y);
+  y+=8;
 
-    // Reason
-    doc.setFontSize(7); doc.setFont('helvetica','italic'); doc.setTextColor(139,148,158);
-    doc.text(`Reason: ${g.assessment.reason}`,18,ly); ly+=6;
+  // ── INSTRUCTIONS ───────────────────────────────────────────────────────────
+  doc.setFontSize(8); doc.setFont('helvetica','italic');
+  doc.text('Review each group below. Tick the box if the names belong to the same child and need merging. Leave blank if they are different children.', M, y, {maxWidth: W-(M*2)});
+  y+=10;
 
-    // Student table
-    const tableData=g.students.map(s=>([
-      s.studentName||'–',
-      s.tutorEmail||s.tutorName||'–',
-      Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–'),
-      s.grade||'–',
-      s.days||'–',
-      s.studentUid?'✓ Yes':'No'
-    ]));
+  // ── CONFIDENCE KEY ─────────────────────────────────────────────────────────
+  doc.setFont('helvetica','bold'); doc.setFontSize(8);
+  doc.text('Key:', M, y);
+  doc.setFont('helvetica','normal');
+  doc.text('(H) Very Likely Same Child     (M) Possibly Same Child     (C) Worth Checking', M+10, y);
+  y+=8;
 
-    doc.autoTable({
-      startY:ly,
-      head:[['Student Name','Tutor','Subjects','Grade','Days','Has Login']],
-      body:tableData,
-      margin:{left:14,right:14},
-      styles:{
-        fontSize:8, cellPadding:2.5,
-        textColor:[230,237,243], fillColor:[22,27,34],
-        lineColor:[48,54,61], lineWidth:0.3
-      },
-      headStyles:{fillColor:[33,38,45],textColor:[139,148,158],fontStyle:'bold',fontSize:7},
-      alternateRowStyles:{fillColor:[13,17,23]},
-      columnStyles:{0:{fontStyle:'bold',cellWidth:40},1:{cellWidth:42},2:{cellWidth:42},3:{cellWidth:13},4:{cellWidth:13},5:{cellWidth:18}},
-      theme:'grid'
+  doc.setLineWidth(0.3);
+  doc.line(M, y, W-M, y);
+  y+=7;
+
+  // ── GROUP NUMBER counter ───────────────────────────────────────────────────
+  let groupNum=0;
+
+  visible.forEach(g=>{
+    groupNum++;
+    const confShort={high:'H',medium:'M',low:'C'};
+    const nameList=g.students.map(s=>s.studentName||'Unnamed');
+
+    // Estimate height needed: header line + one line per student + gap
+    const neededHeight=8+(nameList.length*7)+6;
+    if(y+neededHeight>272){
+      // Footer before new page
+      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text(`Blooming Kids House  ·  Page ${doc.internal.getCurrentPageInfo().pageNumber}`, W/2, 287, {align:'center'});
+      doc.addPage();
+      y=20;
+    }
+
+    // Group header line
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text(`${groupNum}.  (${confShort[g.assessment.confidence]})`, M, y);
+
+    // Checkbox on the right
+    doc.setDrawColor(0); doc.setLineWidth(0.4);
+    doc.rect(W-M-5, y-4, 4.5, 4.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.text('Merge?', W-M-5, y+2.5);
+    y+=6;
+
+    // Student names — indented, one per line
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    nameList.forEach((name, i)=>{
+      // Bullet
+      doc.setFont('helvetica','normal');
+      doc.text(`\u2022  ${name}`, M+6, y);
+      y+=6;
     });
 
-    ly=doc.lastAutoTable.finalY+10;
-
-    // Separator
-    doc.setDrawColor(48,54,61); doc.line(14,ly-4,W-14,ly-4);
+    // Thin divider
+    doc.setDrawColor(180,180,180); doc.setLineWidth(0.2);
+    doc.line(M, y, W-M, y);
+    y+=6;
   });
 
-  // Footer on each page
-  const pageCount=doc.internal.getNumberOfPages();
-  for(let i=1;i<=pageCount;i++){
-    doc.setPage(i);
-    doc.setFontSize(7); doc.setTextColor(72,79,88); doc.setFont('helvetica','normal');
-    doc.text(`Blooming Kids House — Confidential — Page ${i} of ${pageCount}`,W/2,292,{align:'center'});
+  // ── LAST PAGE FOOTER ───────────────────────────────────────────────────────
+  const totalPages=doc.internal.getNumberOfPages();
+  for(let p=1;p<=totalPages;p++){
+    doc.setPage(p);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+    doc.text(`Blooming Kids House  ·  Confidential  ·  Page ${p} of ${totalPages}`, W/2, 287, {align:'center'});
   }
 
   const dateStr=new Date().toISOString().slice(0,10);
