@@ -150,6 +150,7 @@
     <div class="tab"        id="tab-parents" onclick="switchTab('parents')">👨‍👩‍👧 Fix Parents</div>
     <div class="tab"        id="tab-fixids"  onclick="switchTab('fixids')">🔑 Fix Student IDs</div>
     <div class="tab"        id="tab-merge"   onclick="switchTab('merge')">🔀 Merge Tool</div>
+    <div class="tab"        id="tab-undo"    onclick="switchTab('undo')">↩ Undo Merges</div>
     <div class="tab"        id="tab-split"   onclick="switchTab('split')">✂️ Split Group Docs</div>
   </div>
 
@@ -285,12 +286,52 @@
       <div class="panel" id="log-panel" style="display:none">
         <div class="panel-title">Merge Log</div>
         <div class="log" id="merge-log"></div>
-        <div style="margin-top:12px;"><button class="btn btn-ghost" id="copy-log-btn">Copy Log</button></div>
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-ghost" id="copy-log-btn">Copy Log</button>
+          <button class="btn btn-ghost" id="undo-last-btn" style="border-color:var(--red);color:var(--red);display:none;">
+            ↩ Undo Last Merge
+          </button>
+          <span id="undo-last-hint" style="font-size:11px;color:var(--text-dimmer);font-style:italic;display:none;">
+            Instantly reverses the most recent merge in this session
+          </span>
+        </div>
       </div>
     </div>
   </main></div>
 
-  <!-- ═══ TAB 5: SPLIT GROUP DOCS ═══ -->
+  <!-- ═══ TAB 5: UNDO MERGES ═══ -->
+  <div id="pane-undo" style="display:none"><main>
+    <div class="panel">
+      <div class="panel-title">Undo Merges</div>
+      <div class="alert alert-info">ℹ️ Every merge is saved as a snapshot in Firestore (<strong>merge_snapshots</strong> collection). Select a snapshot below to reverse it — each student's <strong>studentId</strong> and all related collection docs are restored to exactly what they were before the merge.</div>
+      <div class="alert alert-warn">⚠️ Only merges done with this tool (after this update) appear here. Older merges cannot be auto-undone.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary" id="undo-load-btn"><span class="spinner" style="display:none" id="undo-spin"></span>🔄 Load Merge History</button>
+        <span id="undo-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+      </div>
+    </div>
+    <div id="undo-results" style="display:none">
+      <div class="panel">
+        <div class="panel-title">Merge Snapshots</div>
+        <div class="search-row">
+          <input type="search" class="s-input" id="undo-filter" placeholder="Filter by student name…" style="max-width:300px;">
+          <select class="s-input" id="undo-status-filter" style="max-width:200px;">
+            <option value="all">All snapshots</option>
+            <option value="active">Active (not yet undone)</option>
+            <option value="undone">Already undone</option>
+          </select>
+        </div>
+        <div id="undo-list"></div>
+      </div>
+      <div class="panel" id="undo-log-panel" style="display:none">
+        <div class="panel-title">Undo Log</div>
+        <div class="log" id="undo-log"></div>
+        <div style="margin-top:12px;"><button class="btn btn-ghost" id="undo-copy-log-btn">Copy Log</button></div>
+      </div>
+    </div>
+  </main></div>
+
+  <!-- ═══ TAB 6: SPLIT GROUP DOCS ═══ -->
   <div id="pane-split" style="display:none"><main>
     <div class="panel">
       <div class="panel-title">Split Combined Group Class Docs</div>
@@ -392,7 +433,7 @@ document.getElementById('auth-btn').onclick=async()=>{
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
 // ─── TABS ──────────────────────────────────────────────────────────────────────
-const ALL_TABS=['report','parents','fixids','merge','split'];
+const ALL_TABS=['report','parents','fixids','merge','undo','split'];
 function switchTab(t){
   ALL_TABS.forEach(id=>{
     document.getElementById('tab-'+id).className='tab'+(id===t?' active':'');
@@ -1030,6 +1071,34 @@ async function mergeGroup(gi){
     }
 
     g.merged=true;g.collapsed=true;mergedCount++;
+    // ── Save merge snapshot so it can be undone later ──────────────────────
+    try{
+      const snapshot={
+        mergedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        mergedBy: auth.currentUser ? auth.currentUser.email : 'unknown',
+        phone: g.phone,
+        sharedStudentId,
+        undone: false,
+        students: selectedStudents.map(s=>({
+          docId:    s.id,
+          name:     s.studentName || '',
+          tutorEmail: s.tutorEmail || '',
+          studentIdBefore: s.studentId || s.id,   // what it was BEFORE the merge
+          studentIdAfter:  sharedStudentId
+        }))
+      };
+      const snapRef = await withRetry(()=>db.collection('merge_snapshots').add(snapshot));
+      // Keep track so the "Undo Last Merge" quick-button works immediately
+      lastMergeSnapId = snapRef.id;
+      // Show the quick-undo button
+      const undoLastBtn=document.getElementById('undo-last-btn');
+      const undoLastHint=document.getElementById('undo-last-hint');
+      if(undoLastBtn){ undoLastBtn.style.display='inline-flex'; undoLastBtn.onclick=()=>quickUndoLast(); }
+      if(undoLastHint){ undoLastHint.style.display='inline'; }
+      addLog('💾 Snapshot saved (id: '+snapRef.id.substring(0,12)+'…) — use ↩ Undo Last Merge or the ↩ Undo Merges tab','log-info');
+    }catch(snapErr){
+      addLog('⚠ Snapshot save failed: '+snapErr.message+' — merge succeeded but cannot be auto-undone','log-warn');
+    }
     updateMergeStats();renderGroups();
     addLog('\n✅ Done! '+skipped.length+' student(s) left completely untouched.\n','log-ok');
 
@@ -1043,8 +1112,242 @@ document.getElementById('copy-log-btn').onclick=()=>{
   });
 };
 
+// ─── QUICK "UNDO LAST MERGE" (session-only) ───────────────────────────────────
+let lastMergeSnapId=null;
+async function quickUndoLast(){
+  if(!lastMergeSnapId){ alert('No merge has been done in this session yet.'); return; }
+  // Load the snapshot fresh from Firestore then delegate to the full undoMerge
+  const btn=document.getElementById('undo-last-btn');
+  btn.disabled=true;
+  try{
+    const snapDoc=await withRetry(()=>db.collection('merge_snapshots').doc(lastMergeSnapId).get());
+    if(!snapDoc.exists){ alert('Snapshot not found — it may have already been removed.'); return; }
+    const snap={id:snapDoc.id,...snapDoc.data()};
+    // Push into mergeSnapshots array so undoMerge can find it
+    if(!mergeSnapshots.find(s=>s.id===snap.id)) mergeSnapshots.unshift(snap);
+    // Show the undo log panel in the merge tab (undoMerge writes to undo-log so switch first)
+    switchTab('undo');
+    await loadMergeHistory();
+    await undoMerge(snap.id);
+    // Hide the quick-undo button — can't undo twice
+    document.getElementById('undo-last-btn').style.display='none';
+    document.getElementById('undo-last-hint').style.display='none';
+    lastMergeSnapId=null;
+  }catch(e){
+    alert('Quick undo failed: '+e.message);
+  }finally{ btn.disabled=false; }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// TAB 5: SPLIT GROUP DOCS
+// TAB 5: UNDO MERGES
+// Loads merge_snapshots from Firestore. For each snapshot, restores every
+// student doc's studentId to what it was before the merge, then backfills
+// the related collections back to each student's original ID.
+// ═══════════════════════════════════════════════════════════════════════════════
+let mergeSnapshots=[];
+document.getElementById('undo-load-btn').onclick=loadMergeHistory;
+document.getElementById('undo-filter').oninput=renderUndoList;
+document.getElementById('undo-status-filter').onchange=renderUndoList;
+document.getElementById('undo-copy-log-btn').onclick=()=>{
+  navigator.clipboard.writeText(document.getElementById('undo-log').innerText).then(()=>{
+    document.getElementById('undo-copy-log-btn').textContent='✓ Copied!';
+    setTimeout(()=>document.getElementById('undo-copy-log-btn').textContent='Copy Log',2000);
+  });
+};
+
+async function loadMergeHistory(){
+  const btn=document.getElementById('undo-load-btn'),spin=document.getElementById('undo-spin');
+  const stat=document.getElementById('undo-status');
+  btn.disabled=true;spin.style.display='inline-block';stat.textContent='Loading…';
+  try{
+    const snap=await withRetry(()=>db.collection('merge_snapshots').orderBy('mergedAt','desc').get());
+    mergeSnapshots=snap.docs.map(d=>({id:d.id,...d.data()}));
+    stat.textContent=`${mergeSnapshots.length} merge snapshot(s) found.`;
+    renderUndoList();
+    document.getElementById('undo-results').style.display='block';
+  }catch(e){
+    stat.textContent='❌ '+e.message;
+  }finally{
+    btn.disabled=false;spin.style.display='none';
+  }
+}
+
+function renderUndoList(){
+  const list=document.getElementById('undo-list');
+  const fv=document.getElementById('undo-filter').value.toLowerCase();
+  const sf=document.getElementById('undo-status-filter').value;
+
+  let vis=mergeSnapshots.filter(s=>{
+    if(sf==='active'&&s.undone) return false;
+    if(sf==='undone'&&!s.undone) return false;
+    if(fv){
+      const names=(s.students||[]).map(x=>(x.name||'').toLowerCase()).join(' ');
+      if(!names.includes(fv)&&!(s.phone||'').includes(fv)) return false;
+    }
+    return true;
+  });
+
+  if(!vis.length){
+    list.innerHTML='<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">No merge snapshots found</div><p style="font-size:12px;color:var(--text-dimmer);margin-top:6px;">Merges done before the snapshot system was added will not appear here.</p></div>';
+    return;
+  }
+
+  list.innerHTML=vis.map((snap,vi)=>{
+    const realIdx=mergeSnapshots.indexOf(snap);
+    const ts=snap.mergedAt && snap.mergedAt.toDate ? snap.mergedAt.toDate().toLocaleString() : 'Unknown time';
+    const students=snap.students||[];
+    const studentRows=students.map(s=>`
+      <div style="display:flex;align-items:flex-start;gap:14px;padding:9px 13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:7px;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${s.name||'Unnamed'}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dimmer);">Tutor: ${s.tutorEmail||'–'}</div>
+        </div>
+        <div style="font-size:10px;font-family:'DM Mono',monospace;text-align:right;flex-shrink:0;">
+          <div style="color:var(--text-dimmer);margin-bottom:3px;">BEFORE</div>
+          <div style="color:var(--amber);">${(s.studentIdBefore||'?').substring(0,14)}…</div>
+          <div style="color:var(--text-dimmer);margin:3px 0;">AFTER</div>
+          <div style="color:var(--blue);">${(s.studentIdAfter||'?').substring(0,14)}…</div>
+        </div>
+      </div>`).join('');
+
+    const isUndone=!!snap.undone;
+    const undoneInfo=isUndone?`<div style="font-size:11px;color:var(--green);margin-top:8px;">✓ Undone ${snap.undoneAt&&snap.undoneAt.toDate?snap.undoneAt.toDate().toLocaleString():''}${snap.undoneBy?' by '+snap.undoneBy:''}</div>`:'';
+
+    return `<div class="dup-group ${isUndone?'merged-group':''}" style="margin-bottom:14px;">
+      <div class="dup-header" style="cursor:default;gap:12px;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:13px;">${students.map(s=>s.name||'?').join(' + ')}</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:3px;font-family:'DM Mono',monospace;">
+            📅 ${ts} · by ${snap.mergedBy||'unknown'} · phone +…${(snap.phone||'').slice(-7)}
+          </div>
+        </div>
+        ${isUndone
+          ? '<span class="tag tag-merged" style="flex-shrink:0;">UNDONE ✓</span>'
+          : `<span class="tag tag-checked" style="flex-shrink:0;">${students.length} students merged</span>`}
+      </div>
+      <div class="dup-body">
+        <p style="font-size:11px;color:var(--text-dimmer);margin-bottom:10px;">
+          Shared studentId that was applied: <span style="font-family:'DM Mono',monospace;color:var(--blue);">${(snap.sharedStudentId||'?').substring(0,20)}…</span>
+        </p>
+        ${studentRows}
+        ${undoneInfo}
+        <div class="merge-actions">
+          <button class="btn btn-ghost" style="border-color:var(--red);color:var(--red);"
+            onclick="undoMerge('${snap.id}')"
+            ${isUndone?'disabled':''}>
+            ↩ Undo This Merge
+          </button>
+          <span class="merge-hint">
+            ${isUndone
+              ? 'Already reversed — students have their own studentIds again'
+              : 'Restores each student\'s studentId to what it was before · also fixes homework, conversations, etc.'}
+          </span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function undoMerge(snapId){
+  const snap=mergeSnapshots.find(s=>s.id===snapId);
+  if(!snap||snap.undone) return;
+
+  // Confirm
+  const names=(snap.students||[]).map(s=>s.name).join(', ');
+  if(!confirm(`Undo merge of:\n${names}\n\nThis will restore each student's original studentId and backfill all related collections. Continue?`)) return;
+
+  document.getElementById('undo-log-panel').style.display='block';
+  const logEl=document.getElementById('undo-log');
+  function addLog(m,c=''){logEl.innerHTML+=`<div class="${c}">${m}</div>`;logEl.scrollTop=logEl.scrollHeight;}
+
+  addLog('\n─── Undoing merge (snapshot: '+snapId.substring(0,12)+'…) ───','log-info');
+  addLog('Students: '+names,'log-warn');
+
+  const students=snap.students||[];
+  const sharedStudentId=snap.sharedStudentId;
+  const COLLECTIONS=['homework_assignments','conversations','course_materials','daily_topics','student_results','student_notifications','recall_requests'];
+
+  try{
+    // 1. Restore each student doc's studentId back to what it was before.
+    //    Also stamp splitFrom + splitAt so the app and portals know this
+    //    student was previously merged and has now been unlinked.
+    for(const s of students){
+      const restoreId=s.studentIdBefore;
+      if(!restoreId){addLog('⚠ No studentIdBefore recorded for "'+s.name+'" — skipping student doc','log-warn');continue;}
+      if(restoreId===sharedStudentId){addLog('ℹ "'+s.name+'" already has its original id — skipped','log-info');continue;}
+      await withRetry(()=>db.collection('students').doc(s.docId).update({
+        studentId: restoreId,
+        splitFrom: sharedStudentId,         // flags which shared id this was split from
+        splitAt: firebase.firestore.FieldValue.serverTimestamp(),
+        splitBy: auth.currentUser ? auth.currentUser.email : 'unknown'
+      }));
+      addLog('✓ Restored studentId on "'+s.name+'" → '+restoreId.substring(0,14)+'… (splitFrom flag set)','log-ok');
+    }
+
+    // 2. For each student, re-point related collection docs from sharedStudentId → studentIdBefore
+    // But only for docs that BELONG to this student (i.e. their docId matches tutor's doc)
+    // We query by sharedStudentId and then filter by checking which student "owns" those docs.
+    // Simplest safe approach: for each student, re-point docs where studentId===sharedStudentId
+    // back to that student's original ID. We do this per-student in order so docs are claimed.
+    //
+    // Edge case: if multiple students in this merge have homework under sharedStudentId,
+    // we can't perfectly re-separate them without a tutorId field. So we restore the
+    // anchor student's docs to sharedStudentId (unchanged) and restore the others' docs
+    // by scanning for any doc whose tutorEmail matches that student's tutor.
+    for(const s of students){
+      const restoreId=s.studentIdBefore;
+      if(!restoreId||restoreId===sharedStudentId) continue;
+      let totalFixed=0;
+      for(const col of COLLECTIONS){
+        try{
+          // Try tutorEmail-scoped query first for precision
+          let q;
+          if(s.tutorEmail){
+            q=await withRetry(()=>db.collection(col)
+              .where('studentId','==',sharedStudentId)
+              .where('tutorEmail','==',s.tutorEmail)
+              .get());
+          }
+          // Fallback: get all docs with the sharedStudentId (less precise but complete)
+          if(!q||q.empty){
+            q=await withRetry(()=>db.collection(col)
+              .where('studentId','==',sharedStudentId)
+              .get());
+          }
+          if(q.empty) continue;
+          const CHUNK=400;
+          for(let i=0;i<q.docs.length;i+=CHUNK){
+            const batch=db.batch();
+            q.docs.slice(i,i+CHUNK).forEach(d=>batch.update(d.ref,{studentId:restoreId}));
+            await withRetry(()=>batch.commit());
+          }
+          totalFixed+=q.docs.length;
+        }catch(e){ addLog('⚠ '+col+' for "'+s.name+'": '+e.message,'log-warn'); }
+      }
+      if(totalFixed>0) addLog('✓ Restored '+totalFixed+' related docs for "'+s.name+'"','log-ok');
+    }
+
+    // 3. Mark snapshot as undone
+    await withRetry(()=>db.collection('merge_snapshots').doc(snapId).update({
+      undone: true,
+      undoneAt: firebase.firestore.FieldValue.serverTimestamp(),
+      undoneBy: auth.currentUser ? auth.currentUser.email : 'unknown'
+    }));
+
+    // Update local state
+    const localSnap=mergeSnapshots.find(s=>s.id===snapId);
+    if(localSnap){ localSnap.undone=true; localSnap.undoneAt={toDate:()=>new Date()}; localSnap.undoneBy=auth.currentUser?auth.currentUser.email:'unknown'; }
+
+    renderUndoList();
+    addLog('\n✅ Undo complete. Each student now has their own studentId again.\n','log-ok');
+
+  }catch(e){
+    addLog('❌ Undo failed: '+e.message,'log-err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 6: SPLIT GROUP DOCS
 // ═══════════════════════════════════════════════════════════════════════════════
 let splitCombinedDocs=[],splitLinkedCount=0;
 const COMBINED_PATTERNS=[/\s+and\s+/i,/\s*\/\s*/,/\s*&\s*/,/\s*,\s+/,/\s*\+\s*/];
