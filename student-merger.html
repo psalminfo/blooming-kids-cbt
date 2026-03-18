@@ -665,16 +665,81 @@ document.getElementById('download-pdf-btn').onclick = function(){
   const btn = document.getElementById('download-pdf-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Generating…';
-  // Yield to browser first — avoids blocking the click handler
-  setTimeout(function(){
-    try { downloadPDF(); }
-    catch(e){ console.error('PDF error:', e); }
-    finally {
-      btn.disabled = false;
-      btn.textContent = '⬇ Download PDF';
-    }
-  }, 30);
+  // Small delay so browser can repaint button state before heavy work starts
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      try { downloadPDF(); }
+      catch(e){ console.error('PDF error:', e); alert('PDF error: ' + e.message); }
+      finally {
+        btn.disabled = false;
+        btn.textContent = '⬇ Download PDF';
+      }
+    });
+  });
 };
+
+function renderGroupToPdf(doc, g, groupNum, y, W, M, safeStr, confFull, confShort){
+  // Renders one group onto the doc at position y. Returns new y value.
+  const parentName  = safeStr(g.students.map(s=>s.parentName ).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
+  const parentPhone = safeStr(g.students.map(s=>s.parentPhone).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
+  const parentEmail = safeStr(g.students.map(s=>s.parentEmail).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
+
+  const studentRows = g.students.map(s=>({
+    name:       safeStr(s.studentName) || 'Unnamed',
+    grade:      safeStr(s.grade),
+    subjects:   Array.isArray(s.subjects) ? s.subjects.join(', ') : safeStr(s.subjects),
+    tutorName:  safeStr(s.tutorName),
+    tutorEmail: safeStr(s.tutorEmail)
+  }));
+
+  const parentLineCount = [parentName,parentPhone,parentEmail].filter(v=>v).length;
+  const neededHeight = 14 + (parentLineCount*5.5) + 6 + (studentRows.length*18) + 8;
+
+  if(y+neededHeight>280){ doc.addPage(); y=20; }
+
+  // Group header
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0);
+  doc.text('Group '+groupNum+'   ('+confShort[g.assessment.confidence]+') '+confFull[g.assessment.confidence], M, y);
+  y+=8;
+
+  // Parent details
+  doc.setFontSize(8.5); doc.setTextColor(0,0,0);
+  if(parentName){
+    doc.setFont('helvetica','bold'); doc.text('Parent: ', M+4, y);
+    doc.setFont('helvetica','normal'); doc.text(safeStr(parentName), M+4+doc.getTextWidth('Parent: '), y); y+=5.5;
+  }
+  if(parentPhone){
+    doc.setFont('helvetica','bold'); doc.text('Phone: ', M+4, y);
+    doc.setFont('helvetica','normal'); doc.text(safeStr(parentPhone), M+4+doc.getTextWidth('Phone: '), y); y+=5.5;
+  }
+  if(parentEmail){
+    doc.setFont('helvetica','bold'); doc.text('Email: ', M+4, y);
+    doc.setFont('helvetica','normal'); doc.text(safeStr(parentEmail), M+4+doc.getTextWidth('Email: '), y); y+=5.5;
+  }
+  y+=3;
+
+  // Students label
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+  doc.text('Students in this group:', M+4, y); y+=6;
+
+  // Student rows
+  studentRows.forEach(s=>{
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+    doc.text('•  '+s.name+(s.grade ? '   Grade: '+s.grade : ''), M+6, y); y+=5.5;
+    if(s.subjects){
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+      doc.text('Subjects: '+s.subjects, M+12, y); y+=5;
+    }
+    const tl=[s.tutorName?'Tutor: '+s.tutorName:'', s.tutorEmail?'Email: '+s.tutorEmail:''].filter(Boolean).join('   |   ');
+    if(tl){
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
+      doc.text(tl, M+12, y); y+=5;
+    }
+    y+=3;
+  });
+
+  return y+4;
+}
 
 function downloadPDF(){
   const {jsPDF}=window.jspdf;
@@ -684,23 +749,19 @@ function downloadPDF(){
 
   const confFilter=document.getElementById('rpt-conf-filter').value;
   const filterVal=document.getElementById('rpt-filter').value.toLowerCase();
-
-  // safeStr: always returns a plain JS string
   const safeStr = v => (v===null||v===undefined) ? '' : String(v).trim();
 
-  // Exempt identifiers — skip any group matching these
-  const EXEMPT_PHONES = ['08026957689','8026957689','08026957689'];
+  const EXEMPT_PHONES = ['08026957689','8026957689'];
   const EXEMPT_EMAILS = ['psalmbkh09@gmail.com'];
-
   function isExempt(g){
     return g.students.some(s=>{
-      const ph = safeStr(s.parentPhone).replace(/\s/g,'');
-      const em = safeStr(s.parentEmail).toLowerCase();
+      const ph=safeStr(s.parentPhone).replace(/\s/g,'');
+      const em=safeStr(s.parentEmail).toLowerCase();
       return EXEMPT_PHONES.some(p=>ph.endsWith(p.replace(/^0/,''))) || EXEMPT_EMAILS.includes(em);
     });
   }
 
-  let visible=reportGroups.filter(g=>{
+  const visible=reportGroups.filter(g=>{
     if(isExempt(g)) return false;
     if(confFilter!=='all'&&g.assessment.confidence!==confFilter) return false;
     if(filterVal){
@@ -710,143 +771,39 @@ function downloadPDF(){
     return true;
   });
 
-  doc.setFont('helvetica','normal');
-  doc.setTextColor(0,0,0);
+  doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0);
   let y=26;
 
-  // ── HEADING ──────────────────────────────────────────────────────────────────
-  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
-  doc.text('Blooming Kids House', W/2, y, {align:'center'});
-  y+=9;
-
+  // Heading
+  doc.setFontSize(20); doc.setFont('helvetica','bold');
+  doc.text('Blooming Kids House', W/2, y, {align:'center'}); y+=9;
   doc.setFontSize(13); doc.setFont('helvetica','normal');
-  doc.text('Student Duplicate Review', W/2, y, {align:'center'});
-  y+=9;
+  doc.text('Student Duplicate Review', W/2, y, {align:'center'}); y+=9;
+  doc.setDrawColor(0); doc.setLineWidth(0.5); doc.line(M, y, W-M, y); y+=9;
 
-  // Full-width rule
-  doc.setDrawColor(0); doc.setLineWidth(0.5);
-  doc.line(M, y, W-M, y);
-  y+=9;
-
-  // ── INSTRUCTIONS ─────────────────────────────────────────────────────────────
-  doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(0,0,0);
-  doc.text(
-    'Review each group below. If the records belong to the same child tick the merge column. ' +
-    'If they are different children of the same parent leave it blank.',
-    M, y, {maxWidth: W-(M*2)}
-  );
+  // Instructions
+  doc.setFontSize(9); doc.setFont('helvetica','italic');
+  doc.text('Review each group below. If the records belong to the same child tick the merge column. If they are different children of the same parent leave it blank.', M, y, {maxWidth:W-(M*2)});
   y+=12;
 
-  // ── CONFIDENCE KEY ───────────────────────────────────────────────────────────
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
-  doc.text('Confidence Key:', M, y);
-  y+=5.5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8);
-  doc.text('(H) Very Likely Same Child  —  names are identical or one is a short version of the other', M+4, y);
-  y+=5;
-  doc.text('(M) Possibly Same Child  —  first names match, full names differ slightly', M+4, y);
-  y+=5;
-  doc.text('(C) Worth Checking  —  some similarity detected, may or may not be the same child', M+4, y);
-  y+=10;
+  // Key
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.text('Confidence Key:', M, y); y+=5.5;
+  doc.setFont('helvetica','normal');
+  doc.text('(H) Very Likely Same Child  —  names are identical or one is a short version of the other', M+4, y); y+=5;
+  doc.text('(M) Possibly Same Child  —  first names match, full names differ slightly', M+4, y); y+=5;
+  doc.text('(C) Worth Checking  —  some similarity detected, may or may not be the same child', M+4, y); y+=10;
+  doc.setDrawColor(0); doc.setLineWidth(0.4); doc.line(M, y, W-M, y); y+=9;
 
-  doc.setDrawColor(0); doc.setLineWidth(0.4);
-  doc.line(M, y, W-M, y);
-  y+=9;
-
-  // ── GROUPS ───────────────────────────────────────────────────────────────────
-  let groupNum=0;
   const confFull={high:'Very Likely Same Child',medium:'Possibly Same Child',low:'Worth Checking'};
   const confShort={high:'H',medium:'M',low:'C'};
 
-  visible.forEach(g=>{
-    groupNum++;
-
-    const parentName  = safeStr(g.students.map(s=>s.parentName ).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
-    const parentPhone = safeStr(g.students.map(s=>s.parentPhone).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
-    const parentEmail = safeStr(g.students.map(s=>s.parentEmail).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
-
-    const studentRows = g.students.map(s=>({
-      name:       safeStr(s.studentName) || 'Unnamed',
-      grade:      safeStr(s.grade),
-      subjects:   Array.isArray(s.subjects) ? s.subjects.join(', ') : safeStr(s.subjects),
-      tutorName:  safeStr(s.tutorName),
-      tutorEmail: safeStr(s.tutorEmail)
-    }));
-
-    const parentLineCount = [parentName,parentPhone,parentEmail].filter(v=>v).length;
-    // Each student: name line + tutor line + subjects line = ~16 each
-    const neededHeight = 14 + (parentLineCount*5.5) + 6 + (studentRows.length*18) + 8;
-
-    if(y+neededHeight>280){
-      doc.addPage();
-      y=20;
-    }
-
-    // ── Group header ────────────────────────────────────────────────────────
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0);
-    doc.text('Group ' + groupNum + '   (' + confShort[g.assessment.confidence] + ') ' + confFull[g.assessment.confidence], M, y);
-    y+=8;
-
-    // ── Parent details ──────────────────────────────────────────────────────
-    doc.setFontSize(8.5); doc.setTextColor(0,0,0);
-    if(parentName){
-      doc.setFont('helvetica','bold');
-      doc.text('Parent: ', M+4, y);
-      doc.setFont('helvetica','normal');
-      doc.text(safeStr(parentName), M+4+doc.getTextWidth('Parent: '), y);
-      y+=5.5;
-    }
-    if(parentPhone){
-      doc.setFont('helvetica','bold');
-      doc.text('Phone: ', M+4, y);
-      doc.setFont('helvetica','normal');
-      doc.text(safeStr(parentPhone), M+4+doc.getTextWidth('Phone: '), y);
-      y+=5.5;
-    }
-    if(parentEmail){
-      doc.setFont('helvetica','bold');
-      doc.text('Email: ', M+4, y);
-      doc.setFont('helvetica','normal');
-      doc.text(safeStr(parentEmail), M+4+doc.getTextWidth('Email: '), y);
-      y+=5.5;
-    }
-    y+=3;
-
-    // ── Students label ──────────────────────────────────────────────────────
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
-    doc.text('Students in this group:', M+4, y);
-    y+=6;
-
-    // ── Student rows ────────────────────────────────────────────────────────
-    studentRows.forEach(s=>{
-      // Line 1: name + grade
-      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
-      const gradePart = s.grade ? '   Grade: ' + s.grade : '';
-      doc.text('•  ' + s.name + gradePart, M+6, y);
-      y+=5.5;
-
-      // Line 2: Subjects
-      if(s.subjects){
-        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(0,0,0);
-        doc.text('Subjects: ' + s.subjects, M+12, y);
-        y+=5;
-      }
-
-      // Line 3: Tutor name + email
-      const tutorLine = [
-        s.tutorName  ? 'Tutor: '  + s.tutorName  : '',
-        s.tutorEmail ? 'Email: '  + s.tutorEmail : ''
-      ].filter(Boolean).join('   |   ');
-      if(tutorLine){
-        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
-        doc.text(tutorLine, M+12, y);
-        y+=5;
-      }
-      y+=3;
-    });
-
-    y+=4;
+  // Render all groups — extracted to separate function to keep call stack lean
+  visible.forEach((g, i)=>{
+    y = renderGroupToPdf(doc, g, i+1, y, W, M, safeStr, confFull, confShort);
   });
+
+  const dateStr=new Date().toISOString().slice(0,10);
+  doc.save('BKH-Duplicate-Review-'+dateStr+'.pdf');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
