@@ -874,42 +874,59 @@ function renderGroups(){
   const list=document.getElementById('dup-list');
   const fv=document.getElementById('filter-input').value.toLowerCase();
   const sf=document.getElementById('filter-status').value;
-
   let vis=dupGroups.filter(g=>{
     if(sf==='pending'&&g.merged) return false;
     if(sf==='merged'&&!g.merged) return false;
     if(fv){const n=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');if(!n.includes(fv)&&!g.phone.includes(fv)) return false;}
     return true;
   });
-
   if(!vis.length){list.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No groups match</div></div>`;return;}
-
   list.innerHTML=vis.map(g=>{
     const gi=dupGroups.indexOf(g);
     const names=[...new Set(g.students.map(s=>s.studentName||'?'))].join(', ');
+    const checkedIds=g.checkedIds||new Set();
+    const primaryId=g.primaryId||null;
     const rows=g.students.map(s=>{
-      const ip=g.primaryId===s.id, is=g.primaryId&&g.primaryId!==s.id;
-      return `<div class="student-row ${ip?'is-primary':is?'is-secondary':''}" onclick="selectPrimary(${gi},'${s.id}')">
-        <div class="radio-ring ${ip?'filled':is?'secondary':''}"></div>
+      const isChecked=checkedIds.has(s.id);
+      const isPrimary=primaryId===s.id;
+      const rowCls=isPrimary?'is-primary':isChecked?'is-secondary':'';
+      const subs=Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–');
+      return `<div class="student-row ${rowCls}" style="cursor:default;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center;flex-shrink:0;padding-top:4px;min-width:52px;">
+          <label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;">
+            <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck(${gi},'${s.id}',this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--amber);">
+            <span style="font-size:9px;color:var(--text-dimmer);">Include</span>
+          </label>
+          <label style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <input type="radio" name="primary-${gi}" value="${s.id}" ${isPrimary?'checked':''} ${!isChecked?'disabled':''} onchange="setPrimary(${gi},'${s.id}')" style="width:14px;height:14px;accent-color:var(--green);cursor:${isChecked?'pointer':'not-allowed'};">
+            <span style="font-size:9px;color:${isChecked?'var(--green)':'var(--text-dimmer)'};">Primary</span>
+          </label>
+        </div>
         <div class="student-info">
           <div class="student-name-row">
             <span class="student-name">${s.studentName||'Unnamed'}</span>
-            ${ip?'<span class="tag tag-primary">PRIMARY</span>':is?'<span class="tag tag-secondary">SECONDARY</span>':''}
+            ${isPrimary?'<span class="tag tag-primary">MASTER RECORD</span>':isChecked?'<span class="tag tag-secondary">WILL MERGE IN</span>':'<span class="tag" style="background:var(--surface2);color:var(--text-dimmer);border:1px solid var(--border)">NOT SELECTED</span>'}
             ${s.studentUid?'<span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">🔑 Has Login</span>':''}
             ${s.primaryStudentId?'<span class="tag tag-merged">ALREADY LINKED</span>':''}
           </div>
           <div class="student-meta">
             <span class="meta-item"><span class="meta-label">tutor:</span>${s.tutorEmail||'–'}</span>
-            <span class="meta-item"><span class="meta-label">subjects:</span>${Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–')}</span>
+            <span class="meta-item"><span class="meta-label">subjects:</span>${subs}</span>
             <span class="meta-item"><span class="meta-label">grade:</span>${s.grade||'–'}</span>
             <span class="meta-item"><span class="meta-label">id:</span>${s.id.substring(0,10)}…</span>
           </div>
         </div>
       </div>`;
     }).join('');
-
-    const canMerge=g.primaryId&&!g.merged;
-    return `<div class="dup-group ${g.merged?'merged-group':g.primaryId?'selected-group':''}" id="group-${gi}">
+    const checkedCount=checkedIds.size;
+    const hasPrimary=primaryId&&checkedIds.has(primaryId);
+    const canMerge=checkedCount>=2&&hasPrimary&&!g.merged;
+    let mergeHint='';
+    if(g.merged) mergeHint='Already merged ✓';
+    else if(checkedCount<2) mergeHint='Tick Include on at least 2 students to merge';
+    else if(!hasPrimary) mergeHint='Now pick Primary on one of the ticked students';
+    else mergeHint='Will merge '+( checkedCount-1)+' into Primary · unticked students are NOT affected';
+    return `<div class="dup-group ${g.merged?'merged-group':canMerge?'selected-group':''}" id="group-${gi}">
       <div class="dup-header" onclick="toggleGroup(${gi})">
         <span class="dup-phone">+…${g.phone.slice(-7)}</span>
         <span class="dup-count">${g.students.length} records</span>
@@ -918,13 +935,16 @@ function renderGroups(){
         <span class="dup-toggle">${g.collapsed?'▶ expand':'▼ collapse'}</span>
       </div>
       ${!g.collapsed?`<div class="dup-body">
+        <div class="alert alert-info" style="margin-bottom:12px;font-size:11px;">
+          Tick <strong>Include</strong> on the students you want to merge together. Then pick <strong>Primary</strong> on the master record (usually the one with 🔑 Login). Students you do <strong>not</strong> tick are completely untouched.
+        </div>
         ${rows}
         <div class="merge-actions">
           <button class="btn btn-success" onclick="mergeGroup(${gi})" ${!canMerge?'disabled':''}>
-            ✨ Merge ${g.students.length-1} duplicate${g.students.length>2?'s':''} into Primary
+            ✨ Merge ${checkedCount>1?checkedCount-1:0} selected into Primary
           </button>
-          <button class="btn btn-ghost" onclick="clearSel(${gi})">Clear</button>
-          <span class="merge-hint">Primary keeps its ID · secondaries are linked</span>
+          <button class="btn btn-ghost" onclick="clearSel(${gi})">Clear Selection</button>
+          <span class="merge-hint">${mergeHint}</span>
         </div>
       </div>`:''}
     </div>`;
@@ -932,8 +952,30 @@ function renderGroups(){
 }
 
 function toggleGroup(i){dupGroups[i].collapsed=!dupGroups[i].collapsed;renderGroups();}
-function selectPrimary(i,id){if(dupGroups[i].merged) return;dupGroups[i].primaryId=id;renderGroups();}
-function clearSel(i){dupGroups[i].primaryId=null;renderGroups();}
+
+function toggleCheck(gi,studentId,checked){
+  if(!dupGroups[gi].checkedIds) dupGroups[gi].checkedIds=new Set();
+  if(checked){
+    dupGroups[gi].checkedIds.add(studentId);
+  } else {
+    dupGroups[gi].checkedIds.delete(studentId);
+    if(dupGroups[gi].primaryId===studentId) dupGroups[gi].primaryId=null;
+  }
+  renderGroups();
+}
+
+function setPrimary(gi,studentId){
+  dupGroups[gi].primaryId=studentId;
+  if(!dupGroups[gi].checkedIds) dupGroups[gi].checkedIds=new Set();
+  dupGroups[gi].checkedIds.add(studentId);
+  renderGroups();
+}
+
+function clearSel(gi){
+  dupGroups[gi].checkedIds=new Set();
+  dupGroups[gi].primaryId=null;
+  renderGroups();
+}
 
 document.getElementById('expand-all-btn').onclick=()=>{
   expandedAll=!expandedAll;
@@ -946,38 +988,34 @@ document.getElementById('filter-status').onchange=renderGroups;
 
 async function mergeGroup(gi){
   const g=dupGroups[gi];
-  if(!g.primaryId||g.merged) return;
+  const checkedIds=g.checkedIds||new Set();
   const primaryId=g.primaryId;
-  const secondaryIds=g.students.filter(s=>s.id!==primaryId).map(s=>s.id);
+  if(!primaryId||checkedIds.size<2||g.merged) return;
+  const secondaryIds=[...checkedIds].filter(id=>id!==primaryId);
   const primaryDoc=g.students.find(s=>s.id===primaryId);
-
+  const skipped=g.students.filter(s=>!checkedIds.has(s.id));
   document.getElementById('log-panel').style.display='block';
   const log=document.getElementById('merge-log');
   function addLog(m,c=''){log.innerHTML+=`<div class="${c}">${m}</div>`;log.scrollTop=log.scrollHeight;}
-
-  addLog(`\n─── Merging: ${g.phone} ───`,'log-info');
-  addLog(`Primary: ${primaryDoc.studentName} (${primaryId})`,'log-ok');
-  secondaryIds.forEach(id=>{const s=g.students.find(x=>x.id===id);addLog(`Secondary: ${s.studentName} (${id})`,'log-warn');});
-
+  addLog('\n─── Merging selected (phone: '+g.phone+') ───','log-info');
+  addLog('Primary: '+primaryDoc.studentName+' ('+primaryId+')','log-ok');
+  secondaryIds.forEach(id=>{const s=g.students.find(x=>x.id===id);addLog('Merging in: '+s.studentName+' ('+id+')','log-warn');});
+  skipped.forEach(s=>addLog('Skipped — not selected: '+s.studentName,'log-info'));
   try{
     const allSubjects=new Set(Array.isArray(primaryDoc.subjects)?primaryDoc.subjects:[]);
     const allTutors=[];
     if(primaryDoc.tutorEmail) allTutors.push({tutorEmail:primaryDoc.tutorEmail,tutorName:primaryDoc.tutorName||'',subjects:Array.isArray(primaryDoc.subjects)?primaryDoc.subjects:[],days:primaryDoc.days||'',studentFee:primaryDoc.studentFee||0});
-
     secondaryIds.forEach(id=>{
       const s=g.students.find(x=>x.id===id);
       if(s.tutorEmail&&!allTutors.find(t=>t.tutorEmail===s.tutorEmail)) allTutors.push({tutorEmail:s.tutorEmail,tutorName:s.tutorName||'',subjects:Array.isArray(s.subjects)?s.subjects:[],days:s.days||'',studentFee:s.studentFee||0});
       (Array.isArray(s.subjects)?s.subjects:[]).forEach(sub=>allSubjects.add(sub));
     });
-
     await db.collection('students').doc(primaryId).update({linkedStudentIds:secondaryIds,allSubjects:Array.from(allSubjects),tutors:allTutors,mergedAt:firebase.firestore.FieldValue.serverTimestamp()});
     addLog('✓ Updated primary doc','log-ok');
-
     for(const secId of secondaryIds){
       await db.collection('students').doc(secId).update({primaryStudentId:primaryId,isMergedRecord:true,mergedAt:firebase.firestore.FieldValue.serverTimestamp()});
-      addLog(`✓ Marked secondary as merged`,'log-ok');
+      addLog('✓ Marked "'+g.students.find(x=>x.id===secId).studentName+'" as merged','log-ok');
     }
-
     const cols=['homework_assignments','conversations','course_materials','daily_topics','student_results','student_notifications','recall_requests'];
     for(const col of cols){
       let fixed=0;
@@ -988,14 +1026,13 @@ async function mergeGroup(gi){
           const batch=db.batch();
           q.docs.forEach(d=>batch.update(d.ref,{studentId:primaryId}));
           await batch.commit(); fixed+=q.docs.length;
-        }catch(e){addLog(`⚠ ${col}: ${e.message}`,'log-warn');}
+        }catch(e){addLog('⚠ '+col+': '+e.message,'log-warn');}
       }
-      if(fixed>0) addLog(`✓ Fixed ${fixed} docs in ${col}`,'log-ok');
+      if(fixed>0) addLog('✓ Fixed '+fixed+' docs in '+col,'log-ok');
     }
-
     g.merged=true; g.collapsed=true; mergedCount++;
     updateMergeStats(); renderGroups(); setStep(3);
-    addLog(`\n✅ Done!\n`,'log-ok');
+    addLog('\n✅ Done!'+(skipped.length?' '+skipped.length+' student(s) left untouched.':'')+'\n','log-ok');
   }catch(e){addLog('❌ '+e.message,'log-err');}
 }
 
