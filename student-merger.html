@@ -696,6 +696,10 @@ function downloadPDF(){
   doc.text('Student Duplicate Review', W/2, y, {align:'center'});
   y+=6;
 
+  doc.setFontSize(9);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}   ·   ${visible.length} group${visible.length!==1?'s':''} flagged for review`, W/2, y, {align:'center'});
+  y+=5;
+
   // thin rule under heading
   doc.setDrawColor(0); doc.setLineWidth(0.4);
   doc.line(M, y, W-M, y);
@@ -726,9 +730,10 @@ function downloadPDF(){
     const nameList=g.students.map(s=>s.studentName||'Unnamed');
 
     // Collect parent info — use first student that has each field
-    const parentName  = g.students.map(s=>s.parentName||'').find(v=>v) || '';
-    const parentPhone = g.students.map(s=>s.parentPhone||'').find(v=>v) || '';
-    const parentEmail = g.students.map(s=>s.parentEmail||'').find(v=>v) || '';
+    // Force string conversion: phone numbers are sometimes stored as numbers in Firebase
+    const parentName  = String(g.students.map(s=>s.parentName||'').find(v=>v)  || '').trim();
+    const parentPhone = String(g.students.map(s=>s.parentPhone||'').find(v=>v) || '').trim();
+    const parentEmail = String(g.students.map(s=>s.parentEmail||'').find(v=>v) || '').trim();
 
     // Count parent info lines that actually have content
     const parentLines = [parentName, parentPhone, parentEmail].filter(v=>v).length;
