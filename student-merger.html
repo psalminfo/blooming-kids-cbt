@@ -184,13 +184,35 @@
 <!-- MAIN TOOL -->
 <div id="tool-wrap" style="display:none">
 
+
+<!-- AUTH -->
+<div id="auth-wrap">
+  <main>
+    <div id="auth-panel" class="panel">
+      <div class="panel-title">Authentication Required</div>
+      <div class="alert alert-warn">⚠️ Admin login required — this tool modifies your database.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input id="auth-email" type="email" class="s-input" placeholder="Admin email" style="max-width:260px;">
+        <input id="auth-pass" type="password" class="s-input" placeholder="Password" style="max-width:200px;">
+        <button class="btn btn-primary" id="auth-btn">Sign In</button>
+      </div>
+      <div id="auth-error" style="color:var(--red);font-size:12px;margin-top:9px;"></div>
+    </div>
+  </main>
+</div>
+
+<!-- MAIN TOOL -->
+<div id="tool-wrap" style="display:none">
+
   <div class="tab-bar">
-    <div class="tab active" id="tab-report" onclick="switchTab('report')">📋 Review Report</div>
-    <div class="tab" id="tab-merge" onclick="switchTab('merge')">🔀 Merge Tool</div>
-    <div class="tab" id="tab-split" onclick="switchTab('split')">✂️ Split Group Docs</div>
+    <div class="tab active" id="tab-report"       onclick="switchTab('report')">📋 Review Report</div>
+    <div class="tab"        id="tab-fix-parents"  onclick="switchTab('fix-parents')">👨‍👩‍👧 Fix Parents</div>
+    <div class="tab"        id="tab-fix-students" onclick="switchTab('fix-students')">🪪 Fix Student IDs</div>
+    <div class="tab"        id="tab-merge"        onclick="switchTab('merge')">🔀 Merge Tool</div>
+    <div class="tab"        id="tab-split"        onclick="switchTab('split')">✂️ Split Group Docs</div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════
+<!-- ═══════════════════════════════════════════════════════
        TAB 1: REVIEW REPORT
   ═══════════════════════════════════════════════════════ -->
   <div id="pane-report">
@@ -245,21 +267,86 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
-       TAB 2: MERGE TOOL
+       TAB 2: FIX PARENTS
+  ═══════════════════════════════════════════════════════ -->
+  <div id="pane-fix-parents" style="display:none">
+  <main>
+    <div class="panel">
+      <div class="panel-title">Fix Parent IDs</div>
+      <div class="alert alert-info">ℹ️ This matches every student doc to a parent account using email first, then phone. It writes <strong>parentUid</strong> onto each student doc. For parents with no account yet, it creates a placeholder so they have a permanent ID ready when they sign up.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary" id="fix-parents-scan-btn">
+          <span class="spinner" style="display:none" id="fix-parents-spin"></span>
+          🔍 Run Fix Parents
+        </button>
+        <span id="fix-parents-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+      </div>
+      <div class="progress-bar" style="display:none" id="fix-parents-progress-wrap">
+        <div class="progress-fill" id="fix-parents-progress" style="width:0%"></div>
+      </div>
+    </div>
+    <div id="fix-parents-results" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="stat-val blue" id="fp-stat-total">–</div><div class="stat-label">Total Students</div></div>
+        <div class="stat"><div class="stat-val green" id="fp-stat-matched">–</div><div class="stat-label">Matched to Parent</div></div>
+        <div class="stat"><div class="stat-val amber" id="fp-stat-placeholder">–</div><div class="stat-label">Placeholders Created</div></div>
+        <div class="stat"><div class="stat-val red" id="fp-stat-nomatch">–</div><div class="stat-label">Could Not Match</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Students with no parent match</div>
+        <div id="fp-detail-list"></div>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       TAB 3: FIX STUDENT IDs
+  ═══════════════════════════════════════════════════════ -->
+  <div id="pane-fix-students" style="display:none">
+  <main>
+    <div class="panel">
+      <div class="panel-title">Fix Student IDs</div>
+      <div class="alert alert-info">ℹ️ Every student doc needs a <strong>studentId</strong> field. For docs that don't have it, this sets <strong>studentId</strong> to the doc's own Firestore ID. Run this before merging. Safe to run multiple times.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary" id="fix-students-scan-btn">
+          <span class="spinner" style="display:none" id="fix-students-spin"></span>
+          🪪 Run Fix Student IDs
+        </button>
+        <span id="fix-students-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+      </div>
+      <div class="progress-bar" style="display:none" id="fix-students-progress-wrap">
+        <div class="progress-fill" id="fix-students-progress" style="width:0%"></div>
+      </div>
+    </div>
+    <div id="fix-students-results" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="stat-val blue"  id="fs-stat-total">–</div><div class="stat-label">Total Students</div></div>
+        <div class="stat"><div class="stat-val green" id="fs-stat-already">–</div><div class="stat-label">Already Had ID</div></div>
+        <div class="stat"><div class="stat-val amber" id="fs-stat-fixed">–</div><div class="stat-label">IDs Set Now</div></div>
+        <div class="stat"><div class="stat-val blue"  id="fs-stat-dummy" style="opacity:0">–</div><div class="stat-label"> </div></div>
+      </div>
+      <div class="panel">
+        <div class="alert alert-info">✅ All student docs now have a <strong>studentId</strong> field. You can now run the Merge Tool on Tab 4.</div>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       TAB 4: MERGE TOOL
   ═══════════════════════════════════════════════════════ -->
   <div id="pane-merge" style="display:none">
   <main>
-
     <div class="steps">
       <div class="step active" id="step1"><div class="step-num">1</div> Scan</div>
-      <div class="step" id="step2"><div class="step-num">2</div> Review</div>
-      <div class="step" id="step3"><div class="step-num">3</div> Merge</div>
+      <div class="step" id="step2"><div class="step-num">2</div> Select</div>
+      <div class="step" id="step3"><div class="step-num">3</div> Done</div>
     </div>
-
     <div id="view-scan">
       <div class="panel">
         <div class="panel-title">Scan All Students</div>
-        <div class="alert alert-warn">⚠️ Complete the Review Report first so you know exactly which groups to merge.</div>
+        <div class="alert alert-warn">⚠️ Run Tab 2 (Fix Parents) and Tab 3 (Fix Student IDs) first. Then use the Review Report PDF from Tab 1 to know which groups to merge.</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
           <button class="btn btn-primary" id="scan-btn">
             <span class="spinner" style="display:none" id="scan-spin"></span>
@@ -272,12 +359,11 @@
         </div>
       </div>
     </div>
-
     <div id="view-results" style="display:none">
       <div class="stats">
-        <div class="stat"><div class="stat-val blue" id="stat-total">–</div><div class="stat-label">Total Students</div></div>
-        <div class="stat"><div class="stat-val amber" id="stat-groups">–</div><div class="stat-label">Duplicate Groups</div></div>
-        <div class="stat"><div class="stat-val red" id="stat-dupes">–</div><div class="stat-label">Duplicate Docs</div></div>
+        <div class="stat"><div class="stat-val blue"  id="stat-total">–</div><div class="stat-label">Total Students</div></div>
+        <div class="stat"><div class="stat-val amber" id="stat-groups">–</div><div class="stat-label">Groups (same phone)</div></div>
+        <div class="stat"><div class="stat-val red"   id="stat-dupes">–</div><div class="stat-label">Extra Records</div></div>
         <div class="stat"><div class="stat-val green" id="stat-merged">0</div><div class="stat-label">Merged So Far</div></div>
       </div>
       <div class="panel">
@@ -296,15 +382,11 @@
       <div class="panel" id="log-panel" style="display:none">
         <div class="panel-title">Merge Log</div>
         <div class="log" id="merge-log"></div>
-        <div style="margin-top:12px;display:flex;gap:10px;">
-          <button class="btn btn-ghost" id="copy-log-btn">Copy Log</button>
-        </div>
+        <div style="margin-top:12px;"><button class="btn btn-ghost" id="copy-log-btn">Copy Log</button></div>
       </div>
     </div>
-
   </main>
   </div>
-
 
   <!-- ═══════════════════════════════════════════════════════
        TAB 3: SPLIT GROUP DOCS
@@ -357,12 +439,15 @@
 
 </div><!-- /tool-wrap -->
 
+
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+
 <script>
+
 // ─── FIREBASE ─────────────────────────────────────────────────────────────────
 const mainCfg={apiKey:"AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",authDomain:"bloomingkidsassessment.firebaseapp.com",projectId:"bloomingkidsassessment",storageBucket:"bloomingkidsassessment.appspot.com",messagingSenderId:"238975054977",appId:"1:238975054977:web:87c70b4db044998a204980"};
 const devCfg={apiKey:"AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",authDomain:"blooming-kids-dev.firebaseapp.com",projectId:"blooming-kids-dev",storageBucket:"blooming-kids-dev.firebasestorage.app",messagingSenderId:"336022609689",appId:"1:336022609689:web:ad5a0a74dcac011f21ef88"};
@@ -391,15 +476,13 @@ document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
 // ─── TABS ──────────────────────────────────────────────────────────────────────
 function switchTab(t){
-  ['report','merge','split'].forEach(id=>{
+  ['report','fix-parents','fix-students','merge','split'].forEach(id=>{
     document.getElementById('tab-'+id).className='tab'+(id===t?' active':'');
     document.getElementById('pane-'+id).style.display=id===t?'block':'none';
   });
-  // When switching to merge tab, always make sure view-scan is visible
-  if(t==='merge'){
-    document.getElementById('view-scan').style.display='block';
-  }
+  if(t==='merge') document.getElementById('view-scan').style.display='block';
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NAME SIMILARITY ENGINE
@@ -529,6 +612,7 @@ function normPhone(p){
   const d=String(p).replace(/\D/g,'');
   return d.length<7?null:d.slice(-10);
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 1: REVIEW REPORT
@@ -810,19 +894,253 @@ function downloadPDF(){
   doc.save('BKH-Duplicate-Review-'+dateStr+'.pdf');
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// TAB 2: MERGE TOOL (same logic as before)
+// TAB 2: FIX PARENTS
+// Matches every student doc to a parent_users doc by parentEmail then parentPhone.
+// Writes parentUid onto the student doc.
+// Creates placeholder parent_users docs for parents with no account yet.
 // ═══════════════════════════════════════════════════════════════════════════════
+
+let fixParentsResults = { matched:0, placeholder:0, noMatch:0, total:0, details:[] };
+
+document.getElementById('fix-parents-scan-btn').onclick = runFixParents;
+
+async function runFixParents(){
+  const btn  = document.getElementById('fix-parents-scan-btn');
+  const spin = document.getElementById('fix-parents-spin');
+  const stat = document.getElementById('fix-parents-status');
+  const wrap = document.getElementById('fix-parents-progress-wrap');
+  const bar  = document.getElementById('fix-parents-progress');
+
+  btn.disabled=true; spin.style.display='inline-block';
+  wrap.style.display='block'; bar.style.width='5%';
+  stat.textContent='Loading students…';
+
+  try{
+    // Load all students
+    const studSnap = await db.collection('students').get();
+    const students = studSnap.docs.map(d=>({id:d.id,...d.data()}));
+    bar.style.width='20%';
+    stat.textContent='Loading parent accounts…';
+
+    // Load all parent_users
+    const parSnap = await db.collection('parent_users').get();
+    const parents = parSnap.docs.map(d=>({id:d.id,...d.data()}));
+    bar.style.width='35%';
+
+    // Build lookup maps
+    const parentByEmail = {};
+    const parentByPhone = {};
+    parents.forEach(p=>{
+      if(p.email) parentByEmail[p.email.toLowerCase().trim()] = p;
+      const ph = normPhone(p.phone||p.parentPhone||'');
+      if(ph) parentByPhone[ph] = p;
+    });
+
+    bar.style.width='45%';
+    stat.textContent='Matching students to parents…';
+
+    fixParentsResults = { matched:0, placeholder:0, noMatch:0, total:students.length, details:[] };
+    const placeholdersToCreate = {}; // key=email, value=parentData
+
+    const total = students.length;
+    let done = 0;
+
+    for(const s of students){
+      done++;
+      bar.style.width = (45 + Math.round((done/total)*40)) + '%';
+
+      // Already has parentUid — skip
+      if(s.parentUid){
+        fixParentsResults.matched++;
+        fixParentsResults.details.push({student:s.studentName, status:'already_linked', parentUid:s.parentUid});
+        continue;
+      }
+
+      const sEmail = (s.parentEmail||'').toLowerCase().trim();
+      const sPhone = normPhone(s.parentPhone||'');
+
+      // Try match by email first
+      let match = sEmail ? parentByEmail[sEmail] : null;
+      // Fallback to phone
+      if(!match && sPhone) match = parentByPhone[sPhone];
+
+      if(match){
+        // Write parentUid to student doc
+        await db.collection('students').doc(s.id).update({ parentUid: match.uid || match.id });
+        fixParentsResults.matched++;
+        fixParentsResults.details.push({student:s.studentName, status:'matched', parentName:match.name||match.displayName||'', parentUid:match.uid||match.id});
+      } else if(sEmail || sPhone){
+        // No parent account — queue placeholder creation
+        const key = sEmail || sPhone;
+        if(!placeholdersToCreate[key]){
+          placeholdersToCreate[key] = {
+            name:        s.parentName || '',
+            email:       s.parentEmail || '',
+            phone:       s.parentPhone ? String(s.parentPhone) : '',
+            isPlaceholder: true,
+            createdAt:   firebase.firestore.FieldValue.serverTimestamp(),
+            linkedStudentIds: [s.id]
+          };
+        } else {
+          placeholdersToCreate[key].linkedStudentIds.push(s.id);
+        }
+        fixParentsResults.noMatch++;
+        fixParentsResults.details.push({student:s.studentName, status:'no_match', parentEmail:s.parentEmail||'', parentPhone:String(s.parentPhone||'')});
+      } else {
+        fixParentsResults.noMatch++;
+        fixParentsResults.details.push({student:s.studentName, status:'no_contact', note:'No email or phone on student doc'});
+      }
+    }
+
+    bar.style.width='88%';
+    stat.textContent='Creating placeholder parent accounts…';
+
+    // Create placeholders and write parentUid back to their students
+    for(const [key, pData] of Object.entries(placeholdersToCreate)){
+      const newRef = db.collection('parent_users').doc();
+      const placeholderUid = newRef.id;
+      await newRef.set({ ...pData, uid: placeholderUid });
+
+      // Write parentUid to each student linked to this placeholder
+      for(const sid of pData.linkedStudentIds){
+        await db.collection('students').doc(sid).update({ parentUid: placeholderUid });
+      }
+      fixParentsResults.placeholder++;
+    }
+
+    bar.style.width='100%';
+    stat.textContent=`Done. ${fixParentsResults.matched} matched · ${fixParentsResults.placeholder} placeholders created · ${fixParentsResults.noMatch} could not match.`;
+
+    renderFixParentsResults();
+    document.getElementById('fix-parents-results').style.display='block';
+
+  }catch(e){
+    stat.textContent='❌ Error: '+e.message;
+    console.error(e);
+  }finally{
+    btn.disabled=false; spin.style.display='none';
+    setTimeout(()=>wrap.style.display='none', 1500);
+  }
+}
+
+function renderFixParentsResults(){
+  const r = fixParentsResults;
+  document.getElementById('fp-stat-total').textContent   = r.total;
+  document.getElementById('fp-stat-matched').textContent = r.matched;
+  document.getElementById('fp-stat-placeholder').textContent = r.placeholder;
+  document.getElementById('fp-stat-nomatch').textContent  = r.noMatch;
+
+  const list = document.getElementById('fp-detail-list');
+  const noMatch = r.details.filter(d=>d.status==='no_match'||d.status==='no_contact');
+  if(!noMatch.length){
+    list.innerHTML='<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">All students matched to a parent</div></div>';
+    return;
+  }
+  list.innerHTML = noMatch.map(d=>`
+    <div style="padding:10px 14px;background:var(--bg);border:1px solid var(--red);border-radius:6px;margin-bottom:8px;">
+      <div style="font-weight:700;font-size:13px;color:var(--text);">${d.student||'Unknown'}</div>
+      <div style="font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;margin-top:4px;">
+        ${d.status==='no_contact'
+          ? '<span style="color:var(--red);">No parent email or phone on this student doc</span>'
+          : `Email: ${d.parentEmail||'–'}  ·  Phone: ${d.parentPhone||'–'}`}
+      </div>
+    </div>`).join('');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 3: FIX STUDENT IDs
+// For every student doc that has no studentId field, sets it to the doc's own
+// Firestore ID. This ensures every student has a stable studentId that all
+// portals can use to query across collections.
+// Does NOT merge anything — this is just the ID-setting pass.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let fixStudentsStats = { total:0, alreadySet:0, fixed:0, errors:0 };
+
+document.getElementById('fix-students-scan-btn').onclick = runFixStudentIds;
+
+async function runFixStudentIds(){
+  const btn  = document.getElementById('fix-students-scan-btn');
+  const spin = document.getElementById('fix-students-spin');
+  const stat = document.getElementById('fix-students-status');
+  const wrap = document.getElementById('fix-students-progress-wrap');
+  const bar  = document.getElementById('fix-students-progress');
+
+  btn.disabled=true; spin.style.display='inline-block';
+  wrap.style.display='block'; bar.style.width='5%';
+  stat.textContent='Loading all students…';
+
+  try{
+    const snap = await db.collection('students').get();
+    const all  = snap.docs.map(d=>({id:d.id,...d.data()}));
+    fixStudentsStats = { total:all.length, alreadySet:0, fixed:0, errors:0 };
+
+    bar.style.width='20%';
+    stat.textContent=`Found ${all.length} students. Setting IDs…`;
+
+    // Process in batches of 400 (Firestore batch limit is 500)
+    const needsFix = all.filter(s => !s.studentId);
+    const alreadySet = all.length - needsFix.length;
+    fixStudentsStats.alreadySet = alreadySet;
+
+    const BATCH_SIZE = 400;
+    let processed = 0;
+
+    for(let i=0; i<needsFix.length; i+=BATCH_SIZE){
+      const chunk = needsFix.slice(i, i+BATCH_SIZE);
+      const batch = db.batch();
+      chunk.forEach(s=>{
+        batch.update(db.collection('students').doc(s.id), { studentId: s.id });
+      });
+      await batch.commit();
+      processed += chunk.length;
+      fixStudentsStats.fixed = processed;
+      bar.style.width = (20 + Math.round((processed/Math.max(needsFix.length,1))*75)) + '%';
+      stat.textContent = `Setting IDs… ${processed} of ${needsFix.length}`;
+    }
+
+    bar.style.width='100%';
+    stat.textContent=`Done. ${fixStudentsStats.fixed} IDs set · ${fixStudentsStats.alreadySet} already had IDs.`;
+
+    document.getElementById('fs-stat-total').textContent    = fixStudentsStats.total;
+    document.getElementById('fs-stat-already').textContent  = fixStudentsStats.alreadySet;
+    document.getElementById('fs-stat-fixed').textContent    = fixStudentsStats.fixed;
+    document.getElementById('fix-students-results').style.display='block';
+
+  }catch(e){
+    stat.textContent='❌ Error: '+e.message;
+    console.error(e);
+  }finally{
+    btn.disabled=false; spin.style.display='none';
+    setTimeout(()=>wrap.style.display='none', 1500);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 4: MERGE TOOL
+// Selective checkbox merge. No primary/secondary — all selected docs become
+// EQUAL. They all get the same studentId value written on them.
+// The studentId chosen is: the doc that already has studentUid (login) if any,
+// otherwise the doc's own Firestore ID from the first checked doc.
+// Each tutor doc stays fully independent — summerBreak, status, archived on
+// one doc NEVER touches another doc.
+// All historical records in 7 collections get updated to the shared studentId.
+// ═══════════════════════════════════════════════════════════════════════════════
+
 let allStudents=[], dupGroups=[], mergedCount=0, expandedAll=false;
 
 document.getElementById('scan-btn').onclick=scanStudents;
 
 async function scanStudents(){
-  const btn=document.getElementById('scan-btn');
-  const spin=document.getElementById('scan-spin');
-  const stat=document.getElementById('scan-status');
-  const wrap=document.getElementById('scan-progress-wrap');
-  const bar=document.getElementById('scan-progress');
+  const btn  = document.getElementById('scan-btn');
+  const spin = document.getElementById('scan-spin');
+  const stat = document.getElementById('scan-status');
+  const wrap = document.getElementById('scan-progress-wrap');
+  const bar  = document.getElementById('scan-progress');
 
   btn.disabled=true; spin.style.display='inline-block';
   wrap.style.display='block'; bar.style.width='10%';
@@ -832,7 +1150,7 @@ async function scanStudents(){
     const snap=await db.collection('students').get();
     allStudents=snap.docs.map(d=>({id:d.id,...d.data()}));
     bar.style.width='40%';
-    stat.textContent=`Loaded ${allStudents.length} students. Grouping…`;
+    stat.textContent=`Loaded ${allStudents.length} students. Grouping by phone…`;
 
     const phoneMap={};
     allStudents.forEach(s=>{
@@ -845,10 +1163,10 @@ async function scanStudents(){
 
     dupGroups=Object.entries(phoneMap)
       .filter(([,arr])=>arr.length>1)
-      .map(([phone,students])=>({phone,students,merged:false,primaryId:null,collapsed:true}));
+      .map(([phone,students])=>({phone,students,merged:false,checkedIds:new Set(),sharedStudentId:null,collapsed:true}));
 
     bar.style.width='100%';
-    stat.textContent=`Done. Found ${dupGroups.length} groups.`;
+    stat.textContent=`Done. Found ${dupGroups.length} groups with multiple students.`;
 
     updateMergeStats(); renderGroups();
     document.getElementById('view-results').style.display='block';
@@ -874,58 +1192,62 @@ function renderGroups(){
   const list=document.getElementById('dup-list');
   const fv=document.getElementById('filter-input').value.toLowerCase();
   const sf=document.getElementById('filter-status').value;
+
   let vis=dupGroups.filter(g=>{
     if(sf==='pending'&&g.merged) return false;
     if(sf==='merged'&&!g.merged) return false;
     if(fv){const n=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');if(!n.includes(fv)&&!g.phone.includes(fv)) return false;}
     return true;
   });
+
   if(!vis.length){list.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No groups match</div></div>`;return;}
+
   list.innerHTML=vis.map(g=>{
     const gi=dupGroups.indexOf(g);
     const names=[...new Set(g.students.map(s=>s.studentName||'?'))].join(', ');
     const checkedIds=g.checkedIds||new Set();
-    const primaryId=g.primaryId||null;
+
     const rows=g.students.map(s=>{
       const isChecked=checkedIds.has(s.id);
-      const isPrimary=primaryId===s.id;
-      const rowCls=isPrimary?'is-primary':isChecked?'is-secondary':'';
       const subs=Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–');
-      return `<div class="student-row ${rowCls}" style="cursor:default;align-items:flex-start;">
-        <div style="display:flex;flex-direction:column;gap:8px;align-items:center;flex-shrink:0;padding-top:4px;min-width:52px;">
+      return `<div class="student-row ${isChecked?'is-secondary':''}" style="cursor:default;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:center;flex-shrink:0;padding-top:4px;min-width:52px;">
           <label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;">
-            <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck(${gi},'${s.id}',this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--amber);">
+            <input type="checkbox" ${isChecked?'checked':''} onchange="toggleCheck(${gi},'${s.id}',this.checked)"
+              style="width:15px;height:15px;cursor:pointer;accent-color:var(--amber);">
             <span style="font-size:9px;color:var(--text-dimmer);">Include</span>
-          </label>
-          <label style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-            <input type="radio" name="primary-${gi}" value="${s.id}" ${isPrimary?'checked':''} ${!isChecked?'disabled':''} onchange="setPrimary(${gi},'${s.id}')" style="width:14px;height:14px;accent-color:var(--green);cursor:${isChecked?'pointer':'not-allowed'};">
-            <span style="font-size:9px;color:${isChecked?'var(--green)':'var(--text-dimmer)'};">Primary</span>
           </label>
         </div>
         <div class="student-info">
           <div class="student-name-row">
             <span class="student-name">${s.studentName||'Unnamed'}</span>
-            ${isPrimary?'<span class="tag tag-primary">MASTER RECORD</span>':isChecked?'<span class="tag tag-secondary">WILL MERGE IN</span>':'<span class="tag" style="background:var(--surface2);color:var(--text-dimmer);border:1px solid var(--border)">NOT SELECTED</span>'}
-            ${s.studentUid?'<span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">🔑 Has Login</span>':''}
-            ${s.primaryStudentId?'<span class="tag tag-merged">ALREADY LINKED</span>':''}
+            ${isChecked?'<span class="tag tag-secondary">WILL LINK</span>':'<span class="tag" style="background:var(--surface2);color:var(--text-dimmer);border:1px solid var(--border)">NOT SELECTED</span>'}
+            ${s.studentUid?'<span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)">🔑 Has Login — ID will be shared</span>':''}
+            ${s.studentId?'<span class="tag" style="background:var(--surface2);color:var(--text-dimmer);font-size:9px;">id:'+s.studentId.substring(0,8)+'…</span>':''}
+            ${s.primaryStudentId||s.isMergedRecord?'<span class="tag tag-merged">ALREADY MERGED</span>':''}
           </div>
           <div class="student-meta">
             <span class="meta-item"><span class="meta-label">tutor:</span>${s.tutorEmail||'–'}</span>
             <span class="meta-item"><span class="meta-label">subjects:</span>${subs}</span>
             <span class="meta-item"><span class="meta-label">grade:</span>${s.grade||'–'}</span>
-            <span class="meta-item"><span class="meta-label">id:</span>${s.id.substring(0,10)}…</span>
           </div>
         </div>
       </div>`;
     }).join('');
+
     const checkedCount=checkedIds.size;
-    const hasPrimary=primaryId&&checkedIds.has(primaryId);
-    const canMerge=checkedCount>=2&&hasPrimary&&!g.merged;
+    const canMerge=checkedCount>=2&&!g.merged;
+
+    // Find the shared studentId that will be used
+    const checkedDocs=g.students.filter(s=>checkedIds.has(s.id));
+    const docWithLogin=checkedDocs.find(s=>s.studentUid);
+    const sharedId=docWithLogin?(docWithLogin.studentId||docWithLogin.id):(checkedDocs[0]?(checkedDocs[0].studentId||checkedDocs[0].id):'');
+
     let mergeHint='';
-    if(g.merged) mergeHint='Already merged ✓';
-    else if(checkedCount<2) mergeHint='Tick Include on at least 2 students to merge';
-    else if(!hasPrimary) mergeHint='Now pick Primary on one of the ticked students';
-    else mergeHint='Will merge '+( checkedCount-1)+' into Primary · unticked students are NOT affected';
+    if(g.merged)            mergeHint='Already merged ✓';
+    else if(checkedCount<2) mergeHint='Tick Include on at least 2 students';
+    else                    mergeHint=`All ${checkedCount} selected will share studentId: ${sharedId.substring(0,12)}… · Each tutor doc stays independent`;
+
     return `<div class="dup-group ${g.merged?'merged-group':canMerge?'selected-group':''}" id="group-${gi}">
       <div class="dup-header" onclick="toggleGroup(${gi})">
         <span class="dup-phone">+…${g.phone.slice(-7)}</span>
@@ -936,14 +1258,14 @@ function renderGroups(){
       </div>
       ${!g.collapsed?`<div class="dup-body">
         <div class="alert alert-info" style="margin-bottom:12px;font-size:11px;">
-          Tick <strong>Include</strong> on the students you want to merge together. Then pick <strong>Primary</strong> on the master record (usually the one with 🔑 Login). Students you do <strong>not</strong> tick are completely untouched.
+          Tick <strong>Include</strong> on students that are the same child. All ticked docs will share one <strong>studentId</strong> — the one with 🔑 Login is used if available. Each tutor doc stays completely independent. Unticked students are not affected.
         </div>
         ${rows}
         <div class="merge-actions">
           <button class="btn btn-success" onclick="mergeGroup(${gi})" ${!canMerge?'disabled':''}>
-            ✨ Merge ${checkedCount>1?checkedCount-1:0} selected into Primary
+            🔗 Link ${checkedCount} selected with shared studentId
           </button>
-          <button class="btn btn-ghost" onclick="clearSel(${gi})">Clear Selection</button>
+          <button class="btn btn-ghost" onclick="clearSel(${gi})">Clear</button>
           <span class="merge-hint">${mergeHint}</span>
         </div>
       </div>`:''}
@@ -955,25 +1277,13 @@ function toggleGroup(i){dupGroups[i].collapsed=!dupGroups[i].collapsed;renderGro
 
 function toggleCheck(gi,studentId,checked){
   if(!dupGroups[gi].checkedIds) dupGroups[gi].checkedIds=new Set();
-  if(checked){
-    dupGroups[gi].checkedIds.add(studentId);
-  } else {
-    dupGroups[gi].checkedIds.delete(studentId);
-    if(dupGroups[gi].primaryId===studentId) dupGroups[gi].primaryId=null;
-  }
-  renderGroups();
-}
-
-function setPrimary(gi,studentId){
-  dupGroups[gi].primaryId=studentId;
-  if(!dupGroups[gi].checkedIds) dupGroups[gi].checkedIds=new Set();
-  dupGroups[gi].checkedIds.add(studentId);
+  if(checked) dupGroups[gi].checkedIds.add(studentId);
+  else dupGroups[gi].checkedIds.delete(studentId);
   renderGroups();
 }
 
 function clearSel(gi){
   dupGroups[gi].checkedIds=new Set();
-  dupGroups[gi].primaryId=null;
   renderGroups();
 }
 
@@ -989,50 +1299,67 @@ document.getElementById('filter-status').onchange=renderGroups;
 async function mergeGroup(gi){
   const g=dupGroups[gi];
   const checkedIds=g.checkedIds||new Set();
-  const primaryId=g.primaryId;
-  if(!primaryId||checkedIds.size<2||g.merged) return;
-  const secondaryIds=[...checkedIds].filter(id=>id!==primaryId);
-  const primaryDoc=g.students.find(s=>s.id===primaryId);
+  if(checkedIds.size<2||g.merged) return;
+
+  const selectedDocs=g.students.filter(s=>checkedIds.has(s.id));
   const skipped=g.students.filter(s=>!checkedIds.has(s.id));
+
+  // Choose shared studentId: prefer doc with login, else first selected doc's studentId or its Firestore ID
+  const docWithLogin=selectedDocs.find(s=>s.studentUid);
+  const masterDoc=docWithLogin||selectedDocs[0];
+  const sharedStudentId=masterDoc.studentId||masterDoc.id;
+
   document.getElementById('log-panel').style.display='block';
   const log=document.getElementById('merge-log');
   function addLog(m,c=''){log.innerHTML+=`<div class="${c}">${m}</div>`;log.scrollTop=log.scrollHeight;}
-  addLog('\n─── Merging selected (phone: '+g.phone+') ───','log-info');
-  addLog('Primary: '+primaryDoc.studentName+' ('+primaryId+')','log-ok');
-  secondaryIds.forEach(id=>{const s=g.students.find(x=>x.id===id);addLog('Merging in: '+s.studentName+' ('+id+')','log-warn');});
-  skipped.forEach(s=>addLog('Skipped — not selected: '+s.studentName,'log-info'));
+
+  addLog('\n─── Linking selected students (phone: '+g.phone+') ───','log-info');
+  addLog('Shared studentId will be: '+sharedStudentId,'log-ok');
+  selectedDocs.forEach(s=>addLog('Linking: '+s.studentName+' (doc: '+s.id+'  currentStudentId: '+(s.studentId||'none')+')','log-warn'));
+  if(skipped.length) skipped.forEach(s=>addLog('Skipped — not selected: '+s.studentName,'log-info'));
+
   try{
-    const allSubjects=new Set(Array.isArray(primaryDoc.subjects)?primaryDoc.subjects:[]);
-    const allTutors=[];
-    if(primaryDoc.tutorEmail) allTutors.push({tutorEmail:primaryDoc.tutorEmail,tutorName:primaryDoc.tutorName||'',subjects:Array.isArray(primaryDoc.subjects)?primaryDoc.subjects:[],days:primaryDoc.days||'',studentFee:primaryDoc.studentFee||0});
-    secondaryIds.forEach(id=>{
-      const s=g.students.find(x=>x.id===id);
-      if(s.tutorEmail&&!allTutors.find(t=>t.tutorEmail===s.tutorEmail)) allTutors.push({tutorEmail:s.tutorEmail,tutorName:s.tutorName||'',subjects:Array.isArray(s.subjects)?s.subjects:[],days:s.days||'',studentFee:s.studentFee||0});
-      (Array.isArray(s.subjects)?s.subjects:[]).forEach(sub=>allSubjects.add(sub));
-    });
-    await db.collection('students').doc(primaryId).update({linkedStudentIds:secondaryIds,allSubjects:Array.from(allSubjects),tutors:allTutors,mergedAt:firebase.firestore.FieldValue.serverTimestamp()});
-    addLog('✓ Updated primary doc','log-ok');
-    for(const secId of secondaryIds){
-      await db.collection('students').doc(secId).update({primaryStudentId:primaryId,isMergedRecord:true,mergedAt:firebase.firestore.FieldValue.serverTimestamp()});
-      addLog('✓ Marked "'+g.students.find(x=>x.id===secId).studentName+'" as merged','log-ok');
+    // Step 1: Write shared studentId onto every selected student doc
+    for(const s of selectedDocs){
+      if(s.studentId===sharedStudentId) continue; // already correct
+      await db.collection('students').doc(s.id).update({ studentId: sharedStudentId });
+      addLog('✓ Set studentId on: '+s.studentName,'log-ok');
     }
-    const cols=['homework_assignments','conversations','course_materials','daily_topics','student_results','student_notifications','recall_requests'];
-    for(const col of cols){
+
+    // Step 2: Update all historical records in every collection
+    const COLLECTIONS=['homework_assignments','conversations','course_materials',
+                        'daily_topics','student_results','student_notifications','recall_requests'];
+
+    for(const col of COLLECTIONS){
       let fixed=0;
-      for(const secId of secondaryIds){
+      for(const s of selectedDocs){
+        if(s.studentId===sharedStudentId) continue; // already had correct ID
+        const oldId=s.studentId||s.id;
         try{
-          const q=await db.collection(col).where('studentId','==',secId).get();
+          const q=await db.collection(col).where('studentId','==',oldId).get();
           if(q.empty) continue;
           const batch=db.batch();
-          q.docs.forEach(d=>batch.update(d.ref,{studentId:primaryId}));
-          await batch.commit(); fixed+=q.docs.length;
+          q.docs.forEach(d=>batch.update(d.ref,{studentId:sharedStudentId}));
+          await batch.commit();
+          fixed+=q.docs.length;
         }catch(e){addLog('⚠ '+col+': '+e.message,'log-warn');}
       }
-      if(fixed>0) addLog('✓ Fixed '+fixed+' docs in '+col,'log-ok');
+      if(fixed>0) addLog('✓ Updated '+fixed+' records in '+col,'log-ok');
     }
+
+    // Step 3: Mark all selected docs as part of merged group (for reference only — does NOT affect tutor portals)
+    for(const s of selectedDocs){
+      await db.collection('students').doc(s.id).update({
+        isMergedRecord: true,
+        sharedStudentId: sharedStudentId,
+        mergedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
     g.merged=true; g.collapsed=true; mergedCount++;
     updateMergeStats(); renderGroups(); setStep(3);
-    addLog('\n✅ Done!'+(skipped.length?' '+skipped.length+' student(s) left untouched.':'')+'\n','log-ok');
+    addLog('\n✅ Done! All '+selectedDocs.length+' students now share studentId: '+sharedStudentId+(skipped.length?'\n'+skipped.length+' student(s) left completely untouched.':'')+'\n','log-ok');
+
   }catch(e){addLog('❌ '+e.message,'log-err');}
 }
 
@@ -1049,6 +1376,7 @@ function setStep(n){
     el.className='step '+(i<n?'done':i===n?'active':'');
   });
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 3: SPLIT GROUP DOCS
@@ -1300,6 +1628,8 @@ document.getElementById('split-copy-log-btn').onclick = () => {
   });
 };
 
+
 </script>
+
 </body>
 </html>
