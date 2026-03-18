@@ -187,6 +187,7 @@
   <div class="tab-bar">
     <div class="tab active" id="tab-report" onclick="switchTab('report')">📋 Review Report</div>
     <div class="tab" id="tab-merge" onclick="switchTab('merge')">🔀 Merge Tool</div>
+    <div class="tab" id="tab-split" onclick="switchTab('split')">✂️ Split Group Docs</div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
@@ -304,6 +305,56 @@
   </main>
   </div>
 
+
+  <!-- ═══════════════════════════════════════════════════════
+       TAB 3: SPLIT GROUP DOCS
+  ═══════════════════════════════════════════════════════ -->
+  <div id="pane-split" style="display:none">
+  <main>
+
+    <div class="panel">
+      <div class="panel-title">Split Combined Group Class Docs</div>
+      <div class="alert alert-info">ℹ️ This scan finds student docs where the name contains multiple children written together (e.g. "Tunde and Bayo", "Tunde / Bayo"). It then links the combined doc ID to each individual child&#39;s existing doc so their portal shows all historical homework, topics and materials.</div>
+      <div class="alert alert-warn">⚠️ The portal patch (BKHstudentportal-patch.js) must be applied before individual student portals can benefit from this linking.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary" id="split-scan-btn">
+          <span class="spinner" style="display:none" id="split-spin"></span>
+          🔍 Scan for Combined Docs
+        </button>
+        <span id="split-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+      </div>
+      <div class="progress-bar" style="display:none" id="split-progress-wrap">
+        <div class="progress-fill" id="split-progress" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="split-results" style="display:none">
+
+      <div class="stats">
+        <div class="stat"><div class="stat-val amber" id="split-stat-found">–</div><div class="stat-label">Combined Docs Found</div></div>
+        <div class="stat"><div class="stat-val blue" id="split-stat-matched">–</div><div class="stat-label">Have Matching Individual Docs</div></div>
+        <div class="stat"><div class="stat-val red" id="split-stat-unmatched">–</div><div class="stat-label">No Individual Docs Yet</div></div>
+        <div class="stat"><div class="stat-val green" id="split-stat-linked">0</div><div class="stat-label">Linked So Far</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Combined Docs Detected</div>
+        <div id="split-list"></div>
+      </div>
+
+      <div class="panel" id="split-log-panel" style="display:none">
+        <div class="panel-title">Link Log</div>
+        <div class="log" id="split-log"></div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-ghost" id="split-copy-log-btn">Copy Log</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+  </div>
+
 </div><!-- /tool-wrap -->
 
 <!-- Firebase -->
@@ -340,7 +391,7 @@ document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
 // ─── TABS ──────────────────────────────────────────────────────────────────────
 function switchTab(t){
-  ['report','merge'].forEach(id=>{
+  ['report','merge','split'].forEach(id=>{
     document.getElementById('tab-'+id).className='tab'+(id===t?' active':'');
     document.getElementById('pane-'+id).style.display=id===t?'block':'none';
   });
@@ -927,6 +978,257 @@ function setStep(n){
     el.className='step '+(i<n?'done':i===n?'active':'');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 3: SPLIT GROUP DOCS
+// Finds docs where studentName contains multiple children joined together.
+// Links the combined doc ID into each matching individual child's linkedStudentIds.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let splitCombinedDocs = [];  // [{doc, detectedNames:[], matchedIndividuals:[], phone}]
+let splitLinkedCount = 0;
+
+// Patterns that suggest a combined name
+const COMBINED_PATTERNS = [
+  /\s+and\s+/i,
+  /\s*\/\s*/,
+  /\s*&\s*/,
+  /\s*,\s+/,   // "Tunde, Bayo" — comma followed by space + new name
+  /\s*\+\s*/,
+];
+
+function looksLikeCombined(name) {
+  if (!name) return false;
+  return COMBINED_PATTERNS.some(p => p.test(name));
+}
+
+function extractNamesFromCombined(name) {
+  // Split on and / & + , patterns
+  let parts = name.split(/\s+and\s+|\s*\/\s*|\s*&\s*|\s*\+\s*/i);
+  // Also handle "Tunde, Bayo" (comma-space between names)
+  if (parts.length === 1) parts = name.split(/,\s+/);
+  return parts.map(p => p.trim()).filter(p => p.length > 1);
+}
+
+document.getElementById('split-scan-btn').onclick = runSplitScan;
+
+async function runSplitScan() {
+  const btn  = document.getElementById('split-scan-btn');
+  const spin = document.getElementById('split-spin');
+  const stat = document.getElementById('split-status');
+  const wrap = document.getElementById('split-progress-wrap');
+  const bar  = document.getElementById('split-progress');
+
+  btn.disabled = true; spin.style.display = 'inline-block';
+  wrap.style.display = 'block'; bar.style.width = '10%';
+  stat.textContent = 'Loading students…';
+
+  try {
+    const snap = await db.collection('students').get();
+    const all  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    bar.style.width = '40%';
+
+    // Build phone map for quick lookup
+    const phoneMap = {};
+    all.forEach(s => {
+      const p = normPhone(s.parentPhone);
+      if (!p) return;
+      if (!phoneMap[p]) phoneMap[p] = [];
+      phoneMap[p].push(s);
+    });
+    bar.style.width = '65%';
+
+    // Find combined docs
+    splitCombinedDocs = [];
+    all.forEach(s => {
+      if (!looksLikeCombined(s.studentName)) return;
+      // Skip docs that are already marked as merged/linked
+      if (s.isMergedRecord || s.primaryStudentId) return;
+
+      const detectedNames = extractNamesFromCombined(s.studentName);
+      if (detectedNames.length < 2) return;
+
+      const phone = normPhone(s.parentPhone);
+      const siblings = phone ? (phoneMap[phone] || []).filter(x => x.id !== s.id && !looksLikeCombined(x.studentName)) : [];
+
+      // For each detected name, try to find a matching individual doc under same phone
+      const matchedIndividuals = detectedNames.map(detName => {
+        const match = siblings.find(sib => {
+          const fn1 = tokenise(detName)[0] || '';
+          const fn2 = tokenise(sib.studentName)[0] || '';
+          return fn1 && fn2 && (fn1 === fn2 || levenshtein(fn1, fn2) <= 1 || stringSimilarity(detName, sib.studentName) >= 0.65);
+        });
+        return { detectedName: detName, individualDoc: match || null };
+      });
+
+      splitCombinedDocs.push({ doc: s, detectedNames, matchedIndividuals, phone });
+    });
+
+    bar.style.width = '100%';
+    stat.textContent = `Found ${splitCombinedDocs.length} combined doc${splitCombinedDocs.length !== 1 ? 's' : ''}.`;
+
+    updateSplitStats();
+    renderSplitList();
+    document.getElementById('split-results').style.display = 'block';
+
+  } catch(e) {
+    stat.textContent = '❌ ' + e.message;
+  } finally {
+    btn.disabled = false; spin.style.display = 'none';
+    setTimeout(() => wrap.style.display = 'none', 1000);
+  }
+}
+
+function updateSplitStats() {
+  document.getElementById('split-stat-found').textContent    = splitCombinedDocs.length;
+  const withMatch    = splitCombinedDocs.filter(g => g.matchedIndividuals.some(m => m.individualDoc)).length;
+  const withoutMatch = splitCombinedDocs.filter(g => g.matchedIndividuals.every(m => !m.individualDoc)).length;
+  document.getElementById('split-stat-matched').textContent   = withMatch;
+  document.getElementById('split-stat-unmatched').textContent = withoutMatch;
+  document.getElementById('split-stat-linked').textContent    = splitLinkedCount;
+}
+
+function renderSplitList() {
+  const list = document.getElementById('split-list');
+
+  if (!splitCombinedDocs.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No combined group docs found</div><p style="font-size:12px;color:var(--text-dimmer);margin-top:6px;">All student names appear to be individual children.</p></div>';
+    return;
+  }
+
+  list.innerHTML = splitCombinedDocs.map((g, gi) => {
+    const allHaveMatch = g.matchedIndividuals.every(m => m.individualDoc);
+    const anyHaveMatch = g.matchedIndividuals.some(m => m.individualDoc);
+    const alreadyLinked = g.doc.linkedStudentIds && g.doc.linkedStudentIds.length > 0;
+
+    const statusBadge = alreadyLinked
+      ? '<span class="tag tag-merged">ALREADY LINKED</span>'
+      : allHaveMatch
+        ? '<span class="tag tag-primary">ALL MATCHED</span>'
+        : anyHaveMatch
+          ? '<span class="tag tag-secondary">PARTIAL MATCH</span>'
+          : '<span class="tag" style="background:var(--red-dim);color:var(--red);border:1px solid var(--red)">NO MATCH FOUND</span>';
+
+    const rows = g.matchedIndividuals.map(m => {
+      const hasMatch = !!m.individualDoc;
+      const ind = m.individualDoc;
+      return `
+        <div style="display:flex;align-items:center;gap:16px;padding:10px 14px;background:var(--bg);border:1px solid ${hasMatch ? 'var(--green)' : 'var(--red)'};border-radius:6px;margin-bottom:8px;">
+          <div style="flex:1;">
+            <div style="font-size:12px;color:var(--text-dimmer);margin-bottom:3px;">Detected name from combined doc:</div>
+            <div style="font-weight:700;font-size:14px;">${m.detectedName}</div>
+          </div>
+          <div style="color:var(--text-dimmer);font-size:18px;">→</div>
+          <div style="flex:1;">
+            ${hasMatch ? `
+              <div style="font-size:12px;color:var(--text-dimmer);margin-bottom:3px;">Matched individual doc:</div>
+              <div style="font-weight:700;font-size:14px;color:var(--green);">${ind.studentName}</div>
+              <div style="font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;">${ind.tutorEmail || '–'}  ·  ${Array.isArray(ind.subjects) ? ind.subjects.join(', ') : (ind.subjects || '–')}</div>
+              <div style="font-size:10px;color:var(--text-dimmer);font-family:'DM Mono',monospace;">${ind.studentUid ? '🔑 Has Login' : 'No Login yet'}  ·  ID: ${ind.id.substring(0,12)}…</div>
+            ` : `
+              <div style="font-size:12px;color:var(--red);">No individual doc found under phone +…${g.phone ? g.phone.slice(-7) : '?'}</div>
+              <div style="font-size:11px;color:var(--text-dimmer);margin-top:3px;">Create an individual student record for "${m.detectedName}" first, then re-scan.</div>
+            `}
+          </div>
+        </div>`;
+    }).join('');
+
+    const canLink = anyHaveMatch && !alreadyLinked;
+
+    return `
+      <div class="dup-group ${alreadyLinked ? 'merged-group' : ''}" style="margin-bottom:16px;">
+        <div class="dup-header" style="cursor:default;">
+          <span style="font-weight:700;font-size:14px;">${g.doc.studentName}</span>
+          ${statusBadge}
+          <span class="group-phone" style="margin-left:8px;">+…${g.phone ? g.phone.slice(-7) : '?'}</span>
+          <span style="font-size:11px;color:var(--text-dimmer);margin-left:8px;">Parent: ${g.doc.parentName || '–'}</span>
+          <span style="font-size:10px;color:var(--text-dimmer);font-family:'DM Mono',monospace;margin-left:auto;">Combined ID: ${g.doc.id.substring(0,12)}…</span>
+        </div>
+        <div class="dup-body">
+          <p style="font-size:11px;color:var(--text-dimmer);margin-bottom:12px;">
+            Tutor: <strong style="color:var(--text-dim);">${g.doc.tutorEmail || g.doc.tutorName || '–'}</strong>
+            &nbsp;·&nbsp; Subjects: <strong style="color:var(--text-dim);">${Array.isArray(g.doc.subjects) ? g.doc.subjects.join(', ') : (g.doc.subjects || '–')}</strong>
+          </p>
+          ${rows}
+          <div class="merge-actions">
+            <button class="btn btn-success" onclick="linkCombinedDoc(${gi})" ${!canLink ? 'disabled' : ''}>
+              🔗 Link Combined Doc to Individual Students
+            </button>
+            <span class="merge-hint">
+              ${alreadyLinked ? 'Already linked ✓' : !anyHaveMatch ? 'Create individual docs first' : 'Only matched children will be linked'}
+            </span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function linkCombinedDoc(gi) {
+  const g = splitCombinedDocs[gi];
+  if (!g) return;
+
+  document.getElementById('split-log-panel').style.display = 'block';
+  const log = document.getElementById('split-log');
+  function addLog(m, c='') { log.innerHTML += `<div class="${c}">${m}</div>`; log.scrollTop = log.scrollHeight; }
+
+  addLog(`\n─── Linking: "${g.doc.studentName}" (${g.doc.id.substring(0,12)}…) ───`, 'log-info');
+
+  const combinedId = g.doc.id;
+  let anyLinked = false;
+
+  for (const m of g.matchedIndividuals) {
+    if (!m.individualDoc) {
+      addLog(`⚠ No individual doc for "${m.detectedName}" — skipping`, 'log-warn');
+      continue;
+    }
+
+    const ind = m.individualDoc;
+    try {
+      // Read current linkedStudentIds on the individual doc
+      const indSnap = await db.collection('students').doc(ind.id).get();
+      const existing = indSnap.data().linkedStudentIds || [];
+
+      if (existing.includes(combinedId)) {
+        addLog(`ℹ "${ind.studentName}" already has combined doc linked`, 'log-info');
+        continue;
+      }
+
+      await db.collection('students').doc(ind.id).update({
+        linkedStudentIds: [...existing, combinedId]
+      });
+
+      addLog(`✓ Linked combined doc → "${ind.studentName}" (${ind.id.substring(0,12)}…)`, 'log-ok');
+      anyLinked = true;
+    } catch(e) {
+      addLog(`❌ Failed to link "${ind.studentName}": ${e.message}`, 'log-err');
+    }
+  }
+
+  if (anyLinked) {
+    // Also mark the combined doc so we know it has been processed
+    try {
+      await db.collection('students').doc(combinedId).update({
+        isGroupDoc: true,
+        linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch(e) { /* non critical */ }
+
+    splitLinkedCount++;
+    // Mark as linked in local state so button becomes disabled
+    g.doc.linkedStudentIds = [combinedId];
+    updateSplitStats();
+    renderSplitList();
+    addLog(`\n✅ Done linking "${g.doc.studentName}"\n`, 'log-ok');
+  }
+}
+
+document.getElementById('split-copy-log-btn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('split-log').innerText).then(() => {
+    document.getElementById('split-copy-log-btn').textContent = '✓ Copied!';
+    setTimeout(() => document.getElementById('split-copy-log-btn').textContent = 'Copy Log', 2000);
+  });
+};
+
 </script>
 </body>
 </html>
