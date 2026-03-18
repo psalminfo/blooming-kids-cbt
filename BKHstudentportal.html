@@ -524,8 +524,10 @@ function buildStudentGlobal(studentDoc, user){
     const d=studentDoc.data();
     document.getElementById('student-display-name').textContent=d.studentName||user.displayName||'Student';
     document.getElementById('student-grade-country').textContent=`${d.grade||'--'} · ${d.country||'--'}`;
+    const studentId=d.studentId||studentDoc.id;
     window.currentStudent={
         uid:user.uid, id:studentDoc.id,
+        studentId:studentId,
         name:d.studentName||user.displayName||'Student',
         email:d.email||user.email,
         grade:d.grade||'',
@@ -560,7 +562,7 @@ async function loadAll(){
 // ── ATTENDANCE ──
 async function loadAttendance(){
     try{
-        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id)));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.studentId)));
         const total=snap.size;
         const done=snap.docs.filter(d=>['graded','submitted'].includes(d.data().status)).length;
         const pct=total>0?Math.round((done/total)*100):100;
@@ -574,7 +576,7 @@ async function loadAttendance(){
 // ── PENDING TASKS ──
 async function loadPendingTasks(){
     try{
-        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','in',['assigned','pending'])));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.studentId),where('status','in',['assigned','pending'])));
         document.getElementById('pending-tasks-count').textContent=snap.size;
         document.getElementById('pending-count').textContent=snap.size;
         const now=new Date();let due48=0;
@@ -588,7 +590,7 @@ async function loadPendingTasks(){
 // ── AVERAGE GRADE ──
 async function loadAverageGrade(){
     try{
-        const mySnap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','==','graded')));
+        const mySnap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.studentId),where('status','==','graded')));
         if(mySnap.empty){document.getElementById('average-grade').textContent='--';document.getElementById('grade-ranking').textContent='No grades yet';return;}
         let myTotal=0,myCount=0;
         mySnap.forEach(d=>{const s=parseFloat(d.data().score);if(!isNaN(s)){myTotal+=s;myCount++;}});
@@ -691,7 +693,7 @@ async function loadUpcomingSchedule(){
 // ── PERFORMANCE CHART (fixed: no duplicate listeners) ──
 async function loadPerformanceChart(){
     try{
-        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','==','graded'),orderBy('gradedAt','asc')));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.studentId),where('status','==','graded'),orderBy('gradedAt','asc')));
         window._allGradedSnap=snap.docs;
         renderChart(snap.docs);
         if(!_perfListenerAttached){
@@ -765,7 +767,7 @@ function renderChart(docs){
 async function loadCourses(){
     const c=document.getElementById('courses-container');
     try{
-        const snap=await getDocs(query(collection(db,'course_materials'),where('studentId','==',window.currentStudent.id),orderBy('uploadedAt','desc')));
+        const snap=await getDocs(query(collection(db,'course_materials'),where('studentId','==',window.currentStudent.studentId),orderBy('uploadedAt','desc')));
         if(snap.empty){c.innerHTML='<div class="col-span-3 text-center py-12 text-gray-400"><i class="fas fa-book-open text-4xl mb-4"></i><p>No course materials yet.</p></div>';return;}
         const ICONS={'pdf':'📄','jpg':'🖼️','jpeg':'🖼️','png':'🖼️','gif':'🖼️','ppt':'📊','pptx':'📊','doc':'📝','docx':'📝','xls':'📊','xlsx':'📊'};
         const COLORS=['from-emerald-500 to-teal-400','from-blue-500 to-cyan-400','from-purple-500 to-pink-400','from-orange-500 to-amber-400','from-red-500 to-rose-400'];
@@ -797,7 +799,7 @@ async function loadCourses(){
 async function loadAssignments(){
     const c=document.getElementById('assignments-list');
     try{
-        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),orderBy('assignedDate','desc')));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.studentId),orderBy('assignedDate','desc')));
         if(snap.empty){c.innerHTML='<div class="text-center py-8 text-gray-400">No assignments yet.</div>';return;}
         allAssignments=snap.docs.map(d=>({id:d.id,...d.data()}));
         renderAssignments(allAssignments);
@@ -2426,7 +2428,7 @@ window.submitAnnotation = async (id) => {
         // 4) Send to tutor's conversation AND create tutor notification
         if (window.currentStudent) {
             try {
-                const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.id)));
+                const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.studentId)));
                 const convId = convSnap.docs[0]?.id;
                 const convData = convSnap.docs[0]?.data();
                 const tutorId = convData?.tutorId || convData?.teacherId || null;
@@ -2557,7 +2559,7 @@ window.submitWork = async (id) => {
         // Send annotation + notes to tutor via conversation
         if ((annotUrl || txt) && window.currentStudent) {
             try {
-                const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.id)));
+                const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.studentId)));
                 const convId = convSnap.docs[0]?.id;
                 const convData = convSnap.docs[0]?.data();
                 const tutorId = convData?.tutorId || convData?.teacherId || null;
@@ -2632,7 +2634,7 @@ window.submitWork = async (id) => {
 async function loadResults(){
     const c=document.getElementById('results-container');
     try{
-        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','==','graded'),orderBy('gradedAt','desc')));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.studentId),where('status','==','graded'),orderBy('gradedAt','desc')));
         if(snap.empty){c.innerHTML='<div class="text-center py-8 text-gray-400">No graded results yet.</div>';return;}
         c.innerHTML=`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
             <th class="pb-3 font-semibold text-gray-500">Assignment</th>
@@ -2710,7 +2712,7 @@ function initRealtimeNotifications() {
     _notifUnsubscribers = [];
 
     // 1. Live pending assignments listener — also updates dashboard widgets
-    const q1 = query(collection(db,'homework_assignments'), where('studentId','==',student.id), where('status','in',['assigned','pending']));
+    const q1 = query(collection(db,'homework_assignments'), where('studentId','==',student.studentId), where('status','in',['assigned','pending']));
     _notifUnsubscribers.push(onSnapshot(q1, snap => {
         const prev = _notifData.pending;
         _notifData.pending = snap.size;
@@ -2726,7 +2728,7 @@ function initRealtimeNotifications() {
     }, err => console.warn('Notif assignments listener:', err)));
 
     // 1b. ALL homework listener — for average grade, graded count, due-soon
-    const q1b = query(collection(db,'homework_assignments'), where('studentId','==',student.id));
+    const q1b = query(collection(db,'homework_assignments'), where('studentId','==',student.studentId));
     _notifUnsubscribers.push(onSnapshot(q1b, snap => {
         let totalScore = 0, gradedCount = 0, dueSoon = 0;
         const now = new Date();
@@ -2754,7 +2756,7 @@ function initRealtimeNotifications() {
     }, err => console.warn('Notif all-homework listener:', err)));
 
     // 2. Live conversations (messages) listener
-    const q2 = query(collection(db,'conversations'), where('studentId','==',student.id));
+    const q2 = query(collection(db,'conversations'), where('studentId','==',student.studentId));
     _notifUnsubscribers.push(onSnapshot(q2, snap => {
         let msgCount = 0;
         _notifData.convs = snap.docs.map(d => ({id:d.id,...d.data()}));
@@ -2769,7 +2771,7 @@ function initRealtimeNotifications() {
     }, err => console.warn('Notif conversations listener:', err)));
 
     // 3. New course materials listener
-    const q3 = query(collection(db,'course_materials'), where('studentId','==',student.id), orderBy('uploadedAt','desc'), limit(5));
+    const q3 = query(collection(db,'course_materials'), where('studentId','==',student.studentId), orderBy('uploadedAt','desc'), limit(5));
     _notifUnsubscribers.push(onSnapshot(q3, snap => {
         const now = new Date();
         const prev = _notifData.materials.length;
@@ -2788,7 +2790,7 @@ function initRealtimeNotifications() {
 
     // 4. Daily topics listener — real-time topic updates
     if (student.tutorEmail) {
-        const q4 = query(collection(db,'daily_topics'), where('studentId','==',student.id), orderBy('createdAt','desc'), limit(5));
+        const q4 = query(collection(db,'daily_topics'), where('studentId','==',student.studentId), orderBy('createdAt','desc'), limit(5));
         _notifUnsubscribers.push(onSnapshot(q4, snap => {
             if (_notifLoaded && snap.docChanges().some(c => c.type === 'added')) {
                 // Subtle notification for new topics
@@ -2807,7 +2809,7 @@ function initRealtimeNotifications() {
             const schedEl = document.getElementById('dash-schedule-info');
             if (schedEl && data.schedule) {
                 // Update the stored student data
-                window.currentStudent = { ...window.currentStudent, ...data, id: snap.id };
+                window.currentStudent = { ...window.currentStudent, ...data, id: snap.id, studentId: window.currentStudent.studentId };
             }
             // Update subjects display
             const subjEl = document.getElementById('dash-subjects');
@@ -3003,7 +3005,7 @@ window.handleNotifClick = (el) => {
 // ── MESSAGING ──
 async function initMessaging(){
     if(studentUnsubInbox)studentUnsubInbox();
-    const q=query(collection(db,'conversations'),where('studentId','==',window.currentStudent.id));
+    const q=query(collection(db,'conversations'),where('studentId','==',window.currentStudent.studentId));
     studentUnsubInbox=onSnapshot(q,snap=>{
         const convs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{
             const tA=a.lastMessageTimestamp?.toDate?a.lastMessageTimestamp.toDate():new Date(a.lastMessageTimestamp||0);
