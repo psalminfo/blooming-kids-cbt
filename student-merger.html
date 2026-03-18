@@ -696,10 +696,6 @@ function downloadPDF(){
   doc.text('Student Duplicate Review', W/2, y, {align:'center'});
   y+=6;
 
-  doc.setFontSize(9);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}   ·   ${visible.length} group${visible.length!==1?'s':''} flagged for review`, W/2, y, {align:'center'});
-  y+=5;
-
   // thin rule under heading
   doc.setDrawColor(0); doc.setLineWidth(0.4);
   doc.line(M, y, W-M, y);
@@ -729,32 +725,66 @@ function downloadPDF(){
     const confShort={high:'H',medium:'M',low:'C'};
     const nameList=g.students.map(s=>s.studentName||'Unnamed');
 
-    // Estimate height needed: header line + one line per student + gap
-    const neededHeight=8+(nameList.length*7)+6;
+    // Collect parent info — use first student that has each field
+    const parentName  = g.students.map(s=>s.parentName||'').find(v=>v) || '';
+    const parentPhone = g.students.map(s=>s.parentPhone||'').find(v=>v) || '';
+    const parentEmail = g.students.map(s=>s.parentEmail||'').find(v=>v) || '';
+
+    // Count parent info lines that actually have content
+    const parentLines = [parentName, parentPhone, parentEmail].filter(v=>v).length;
+
+    // Estimate height: header + parent lines + student names + gap
+    const neededHeight = 8 + (parentLines * 5.5) + (nameList.length * 7) + 8;
     if(y+neededHeight>272){
-      // Footer before new page
-      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
       doc.text(`Blooming Kids House  ·  Page ${doc.internal.getCurrentPageInfo().pageNumber}`, W/2, 287, {align:'center'});
       doc.addPage();
+      doc.setTextColor(0,0,0);
       y=20;
     }
 
-    // Group header line
-    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    // ── Group header: number + confidence ──────────────────────────────────
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
     doc.text(`${groupNum}.  (${confShort[g.assessment.confidence]})`, M, y);
 
     // Checkbox on the right
     doc.setDrawColor(0); doc.setLineWidth(0.4);
     doc.rect(W-M-5, y-4, 4.5, 4.5);
-    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80);
     doc.text('Merge?', W-M-5, y+2.5);
     y+=6;
 
-    // Student names — indented, one per line
-    doc.setFont('helvetica','normal'); doc.setFontSize(9);
-    nameList.forEach((name, i)=>{
-      // Bullet
+    // ── Parent details ─────────────────────────────────────────────────────
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
+    if(parentName){
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+      doc.text('Parent Name: ', M+6, y);
+      const labelW1 = doc.getTextWidth('Parent Name: ');
       doc.setFont('helvetica','normal');
+      doc.text(parentName, M+6+labelW1, y);
+      y+=5.5;
+    }
+    if(parentPhone){
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+      doc.text('Phone: ', M+6, y);
+      const labelW2 = doc.getTextWidth('Phone: ');
+      doc.setFont('helvetica','normal');
+      doc.text(parentPhone, M+6+labelW2, y);
+      y+=5.5;
+    }
+    if(parentEmail){
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+      doc.text('Email: ', M+6, y);
+      const labelW3 = doc.getTextWidth('Email: ');
+      doc.setFont('helvetica','normal');
+      doc.text(parentEmail, M+6+labelW3, y);
+      y+=5.5;
+    }
+    y+=2;
+
+    // ── Student names ──────────────────────────────────────────────────────
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+    nameList.forEach(name=>{
       doc.text(`\u2022  ${name}`, M+6, y);
       y+=6;
     });
@@ -762,7 +792,7 @@ function downloadPDF(){
     // Thin divider
     doc.setDrawColor(180,180,180); doc.setLineWidth(0.2);
     doc.line(M, y, W-M, y);
-    y+=6;
+    y+=7;
   });
 
   // ── LAST PAGE FOOTER ───────────────────────────────────────────────────────
