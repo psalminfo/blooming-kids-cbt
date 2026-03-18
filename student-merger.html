@@ -667,16 +667,28 @@ function downloadPDF(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth();
-  const M=18;  // left margin
-  const RCB=M; // checkbox right anchor (from right edge)
+  const M=18;
 
   const confFilter=document.getElementById('rpt-conf-filter').value;
   const filterVal=document.getElementById('rpt-filter').value.toLowerCase();
 
-  // safeStr: always returns a plain JS string — handles Firestore numbers, null, undefined
+  // safeStr: always returns a plain JS string
   const safeStr = v => (v===null||v===undefined) ? '' : String(v).trim();
 
+  // Exempt identifiers — skip any group matching these
+  const EXEMPT_PHONES = ['08026957689','8026957689','08026957689'];
+  const EXEMPT_EMAILS = ['psalmbkh09@gmail.com'];
+
+  function isExempt(g){
+    return g.students.some(s=>{
+      const ph = safeStr(s.parentPhone).replace(/\s/g,'');
+      const em = safeStr(s.parentEmail).toLowerCase();
+      return EXEMPT_PHONES.some(p=>ph.endsWith(p.replace(/^0/,''))) || EXEMPT_EMAILS.includes(em);
+    });
+  }
+
   let visible=reportGroups.filter(g=>{
+    if(isExempt(g)) return false;
     if(confFilter!=='all'&&g.assessment.confidence!==confFilter) return false;
     if(filterVal){
       const names=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');
@@ -696,24 +708,18 @@ function downloadPDF(){
 
   doc.setFontSize(13); doc.setFont('helvetica','normal');
   doc.text('Student Duplicate Review', W/2, y, {align:'center'});
-  y+=7;
-
-  doc.setFontSize(9); doc.setTextColor(60,60,60);
-  const genDate = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
-  const genTime = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  doc.text(`Generated: ${genDate} at ${genTime}   ·   ${visible.length} group${visible.length!==1?'s':''} flagged for review`, W/2, y, {align:'center'});
-  y+=6;
+  y+=9;
 
   // Full-width rule
-  doc.setDrawColor(0); doc.setLineWidth(0.5); doc.setTextColor(0,0,0);
+  doc.setDrawColor(0); doc.setLineWidth(0.5);
   doc.line(M, y, W-M, y);
   y+=9;
 
   // ── INSTRUCTIONS ─────────────────────────────────────────────────────────────
   doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(0,0,0);
   doc.text(
-    'Review each group below. If the records belong to the same child, tick the MERGE box on the right. ' +
-    'If they are different children of the same parent, leave the box blank.',
+    'Review each group below. If the records belong to the same child tick the merge column. ' +
+    'If they are different children of the same parent leave it blank.',
     M, y, {maxWidth: W-(M*2)}
   );
   y+=12;
@@ -728,7 +734,7 @@ function downloadPDF(){
   doc.text('(M) Possibly Same Child  —  first names match, full names differ slightly', M+4, y);
   y+=5;
   doc.text('(C) Worth Checking  —  some similarity detected, may or may not be the same child', M+4, y);
-  y+=8;
+  y+=10;
 
   doc.setDrawColor(0); doc.setLineWidth(0.4);
   doc.line(M, y, W-M, y);
@@ -742,47 +748,30 @@ function downloadPDF(){
   visible.forEach(g=>{
     groupNum++;
 
-    // Parent info (force string for all — phone is sometimes a number in Firestore)
     const parentName  = safeStr(g.students.map(s=>s.parentName ).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
     const parentPhone = safeStr(g.students.map(s=>s.parentPhone).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
     const parentEmail = safeStr(g.students.map(s=>s.parentEmail).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
 
-    // Student rows: name + grade + tutor name + tutor email
     const studentRows = g.students.map(s=>({
       name:       safeStr(s.studentName) || 'Unnamed',
       grade:      safeStr(s.grade),
+      subjects:   Array.isArray(s.subjects) ? s.subjects.join(', ') : safeStr(s.subjects),
       tutorName:  safeStr(s.tutorName),
       tutorEmail: safeStr(s.tutorEmail)
     }));
 
     const parentLineCount = [parentName,parentPhone,parentEmail].filter(v=>v).length;
-    // Each student: name line (8) + tutor line (5.5) = 13.5 per student
-    const neededHeight = 14 + (parentLineCount*5.5) + 6 + (studentRows.length*14) + 10;
+    // Each student: name line + tutor line + subjects line = ~16 each
+    const neededHeight = 14 + (parentLineCount*5.5) + 6 + (studentRows.length*18) + 8;
 
-    if(y+neededHeight>272){
-      // Footer on this page before break
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0);
-      doc.text(
-        `Blooming Kids House  |  Student Duplicate Review  |  Confidential  |  Page ${doc.internal.getCurrentPageInfo().pageNumber}`,
-        W/2, 287, {align:'center'}
-      );
+    if(y+neededHeight>280){
       doc.addPage();
       y=20;
     }
 
-    // ── Group header line ───────────────────────────────────────────────────
+    // ── Group header ────────────────────────────────────────────────────────
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0);
-    doc.text(`Group ${groupNum}   (${confShort[g.assessment.confidence]}) ${confFull[g.assessment.confidence]}`, M, y);
-
-    // ── MERGE checkbox — larger and clearly labelled ────────────────────────
-    const cbSize = 6;
-    const cbX = W - M - cbSize;
-    const cbY = y - 5;
-    doc.setDrawColor(0); doc.setLineWidth(0.5);
-    doc.rect(cbX, cbY, cbSize, cbSize);   // checkbox square
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
-    doc.text('MERGE', cbX + cbSize/2, cbY - 1.5, {align:'center'});
-    doc.text('Yes / No', cbX + cbSize/2, cbY + cbSize + 3.5, {align:'center'});
+    doc.text('Group ' + groupNum + '   (' + confShort[g.assessment.confidence] + ') ' + confFull[g.assessment.confidence], M, y);
     y+=8;
 
     // ── Parent details ──────────────────────────────────────────────────────
@@ -817,50 +806,34 @@ function downloadPDF(){
 
     // ── Student rows ────────────────────────────────────────────────────────
     studentRows.forEach(s=>{
-      // Name + Grade on first line
+      // Line 1: name + grade
       doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
       const gradePart = s.grade ? '   Grade: ' + s.grade : '';
       doc.text('•  ' + s.name + gradePart, M+6, y);
       y+=5.5;
 
-      // Tutor name + email on second line (indented further)
+      // Line 2: Subjects
+      if(s.subjects){
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+        doc.text('Subjects: ' + s.subjects, M+12, y);
+        y+=5;
+      }
+
+      // Line 3: Tutor name + email
       const tutorLine = [
         s.tutorName  ? 'Tutor: '  + s.tutorName  : '',
-        s.tutorEmail ? 'Email: ' + s.tutorEmail : ''
+        s.tutorEmail ? 'Email: '  + s.tutorEmail : ''
       ].filter(Boolean).join('   |   ');
       if(tutorLine){
         doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
         doc.text(tutorLine, M+12, y);
         y+=5;
       }
-      y+=1.5;
+      y+=3;
     });
 
-    // ── Divider ─────────────────────────────────────────────────────────────
-    y+=3;
-    doc.setDrawColor(0); doc.setLineWidth(0.3);
-    doc.line(M, y, W-M, y);
-    y+=8;
+    y+=4;
   });
-
-  // ── FOOTER on every page ─────────────────────────────────────────────────────
-  const totalPages=doc.internal.getNumberOfPages();
-  for(let p=1;p<=totalPages;p++){
-    doc.setPage(p);
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0);
-    // Left side
-    doc.text('Blooming Kids House  |  Confidential', M, 289);
-    // Centre
-    doc.text('Student Duplicate Review', W/2, 289, {align:'center'});
-    // Right side
-    doc.text(`Page ${p} of ${totalPages}`, W-M, 289, {align:'right'});
-    // Rule above footer
-    doc.setDrawColor(0); doc.setLineWidth(0.3);
-    doc.line(M, 284, W-M, 284);
-  }
-
-  const dateStr=new Date().toISOString().slice(0,10);
-  doc.save(`BKH-Duplicate-Review-${dateStr}.pdf`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
