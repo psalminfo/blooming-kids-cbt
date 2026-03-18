@@ -23,6 +23,9 @@
   header p{font-size:11px;color:var(--text-dim);margin-top:1px;font-family:'DM Mono',monospace;}
   .header-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
   .env-badge{font-family:'DM Mono',monospace;font-size:11px;padding:3px 10px;border-radius:4px;background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
+  /* Connection status banner */
+  #conn-banner{display:none;background:var(--red-dim);border-bottom:1px solid var(--red);color:var(--red);font-size:12px;font-family:'DM Mono',monospace;padding:7px 28px;text-align:center;}
+  #conn-banner.visible{display:block;}
   .tab-bar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;overflow-x:auto;}
   .tab{padding:14px 18px;font-size:12px;font-weight:600;color:var(--text-dimmer);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
   .tab:hover{color:var(--text-dim);}
@@ -74,6 +77,7 @@
   .alert-info{background:var(--blue-dim);border:1px solid var(--blue);color:var(--blue);}
   .alert-warn{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);}
   .alert-success{background:var(--green-dim);border:1px solid var(--green);color:var(--green);}
+  .alert-error{background:var(--red-dim);border:1px solid var(--red);color:var(--red);}
   .progress-bar{width:100%;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:10px 0;}
   .progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:3px;transition:width .3s ease;}
   .empty{text-align:center;padding:44px 24px;color:var(--text-dimmer);}
@@ -107,13 +111,15 @@
   .merge-hint{font-size:10px;color:var(--text-dimmer);margin-left:auto;font-style:italic;}
   .log{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 15px;max-height:200px;overflow-y:auto;line-height:1.8;}
   .log-ok{color:var(--green);}.log-warn{color:var(--amber);}.log-err{color:var(--red);}.log-info{color:var(--blue);}
-  .fix-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;font-size:12px;}
-  .fix-row.ok{border-color:var(--green);}
-  .fix-row.warn{border-color:var(--amber);}
-  .fix-row.err{border-color:var(--red);}
+  .retry-info{font-size:11px;color:var(--amber);font-family:'DM Mono',monospace;display:none;}
+  .retry-info.visible{display:inline;}
 </style>
 </head>
 <body>
+
+<!-- Connection lost banner -->
+<div id="conn-banner">⚠ Network connection lost — waiting to reconnect before continuing…</div>
+
 <header>
   <span class="logo-badge">BKH</span>
   <div><h1>Student Record Manager</h1><p>Fix parents · Fix IDs · Merge · Split · Review report</p></div>
@@ -155,6 +161,7 @@
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
         <button class="btn btn-primary" id="rpt-scan-btn"><span class="spinner" style="display:none" id="rpt-spin"></span>🔍 Scan Students</button>
         <span id="rpt-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+        <span class="retry-info" id="rpt-retry"></span>
       </div>
       <div class="progress-bar" style="display:none" id="rpt-progress-wrap"><div class="progress-fill" id="rpt-progress" style="width:0%"></div></div>
     </div>
@@ -194,6 +201,7 @@
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
         <button class="btn btn-primary" id="parents-scan-btn"><span class="spinner" style="display:none" id="parents-spin"></span>🔍 Scan & Fix Parents</button>
         <span id="parents-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+        <span class="retry-info" id="parents-retry"></span>
       </div>
       <div class="progress-bar" style="display:none" id="parents-progress-wrap"><div class="progress-fill" id="parents-progress" style="width:0%"></div></div>
     </div>
@@ -220,6 +228,7 @@
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
         <button class="btn btn-primary" id="fixids-scan-btn"><span class="spinner" style="display:none" id="fixids-spin"></span>🔑 Fix Student IDs</button>
         <span id="fixids-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
+        <span class="retry-info" id="fixids-retry"></span>
       </div>
       <div class="progress-bar" style="display:none" id="fixids-progress-wrap"><div class="progress-fill" id="fixids-progress" style="width:0%"></div></div>
     </div>
@@ -324,9 +333,48 @@ const devCfg={apiKey:"AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",authDomain:"bloom
 const isDev=location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.hostname.includes('bkhdevelop');
 firebase.initializeApp(isDev?devCfg:mainCfg);
 const db=firebase.firestore(),auth=firebase.auth();
+
+// ─── Firestore settings: longer timeout + offline persistence ─────────────────
+db.settings({cacheSizeBytes:firebase.firestore.CACHE_SIZE_UNLIMITED});
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});// best-effort; ignore if already enabled
+
 const envEl=document.getElementById('env-label');
 envEl.textContent=isDev?'🛠 DEV':'🚀 PRODUCTION';
 envEl.style.cssText=isDev?'background:var(--green-dim);color:var(--green);border-color:var(--green)':'background:var(--amber-dim);color:var(--amber);border-color:var(--amber)';
+
+// ─── NETWORK MONITOR ──────────────────────────────────────────────────────────
+// Show a banner when the browser goes offline so users know why writes are stalled.
+const connBanner=document.getElementById('conn-banner');
+window.addEventListener('online', ()=>{ connBanner.classList.remove('visible'); });
+window.addEventListener('offline',()=>{ connBanner.classList.add('visible'); });
+
+// ─── RETRY HELPER ─────────────────────────────────────────────────────────────
+// Wraps any async Firestore call with exponential back-off retries.
+// retryEl: optional DOM element to show retry progress in.
+const RETRYABLE_CODES=new Set(['unavailable','deadline-exceeded','resource-exhausted','internal','cancelled','aborted']);
+async function withRetry(fn, retryEl=null, maxAttempts=5){
+  let attempt=0;
+  while(true){
+    attempt++;
+    try{
+      return await fn();
+    }catch(err){
+      const code=(err&&err.code)||'';
+      const isNet=err instanceof TypeError&&err.message&&err.message.includes('network');
+      const retryable=RETRYABLE_CODES.has(code)||isNet||code==='';
+      if(!retryable || attempt>=maxAttempts) throw err;
+      const delay=Math.min(500*Math.pow(2,attempt-1),15000)+(Math.random()*300|0);
+      if(retryEl){
+        retryEl.classList.add('visible');
+        retryEl.textContent=`Connection interrupted — retrying in ${Math.round(delay/1000)}s (attempt ${attempt}/${maxAttempts})…`;
+      }
+      await new Promise(r=>setTimeout(r,delay));
+      if(retryEl) retryEl.textContent=`Retrying (attempt ${attempt+1}/${maxAttempts})…`;
+    }
+  }
+}
+// Clears the retry label after a successful run
+function clearRetry(retryEl){ if(retryEl){retryEl.classList.remove('visible');retryEl.textContent='';} }
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────────
 auth.onAuthStateChanged(u=>{
@@ -339,7 +387,7 @@ document.getElementById('auth-btn').onclick=async()=>{
   const p=document.getElementById('auth-pass').value;
   const err=document.getElementById('auth-error');
   err.textContent='';
-  try{await auth.signInWithEmailAndPassword(e,p);}catch(ex){err.textContent=ex.message;}
+  try{ await auth.signInWithEmailAndPassword(e,p); }catch(ex){ err.textContent=ex.message; }
 };
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
@@ -360,13 +408,20 @@ function normPhone(p){
   const d=String(p).replace(/\D/g,'');
   return d.length<7?null:d.slice(-10);
 }
-// Exempt: never process this parent's records
 const EXEMPT_PHONES=['08026957689','8026957689'];
 const EXEMPT_EMAILS=['psalmbkh09@gmail.com'];
 function isExemptStudent(s){
   const ph=safeStr(s.parentPhone).replace(/\s/g,'');
   const em=safeStr(s.parentEmail).toLowerCase();
   return EXEMPT_PHONES.some(p=>ph.endsWith(p.replace(/^0/,''))) || EXEMPT_EMAILS.includes(em);
+}
+
+// ─── RESET BUTTON HELPER ──────────────────────────────────────────────────────
+// Guarantees button + spinner are always restored even if an error is thrown.
+function resetBtn(btn,spin,wrap){
+  btn.disabled=false;
+  if(spin) spin.style.display='none';
+  if(wrap) setTimeout(()=>wrap.style.display='none',1000);
 }
 
 // ─── NAME ENGINE ──────────────────────────────────────────────────────────────
@@ -431,6 +486,7 @@ function assessGroup(students){
   }
   return best;
 }
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 1: REVIEW REPORT + PDF
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -443,10 +499,13 @@ document.getElementById('rpt-conf-filter').onchange=renderReportGroups;
 async function runReportScan(){
   const btn=document.getElementById('rpt-scan-btn'),spin=document.getElementById('rpt-spin');
   const stat=document.getElementById('rpt-status'),wrap=document.getElementById('rpt-progress-wrap'),bar=document.getElementById('rpt-progress');
+  const retryEl=document.getElementById('rpt-retry');
   btn.disabled=true;spin.style.display='inline-block';wrap.style.display='block';bar.style.width='10%';
   stat.textContent='Loading students…';
+  clearRetry(retryEl);
   try{
-    const snap=await db.collection('students').get();
+    const snap=await withRetry(()=>db.collection('students').get(), retryEl);
+    clearRetry(retryEl);
     allStudentsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
     bar.style.width='50%';
     stat.textContent=`Loaded ${allStudentsCache.length} students. Analysing…`;
@@ -471,15 +530,19 @@ async function runReportScan(){
     stat.textContent=`Found ${reportGroups.length} groups needing review.`;
     updateReportStats();renderReportGroups();
     document.getElementById('rpt-results').style.display='block';
-  }catch(e){stat.textContent='❌ Error: '+e.message;}
-  finally{btn.disabled=false;spin.style.display='none';setTimeout(()=>wrap.style.display='none',1000);}
+  }catch(e){
+    stat.textContent='❌ Error: '+e.message;
+    clearRetry(retryEl);
+  }finally{ resetBtn(btn,spin,wrap); }
 }
+
 function updateReportStats(){
   document.getElementById('rpt-stat-total').textContent=allStudentsCache.length;
   document.getElementById('rpt-stat-high').textContent=reportGroups.filter(g=>g.assessment.confidence==='high').length;
   document.getElementById('rpt-stat-med').textContent=reportGroups.filter(g=>g.assessment.confidence==='medium').length;
   document.getElementById('rpt-stat-low').textContent=reportGroups.filter(g=>g.assessment.confidence==='low').length;
 }
+
 function renderReportGroups(){
   const list=document.getElementById('rpt-group-list');
   const fv=document.getElementById('rpt-filter').value.toLowerCase();
@@ -514,7 +577,7 @@ function renderReportGroups(){
   }).join('');
 }
 
-// PDF
+// PDF (unchanged)
 document.getElementById('download-pdf-btn').onclick=function(){
   const btn=document.getElementById('download-pdf-btn');
   btn.disabled=true;btn.textContent='⏳ Generating…';
@@ -560,7 +623,9 @@ function downloadPDF(){
     if(fv){const n=g.students.map(s=>(s.studentName||'').toLowerCase()).join(' ');if(!n.includes(fv)&&!g.phone.includes(fv)) return false;}
     return true;
   });
-  doc.setFont('helvetica','normal');doc.setTextColor(0,0,0);let y=26;
+  const {jsPDF:_}=window.jspdf;
+  let y=26;
+  doc.setFont('helvetica','normal');doc.setTextColor(0,0,0);
   doc.setFontSize(20);doc.setFont('helvetica','bold');doc.text('Blooming Kids House',W/2,y,{align:'center'});y+=9;
   doc.setFontSize(13);doc.setFont('helvetica','normal');doc.text('Student Duplicate Review',W/2,y,{align:'center'});y+=9;
   doc.setDrawColor(0);doc.setLineWidth(0.5);doc.line(M,y,W-M,y);y+=9;
@@ -576,26 +641,25 @@ function downloadPDF(){
   vis.forEach((g,i)=>{y=renderGroupToPdf(doc,g,i+1,y,W,M,confFull,confShort);});
   doc.save('BKH-Duplicate-Review-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 2: FIX PARENTS
-// Matches every student doc to parent_users by parentEmail then parentPhone.
-// Writes parentUid onto each student doc.
-// Creates placeholder parent_users docs for parents with no account yet.
 // ═══════════════════════════════════════════════════════════════════════════════
 document.getElementById('parents-scan-btn').onclick=runFixParents;
 
 async function runFixParents(){
   const btn=document.getElementById('parents-scan-btn'),spin=document.getElementById('parents-spin');
   const stat=document.getElementById('parents-status'),wrap=document.getElementById('parents-progress-wrap'),bar=document.getElementById('parents-progress');
+  const retryEl=document.getElementById('parents-retry');
   const logEl=document.getElementById('parents-log');
   btn.disabled=true;spin.style.display='inline-block';wrap.style.display='block';bar.style.width='5%';
-  stat.textContent='Loading…';logEl.innerHTML='';
+  stat.textContent='Loading…';logEl.innerHTML='';clearRetry(retryEl);
   function addLog(m,c=''){logEl.innerHTML+=`<div class="${c}">${m}</div>`;logEl.scrollTop=logEl.scrollHeight;}
 
   try{
-    // 1. Load all parent_users
     bar.style.width='15%';stat.textContent='Loading parent accounts…';
-    const parSnap=await db.collection('parent_users').get();
+    const parSnap=await withRetry(()=>db.collection('parent_users').get(), retryEl);
+    clearRetry(retryEl);
     const parentByEmail={},parentByPhone={};
     parSnap.forEach(d=>{
       const data=d.data();
@@ -607,34 +671,30 @@ async function runFixParents(){
     addLog(`Loaded ${parSnap.size} parent accounts`,'log-info');
     bar.style.width='30%';
 
-    // 2. Load all students
     stat.textContent='Loading students…';
-    const stuSnap=await db.collection('students').get();
+    const stuSnap=await withRetry(()=>db.collection('students').get(), retryEl);
+    clearRetry(retryEl);
     const students=stuSnap.docs.map(d=>({id:d.id,...d.data()}));
     addLog(`Loaded ${students.length} student docs`,'log-info');
     bar.style.width='45%';
 
     let matched=0,created=0,unmatched=0,alreadyDone=0;
-    const placeholdersToCreate={};// keyed by normalised email or phone
+    const placeholdersToCreate={};
 
     for(const s of students){
       if(isExemptStudent(s)) continue;
-      if(s.parentUid){alreadyDone++;continue;}// already linked
-
+      if(s.parentUid){alreadyDone++;continue;}
       const em=(s.parentEmail||'').toLowerCase().trim();
       const ph=normPhone(s.parentPhone||'');
-
       let parentDoc=null;
-      if(em && parentByEmail[em]) parentDoc=parentByEmail[em];
-      else if(ph && parentByPhone[ph]) parentDoc=parentByPhone[ph];
-
+      if(em&&parentByEmail[em]) parentDoc=parentByEmail[em];
+      else if(ph&&parentByPhone[ph]) parentDoc=parentByPhone[ph];
       if(parentDoc){
-        // Write parentUid onto student doc
-        await db.collection('students').doc(s.id).update({parentUid:parentDoc.uid});
+        await withRetry(()=>db.collection('students').doc(s.id).update({parentUid:parentDoc.uid}), retryEl);
+        clearRetry(retryEl);
         matched++;
         addLog(`✓ Linked "${safeStr(s.studentName)}" → parent uid ${parentDoc.uid.substring(0,12)}…`,'log-ok');
       } else {
-        // No parent_users account yet — create a placeholder
         const placeholderKey=em||ph||s.id;
         if(!placeholdersToCreate[placeholderKey]){
           placeholdersToCreate[placeholderKey]={
@@ -650,21 +710,20 @@ async function runFixParents(){
       }
     }
 
-    // Batch create placeholder parent_users docs
     bar.style.width='70%';stat.textContent='Creating placeholder parent accounts…';
     for(const[key,data] of Object.entries(placeholdersToCreate)){
-      // Check if one was already created in a previous run
       let existingRef=null;
       if(data.email){
-        const q=await db.collection('parent_users').where('email','==',data.email).limit(1).get();
+        const q=await withRetry(()=>db.collection('parent_users').where('email','==',data.email).limit(1).get(), retryEl);
+        clearRetry(retryEl);
         if(!q.empty) existingRef=q.docs[0];
       }
-      if(!existingRef && data.normalizedPhone){
-        const q=await db.collection('parent_users').where('normalizedPhone','==',data.normalizedPhone).limit(1).get();
+      if(!existingRef&&data.normalizedPhone){
+        const q=await withRetry(()=>db.collection('parent_users').where('normalizedPhone','==',data.normalizedPhone).limit(1).get(), retryEl);
+        clearRetry(retryEl);
         if(!q.empty) existingRef=q.docs[0];
       }
       if(existingRef){
-        // Already exists — link students to it
         const uid=existingRef.id;
         const stuToLink=students.filter(s=>{
           if(isExemptStudent(s)) return false;
@@ -674,17 +733,17 @@ async function runFixParents(){
         });
         for(const s of stuToLink){
           if(!s.parentUid){
-            await db.collection('students').doc(s.id).update({parentUid:uid});
+            await withRetry(()=>db.collection('students').doc(s.id).update({parentUid:uid}), retryEl);
+            clearRetry(retryEl);
             matched++;
             addLog(`✓ Linked (existing) "${safeStr(s.studentName)}" → ${uid.substring(0,12)}…`,'log-ok');
           }
         }
       } else {
-        // Create new placeholder
         const ref=db.collection('parent_users').doc();
-        await ref.set(data);
+        await withRetry(()=>ref.set(data), retryEl);
+        clearRetry(retryEl);
         created++;
-        // Link all students for this placeholder
         const stuToLink=students.filter(s=>{
           if(isExemptStudent(s)) return false;
           const em=(s.parentEmail||'').toLowerCase().trim();
@@ -692,7 +751,8 @@ async function runFixParents(){
           return (data.email&&em===data.email)||(data.normalizedPhone&&ph===data.normalizedPhone);
         });
         for(const s of stuToLink){
-          await db.collection('students').doc(s.id).update({parentUid:ref.id});
+          await withRetry(()=>db.collection('students').doc(s.id).update({parentUid:ref.id}), retryEl);
+          clearRetry(retryEl);
           matched++;
           addLog(`✓ Created placeholder for "${safeStr(data.name)}" and linked "${safeStr(s.studentName)}"`,'log-ok');
         }
@@ -700,50 +760,47 @@ async function runFixParents(){
       }
     }
 
-    // Count truly unmatched (no email, no phone)
     unmatched=students.filter(s=>!isExemptStudent(s)&&!s.parentUid&&!s.parentEmail&&!normPhone(s.parentPhone)).length;
-
-    bar.style.width='100%';
-    stat.textContent='Done!';
+    bar.style.width='100%';stat.textContent='Done!';
     document.getElementById('par-stat-total').textContent=students.length;
     document.getElementById('par-stat-matched').textContent=matched+alreadyDone;
     document.getElementById('par-stat-created').textContent=created;
     document.getElementById('par-stat-unmatched').textContent=unmatched;
     document.getElementById('parents-results').style.display='block';
-    if(unmatched>0) addLog(`⚠ ${unmatched} student(s) have no parentEmail or parentPhone — cannot match automatically. Add parent details in the tutor portal first.`,'log-warn');
+    if(unmatched>0) addLog(`⚠ ${unmatched} student(s) have no parentEmail or parentPhone — cannot match automatically.`,'log-warn');
     addLog(`\n✅ Fix Parents complete.`,'log-ok');
 
   }catch(e){
     stat.textContent='❌ '+e.message;
     addLog('❌ Error: '+e.message,'log-err');
-  }finally{
-    btn.disabled=false;spin.style.display='none';
-    setTimeout(()=>wrap.style.display='none',1000);
-  }
+    clearRetry(retryEl);
+  }finally{ resetBtn(btn,spin,wrap); }
 }
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 3: FIX STUDENT IDs
-// Sets studentId field = Firestore doc ID on every student doc missing it.
-// Safe to run multiple times. Docs that already have studentId are skipped.
 // ═══════════════════════════════════════════════════════════════════════════════
 document.getElementById('fixids-scan-btn').onclick=runFixStudentIds;
 
 async function runFixStudentIds(){
   const btn=document.getElementById('fixids-scan-btn'),spin=document.getElementById('fixids-spin');
   const stat=document.getElementById('fixids-status'),wrap=document.getElementById('fixids-progress-wrap'),bar=document.getElementById('fixids-progress');
+  const retryEl=document.getElementById('fixids-retry');
   const logEl=document.getElementById('fixids-log');
   btn.disabled=true;spin.style.display='inline-block';wrap.style.display='block';bar.style.width='5%';
-  stat.textContent='Loading…';logEl.innerHTML='';
+  stat.textContent='Loading…';logEl.innerHTML='';clearRetry(retryEl);
   function addLog(m,c=''){logEl.innerHTML+=`<div class="${c}">${m}</div>`;logEl.scrollTop=logEl.scrollHeight;}
 
   try{
     bar.style.width='20%';stat.textContent='Loading students…';
-    const snap=await db.collection('students').get();
+    const snap=await withRetry(()=>db.collection('students').get(), retryEl);
+    clearRetry(retryEl);
     const all=snap.docs.map(d=>({id:d.id,...d.data()}));
     addLog(`Loaded ${all.length} student docs`,'log-info');
     bar.style.width='40%';
 
     let fixed=0,skipped=0,errors=0;
+    // ── Firestore hard limit: 500 writes per batch ──
     const CHUNK=400;
     const toFix=all.filter(s=>!isExemptStudent(s)&&!s.studentId);
     addLog(`${toFix.length} docs need studentId set · ${all.length-toFix.length} already have it`,'log-info');
@@ -753,19 +810,19 @@ async function runFixStudentIds(){
       const batch=db.batch();
       chunk.forEach(s=>batch.update(db.collection('students').doc(s.id),{studentId:s.id}));
       try{
-        await batch.commit();
+        await withRetry(()=>batch.commit(), retryEl);
+        clearRetry(retryEl);
         fixed+=chunk.length;
         bar.style.width=Math.min(40+Math.round((i/toFix.length)*55),95)+'%';
         stat.textContent=`Fixed ${fixed} of ${toFix.length}…`;
       }catch(e){
         errors+=chunk.length;
-        addLog(`⚠ Batch error: ${e.message}`,'log-warn');
+        addLog(`⚠ Batch error (chunk ${i}–${i+chunk.length}): ${e.message}`,'log-warn');
       }
     }
 
     skipped=all.filter(s=>s.studentId).length;
-    bar.style.width='100%';
-    stat.textContent='Done!';
+    bar.style.width='100%';stat.textContent='Done!';
     document.getElementById('fid-stat-total').textContent=all.length;
     document.getElementById('fid-stat-fixed').textContent=fixed;
     document.getElementById('fid-stat-skipped').textContent=skipped;
@@ -779,29 +836,12 @@ async function runFixStudentIds(){
   }catch(e){
     stat.textContent='❌ '+e.message;
     addLog('❌ Error: '+e.message,'log-err');
-  }finally{
-    btn.disabled=false;spin.style.display='none';
-    setTimeout(()=>wrap.style.display='none',1000);
-  }
+    clearRetry(retryEl);
+  }finally{ resetBtn(btn,spin,wrap); }
 }
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 4: MERGE TOOL
-//
-// KEY DESIGN — NO PRIMARY/SECONDARY:
-// All selected student docs get the SAME studentId value written on them.
-// We pick the sharedStudentId as:
-//   1. studentId field of the doc that has studentUid (login)
-//   2. Else studentId field of the first selected doc
-//   3. Else Firestore doc ID of the first selected doc
-//
-// EACH TUTOR DOC STAYS INDEPENDENT:
-// summerBreak, status, archived, grade, days — all stay on each tutor's own doc.
-// Nothing is moved, nothing is deleted. Only studentId field is updated.
-//
-// HISTORICAL RECORDS:
-// For every selected student's OLD Firestore doc ID that differs from
-// sharedStudentId, we update homework_assignments, conversations, etc.
-// so they all point to sharedStudentId.
 // ═══════════════════════════════════════════════════════════════════════════════
 let allStudents=[],dupGroups=[],mergedCount=0,expandedAll=false;
 document.getElementById('scan-btn').onclick=scanStudents;
@@ -812,7 +852,7 @@ async function scanStudents(){
   btn.disabled=true;spin.style.display='inline-block';wrap.style.display='block';bar.style.width='10%';
   stat.textContent='Loading students…';
   try{
-    const snap=await db.collection('students').get();
+    const snap=await withRetry(()=>db.collection('students').get());
     allStudents=snap.docs.map(d=>({id:d.id,...d.data()}));
     bar.style.width='40%';
     stat.textContent=`Loaded ${allStudents.length} students. Grouping…`;
@@ -831,10 +871,9 @@ async function scanStudents(){
     stat.textContent=`Done. Found ${dupGroups.length} phone groups.`;
     updateMergeStats();renderGroups();
     document.getElementById('view-results-merge').style.display='block';
-    const scanBtnEl=document.getElementById('scan-btn');
-    scanBtnEl.innerHTML='<span class="spinner" style="display:none" id="scan-spin"></span>🔄 Re-scan';
-  }catch(e){stat.textContent='❌ '+e.message;}
-  finally{btn.disabled=false;document.getElementById('scan-spin')&&(document.getElementById('scan-spin').style.display='none');setTimeout(()=>wrap.style.display='none',1000);}
+    document.getElementById('scan-btn').innerHTML='<span class="spinner" style="display:none" id="scan-spin"></span>🔄 Re-scan';
+  }catch(e){ stat.textContent='❌ '+e.message; }
+  finally{ resetBtn(btn, document.getElementById('scan-spin'), wrap); }
 }
 
 function updateMergeStats(){
@@ -862,7 +901,6 @@ function renderGroups(){
     const rows=g.students.map(s=>{
       const isChecked=checkedIds.has(s.id);
       const subs=Array.isArray(s.subjects)?s.subjects.join(', '):(s.subjects||'–');
-      // Show if this student already has a shared studentId (from a previous merge)
       const isAlreadyMerged=s.studentId&&s.studentId!==s.id;
       return `<div class="student-row ${isChecked?'is-checked':''}" style="align-items:flex-start;">
         <div style="display:flex;flex-direction:column;gap:8px;align-items:center;flex-shrink:0;padding-top:4px;min-width:52px;">
@@ -944,10 +982,6 @@ async function mergeGroup(gi){
   const selectedStudents=g.students.filter(s=>checkedIds.has(s.id));
   const skipped=g.students.filter(s=>!checkedIds.has(s.id));
 
-  // Determine sharedStudentId:
-  // Prefer the studentId field of the doc with studentUid (login)
-  // Then the studentId field of any selected doc
-  // Then the Firestore doc ID of the first selected doc
   const withLogin=selectedStudents.find(s=>s.studentUid);
   const anchor=withLogin||selectedStudents[0];
   const sharedStudentId=anchor.studentId||anchor.id;
@@ -964,20 +998,12 @@ async function mergeGroup(gi){
   try{
     // 1. Write sharedStudentId onto ALL selected student docs
     for(const s of selectedStudents){
-      if(s.studentId===sharedStudentId){
-        addLog('ℹ '+s.studentName+' already has this studentId — skipped','log-info');
-        continue;
-      }
-      await db.collection('students').doc(s.id).update({studentId:sharedStudentId});
+      if(s.studentId===sharedStudentId){addLog('ℹ '+s.studentName+' already has this studentId — skipped','log-info');continue;}
+      await withRetry(()=>db.collection('students').doc(s.id).update({studentId:sharedStudentId}));
       addLog('✓ Set studentId on "'+s.studentName+'"','log-ok');
     }
 
-    // 2. Update all historical records that used the old studentId values
-    // Old IDs = all selected docs whose Firestore doc ID != sharedStudentId
-    const oldIds=selectedStudents
-      .map(s=>s.studentId||s.id)// what was previously stored in collections
-      .filter((id,_,arr)=>id!==sharedStudentId&&arr.indexOf(id)===arr.lastIndexOf(id));
-    // Also include raw Firestore doc IDs that differ from sharedStudentId
+    // 2. Collect all old IDs to backfill in related collections
     const allOldIds=[...new Set([
       ...selectedStudents.map(s=>s.id).filter(id=>id!==sharedStudentId),
       ...selectedStudents.map(s=>s.studentId||'').filter(id=>id&&id!==sharedStudentId)
@@ -988,13 +1014,17 @@ async function mergeGroup(gi){
       let fixed=0;
       for(const oldId of allOldIds){
         try{
-          const q=await db.collection(col).where('studentId','==',oldId).get();
+          // Query and batch-update in chunks of 400 to stay under Firestore's 500-write limit
+          const q=await withRetry(()=>db.collection(col).where('studentId','==',oldId).get());
           if(q.empty) continue;
-          const batch=db.batch();
-          q.docs.forEach(d=>batch.update(d.ref,{studentId:sharedStudentId}));
-          await batch.commit();
+          const CHUNK=400;
+          for(let i=0;i<q.docs.length;i+=CHUNK){
+            const batch=db.batch();
+            q.docs.slice(i,i+CHUNK).forEach(d=>batch.update(d.ref,{studentId:sharedStudentId}));
+            await withRetry(()=>batch.commit());
+          }
           fixed+=q.docs.length;
-        }catch(e){addLog('⚠ '+col+': '+e.message,'log-warn');}
+        }catch(e){ addLog('⚠ '+col+' ('+oldId.substring(0,8)+'…): '+e.message,'log-warn'); }
       }
       if(fixed>0) addLog('✓ Fixed '+fixed+' docs in '+col,'log-ok');
     }
@@ -1003,7 +1033,7 @@ async function mergeGroup(gi){
     updateMergeStats();renderGroups();
     addLog('\n✅ Done! '+skipped.length+' student(s) left completely untouched.\n','log-ok');
 
-  }catch(e){addLog('❌ '+e.message,'log-err');}
+  }catch(e){ addLog('❌ '+e.message,'log-err'); }
 }
 
 document.getElementById('copy-log-btn').onclick=()=>{
@@ -1012,10 +1042,9 @@ document.getElementById('copy-log-btn').onclick=()=>{
     setTimeout(()=>document.getElementById('copy-log-btn').textContent='Copy Log',2000);
   });
 };
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 5: SPLIT GROUP DOCS
-// Finds docs where studentName contains multiple children joined together.
-// Links the combined doc's studentId to each individual child's doc.
 // ═══════════════════════════════════════════════════════════════════════════════
 let splitCombinedDocs=[],splitLinkedCount=0;
 const COMBINED_PATTERNS=[/\s+and\s+/i,/\s*\/\s*/,/\s*&\s*/,/\s*,\s+/,/\s*\+\s*/];
@@ -1034,7 +1063,7 @@ async function runSplitScan(){
   btn.disabled=true;spin.style.display='inline-block';wrap.style.display='block';bar.style.width='10%';
   stat.textContent='Loading students…';
   try{
-    const snap=await db.collection('students').get();
+    const snap=await withRetry(()=>db.collection('students').get());
     const all=snap.docs.map(d=>({id:d.id,...d.data()}));
     bar.style.width='40%';
     const phoneMap={};
@@ -1066,8 +1095,8 @@ async function runSplitScan(){
     stat.textContent=`Found ${splitCombinedDocs.length} combined doc(s).`;
     updateSplitStats();renderSplitList();
     document.getElementById('split-results').style.display='block';
-  }catch(e){stat.textContent='❌ '+e.message;}
-  finally{btn.disabled=false;spin.style.display='none';setTimeout(()=>wrap.style.display='none',1000);}
+  }catch(e){ stat.textContent='❌ '+e.message; }
+  finally{ resetBtn(btn,spin,wrap); }
 }
 
 function updateSplitStats(){
@@ -1129,22 +1158,23 @@ async function linkCombinedDoc(gi){
     if(!m.individualDoc){addLog('⚠ No individual doc for "'+m.detectedName+'" — skipping','log-warn');continue;}
     const ind=m.individualDoc;
     try{
-      const indSnap=await db.collection('students').doc(ind.id).get();
+      const indSnap=await withRetry(()=>db.collection('students').doc(ind.id).get());
       const existing=indSnap.data().linkedStudentIds||[];
       if(existing.includes(combinedStudentId)){addLog('ℹ "'+ind.studentName+'" already linked','log-info');continue;}
-      await db.collection('students').doc(ind.id).update({linkedStudentIds:[...existing,combinedStudentId]});
+      await withRetry(()=>db.collection('students').doc(ind.id).update({linkedStudentIds:[...existing,combinedStudentId]}));
       addLog('✓ Linked "'+ind.studentName+'"','log-ok');
       anyLinked=true;
-    }catch(e){addLog('❌ Failed: '+e.message,'log-err');}
+    }catch(e){ addLog('❌ Failed: '+e.message,'log-err'); }
   }
   if(anyLinked){
-    try{await db.collection('students').doc(g.doc.id).update({isGroupDoc:true,linkedAt:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
+    try{ await withRetry(()=>db.collection('students').doc(g.doc.id).update({isGroupDoc:true,linkedAt:firebase.firestore.FieldValue.serverTimestamp()})); }catch(e){}
     splitLinkedCount++;
     g.doc.linkedStudentIds=[combinedStudentId];
     updateSplitStats();renderSplitList();
     addLog('\n✅ Done linking "'+g.doc.studentName+'"\n','log-ok');
   }
 }
+
 document.getElementById('split-copy-log-btn').onclick=()=>{
   navigator.clipboard.writeText(document.getElementById('split-log').innerText).then(()=>{
     document.getElementById('split-copy-log-btn').textContent='✓ Copied!';
