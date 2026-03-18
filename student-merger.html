@@ -667,9 +667,14 @@ function downloadPDF(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth();
-  const M=20; // left margin
+  const M=18;  // left margin
+  const RCB=M; // checkbox right anchor (from right edge)
+
   const confFilter=document.getElementById('rpt-conf-filter').value;
   const filterVal=document.getElementById('rpt-filter').value.toLowerCase();
+
+  // safeStr: always returns a plain JS string — handles Firestore numbers, null, undefined
+  const safeStr = v => (v===null||v===undefined) ? '' : String(v).trim();
 
   let visible=reportGroups.filter(g=>{
     if(confFilter!=='all'&&g.assessment.confidence!==confFilter) return false;
@@ -680,128 +685,178 @@ function downloadPDF(){
     return true;
   });
 
-  // jsPDF doesn't embed Raleway natively — we use helvetica (closest clean sans-serif available)
-  // and note Raleway in the title area. For true Raleway you'd need to embed the font file.
   doc.setFont('helvetica','normal');
   doc.setTextColor(0,0,0);
+  let y=26;
 
-  let y=24;
-
-  // ── HEADING ────────────────────────────────────────────────────────────────
-  doc.setFontSize(18); doc.setFont('helvetica','bold');
+  // ── HEADING ──────────────────────────────────────────────────────────────────
+  doc.setFontSize(20); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
   doc.text('Blooming Kids House', W/2, y, {align:'center'});
-  y+=8;
+  y+=9;
 
-  doc.setFontSize(12); doc.setFont('helvetica','normal');
+  doc.setFontSize(13); doc.setFont('helvetica','normal');
   doc.text('Student Duplicate Review', W/2, y, {align:'center'});
-  y+=6;
-
-  // thin rule under heading
-  doc.setDrawColor(0); doc.setLineWidth(0.4);
-  doc.line(M, y, W-M, y);
-  y+=8;
-
-  // ── INSTRUCTIONS ───────────────────────────────────────────────────────────
-  doc.setFontSize(8); doc.setFont('helvetica','italic');
-  doc.text('Review each group below. Tick the box if the names belong to the same child and need merging. Leave blank if they are different children.', M, y, {maxWidth: W-(M*2)});
-  y+=10;
-
-  // ── CONFIDENCE KEY ─────────────────────────────────────────────────────────
-  doc.setFont('helvetica','bold'); doc.setFontSize(8);
-  doc.text('Key:', M, y);
-  doc.setFont('helvetica','normal');
-  doc.text('(H) Very Likely Same Child     (M) Possibly Same Child     (C) Worth Checking', M+10, y);
-  y+=8;
-
-  doc.setLineWidth(0.3);
-  doc.line(M, y, W-M, y);
   y+=7;
 
-  // ── GROUP NUMBER counter ───────────────────────────────────────────────────
+  doc.setFontSize(9); doc.setTextColor(60,60,60);
+  const genDate = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const genTime = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  doc.text(`Generated: ${genDate} at ${genTime}   ·   ${visible.length} group${visible.length!==1?'s':''} flagged for review`, W/2, y, {align:'center'});
+  y+=6;
+
+  // Full-width rule
+  doc.setDrawColor(0); doc.setLineWidth(0.5); doc.setTextColor(0,0,0);
+  doc.line(M, y, W-M, y);
+  y+=9;
+
+  // ── INSTRUCTIONS ─────────────────────────────────────────────────────────────
+  doc.setFontSize(9); doc.setFont('helvetica','italic'); doc.setTextColor(0,0,0);
+  doc.text(
+    'Review each group below. If the records belong to the same child, tick the MERGE box on the right. ' +
+    'If they are different children of the same parent, leave the box blank.',
+    M, y, {maxWidth: W-(M*2)}
+  );
+  y+=12;
+
+  // ── CONFIDENCE KEY ───────────────────────────────────────────────────────────
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  doc.text('Confidence Key:', M, y);
+  y+=5.5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text('(H) Very Likely Same Child  —  names are identical or one is a short version of the other', M+4, y);
+  y+=5;
+  doc.text('(M) Possibly Same Child  —  first names match, full names differ slightly', M+4, y);
+  y+=5;
+  doc.text('(C) Worth Checking  —  some similarity detected, may or may not be the same child', M+4, y);
+  y+=8;
+
+  doc.setDrawColor(0); doc.setLineWidth(0.4);
+  doc.line(M, y, W-M, y);
+  y+=9;
+
+  // ── GROUPS ───────────────────────────────────────────────────────────────────
   let groupNum=0;
+  const confFull={high:'Very Likely Same Child',medium:'Possibly Same Child',low:'Worth Checking'};
+  const confShort={high:'H',medium:'M',low:'C'};
 
   visible.forEach(g=>{
     groupNum++;
-    const confShort={high:'H',medium:'M',low:'C'};
-    const nameList=g.students.map(s=>s.studentName||'Unnamed');
 
-    // Collect parent info — use first student that has each field
-    // Force string conversion: phone numbers are sometimes stored as numbers in Firebase
-    const parentName  = String(g.students.map(s=>s.parentName||'').find(v=>v)  || '').trim();
-    const parentPhone = String(g.students.map(s=>s.parentPhone||'').find(v=>v) || '').trim();
-    const parentEmail = String(g.students.map(s=>s.parentEmail||'').find(v=>v) || '').trim();
+    // Parent info (force string for all — phone is sometimes a number in Firestore)
+    const parentName  = safeStr(g.students.map(s=>s.parentName ).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
+    const parentPhone = safeStr(g.students.map(s=>s.parentPhone).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
+    const parentEmail = safeStr(g.students.map(s=>s.parentEmail).find(v=>v!==undefined&&v!==null&&safeStr(v)!==''));
 
-    // Count parent info lines that actually have content
-    const parentLines = [parentName, parentPhone, parentEmail].filter(v=>v).length;
+    // Student rows: name + grade + tutor name + tutor email
+    const studentRows = g.students.map(s=>({
+      name:       safeStr(s.studentName) || 'Unnamed',
+      grade:      safeStr(s.grade),
+      tutorName:  safeStr(s.tutorName),
+      tutorEmail: safeStr(s.tutorEmail)
+    }));
 
-    // Estimate height: header + parent lines + student names + gap
-    const neededHeight = 8 + (parentLines * 5.5) + (nameList.length * 7) + 8;
+    const parentLineCount = [parentName,parentPhone,parentEmail].filter(v=>v).length;
+    // Each student: name line (8) + tutor line (5.5) = 13.5 per student
+    const neededHeight = 14 + (parentLineCount*5.5) + 6 + (studentRows.length*14) + 10;
+
     if(y+neededHeight>272){
-      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
-      doc.text(`Blooming Kids House  ·  Page ${doc.internal.getCurrentPageInfo().pageNumber}`, W/2, 287, {align:'center'});
+      // Footer on this page before break
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0);
+      doc.text(
+        `Blooming Kids House  |  Student Duplicate Review  |  Confidential  |  Page ${doc.internal.getCurrentPageInfo().pageNumber}`,
+        W/2, 287, {align:'center'}
+      );
       doc.addPage();
-      doc.setTextColor(0,0,0);
       y=20;
     }
 
-    // ── Group header: number + confidence ──────────────────────────────────
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
-    doc.text(`${groupNum}.  (${confShort[g.assessment.confidence]})`, M, y);
+    // ── Group header line ───────────────────────────────────────────────────
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0);
+    doc.text(`Group ${groupNum}   (${confShort[g.assessment.confidence]}) ${confFull[g.assessment.confidence]}`, M, y);
 
-    // Checkbox on the right
-    doc.setDrawColor(0); doc.setLineWidth(0.4);
-    doc.rect(W-M-5, y-4, 4.5, 4.5);
-    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80);
-    doc.text('Merge?', W-M-5, y+2.5);
-    y+=6;
+    // ── MERGE checkbox — larger and clearly labelled ────────────────────────
+    const cbSize = 6;
+    const cbX = W - M - cbSize;
+    const cbY = y - 5;
+    doc.setDrawColor(0); doc.setLineWidth(0.5);
+    doc.rect(cbX, cbY, cbSize, cbSize);   // checkbox square
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+    doc.text('MERGE', cbX + cbSize/2, cbY - 1.5, {align:'center'});
+    doc.text('Yes / No', cbX + cbSize/2, cbY + cbSize + 3.5, {align:'center'});
+    y+=8;
 
-    // ── Parent details ─────────────────────────────────────────────────────
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
+    // ── Parent details ──────────────────────────────────────────────────────
+    doc.setFontSize(8.5); doc.setTextColor(0,0,0);
     if(parentName){
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
-      doc.text('Parent Name: ', M+6, y);
-      const labelW1 = doc.getTextWidth('Parent Name: ');
+      doc.setFont('helvetica','bold');
+      doc.text('Parent: ', M+4, y);
       doc.setFont('helvetica','normal');
-      doc.text(parentName, M+6+labelW1, y);
+      doc.text(safeStr(parentName), M+4+doc.getTextWidth('Parent: '), y);
       y+=5.5;
     }
     if(parentPhone){
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
-      doc.text('Phone: ', M+6, y);
-      const labelW2 = doc.getTextWidth('Phone: ');
+      doc.setFont('helvetica','bold');
+      doc.text('Phone: ', M+4, y);
       doc.setFont('helvetica','normal');
-      doc.text(parentPhone, M+6+labelW2, y);
+      doc.text(safeStr(parentPhone), M+4+doc.getTextWidth('Phone: '), y);
       y+=5.5;
     }
     if(parentEmail){
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
-      doc.text('Email: ', M+6, y);
-      const labelW3 = doc.getTextWidth('Email: ');
+      doc.setFont('helvetica','bold');
+      doc.text('Email: ', M+4, y);
       doc.setFont('helvetica','normal');
-      doc.text(parentEmail, M+6+labelW3, y);
+      doc.text(safeStr(parentEmail), M+4+doc.getTextWidth('Email: '), y);
       y+=5.5;
     }
-    y+=2;
+    y+=3;
 
-    // ── Student names ──────────────────────────────────────────────────────
-    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0,0,0);
-    nameList.forEach(name=>{
-      doc.text(`\u2022  ${name}`, M+6, y);
-      y+=6;
+    // ── Students label ──────────────────────────────────────────────────────
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+    doc.text('Students in this group:', M+4, y);
+    y+=6;
+
+    // ── Student rows ────────────────────────────────────────────────────────
+    studentRows.forEach(s=>{
+      // Name + Grade on first line
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+      const gradePart = s.grade ? '   Grade: ' + s.grade : '';
+      doc.text('•  ' + s.name + gradePart, M+6, y);
+      y+=5.5;
+
+      // Tutor name + email on second line (indented further)
+      const tutorLine = [
+        s.tutorName  ? 'Tutor: '  + s.tutorName  : '',
+        s.tutorEmail ? 'Email: ' + s.tutorEmail : ''
+      ].filter(Boolean).join('   |   ');
+      if(tutorLine){
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
+        doc.text(tutorLine, M+12, y);
+        y+=5;
+      }
+      y+=1.5;
     });
 
-    // Thin divider
-    doc.setDrawColor(180,180,180); doc.setLineWidth(0.2);
+    // ── Divider ─────────────────────────────────────────────────────────────
+    y+=3;
+    doc.setDrawColor(0); doc.setLineWidth(0.3);
     doc.line(M, y, W-M, y);
-    y+=7;
+    y+=8;
   });
 
-  // ── LAST PAGE FOOTER ───────────────────────────────────────────────────────
+  // ── FOOTER on every page ─────────────────────────────────────────────────────
   const totalPages=doc.internal.getNumberOfPages();
   for(let p=1;p<=totalPages;p++){
     doc.setPage(p);
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
-    doc.text(`Blooming Kids House  ·  Confidential  ·  Page ${p} of ${totalPages}`, W/2, 287, {align:'center'});
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0);
+    // Left side
+    doc.text('Blooming Kids House  |  Confidential', M, 289);
+    // Centre
+    doc.text('Student Duplicate Review', W/2, 289, {align:'center'});
+    // Right side
+    doc.text(`Page ${p} of ${totalPages}`, W-M, 289, {align:'right'});
+    // Rule above footer
+    doc.setDrawColor(0); doc.setLineWidth(0.3);
+    doc.line(M, 284, W-M, 284);
   }
 
   const dateStr=new Date().toISOString().slice(0,10);
