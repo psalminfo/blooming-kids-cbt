@@ -395,6 +395,10 @@ function switchTab(t){
     document.getElementById('tab-'+id).className='tab'+(id===t?' active':'');
     document.getElementById('pane-'+id).style.display=id===t?'block':'none';
   });
+  // When switching to merge tab, always make sure view-scan is visible
+  if(t==='merge'){
+    document.getElementById('view-scan').style.display='block';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -847,8 +851,9 @@ async function scanStudents(){
     stat.textContent=`Done. Found ${dupGroups.length} groups.`;
 
     updateMergeStats(); renderGroups();
-    document.getElementById('view-scan').style.display='none';
     document.getElementById('view-results').style.display='block';
+    const scanBtnEl=document.getElementById('scan-btn');
+    scanBtnEl.innerHTML='<span class="spinner" style="display:none" id="scan-spin"></span>🔄 Re-scan';
     setStep(2);
   }catch(e){
     stat.textContent='❌ '+e.message;
