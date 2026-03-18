@@ -164,7 +164,6 @@
     <button class="btn btn-ghost" id="logout-btn" style="display:none">Sign out</button>
   </div>
 </header>
-
 <!-- AUTH -->
 <div id="auth-wrap">
   <main>
@@ -172,29 +171,11 @@
       <div class="panel-title">Authentication Required</div>
       <div class="alert alert-warn">⚠️ Admin login required — this tool modifies your database.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <input id="auth-email" type="email" class="s-input" placeholder="Admin email" style="max-width:260px;">
-        <input id="auth-pass" type="password" class="s-input" placeholder="Password" style="max-width:200px;">
-        <button class="btn btn-primary" id="auth-btn">Sign In</button>
-      </div>
-      <div id="auth-error" style="color:var(--red);font-size:12px;margin-top:9px;"></div>
-    </div>
-  </main>
-</div>
-
-<!-- MAIN TOOL -->
-<div id="tool-wrap" style="display:none">
-
-
-<!-- AUTH -->
-<div id="auth-wrap">
-  <main>
-    <div id="auth-panel" class="panel">
-      <div class="panel-title">Authentication Required</div>
-      <div class="alert alert-warn">⚠️ Admin login required — this tool modifies your database.</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <input id="auth-email" type="email" class="s-input" placeholder="Admin email" style="max-width:260px;">
-        <input id="auth-pass" type="password" class="s-input" placeholder="Password" style="max-width:200px;">
-        <button class="btn btn-primary" id="auth-btn">Sign In</button>
+        <form id="auth-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <input id="auth-email" type="email" class="s-input" placeholder="Admin email" style="max-width:260px;" autocomplete="username">
+          <input id="auth-pass" type="password" class="s-input" placeholder="Password" style="max-width:200px;" autocomplete="current-password">
+          <button type="button" class="btn btn-primary" id="auth-btn">Sign In</button>
+        </form>
       </div>
       <div id="auth-error" style="color:var(--red);font-size:12px;margin-top:9px;"></div>
     </div>
@@ -212,59 +193,7 @@
     <div class="tab"        id="tab-split"        onclick="switchTab('split')">✂️ Split Group Docs</div>
   </div>
 
-<!-- ═══════════════════════════════════════════════════════
-       TAB 1: REVIEW REPORT
-  ═══════════════════════════════════════════════════════ -->
-  <div id="pane-report">
-  <main>
 
-    <div class="panel">
-      <div class="panel-title">Generate Review Report</div>
-      <div class="alert alert-info">ℹ️ This scan only shows groups where student names are similar enough to be the same child. Different-named siblings under the same parent are automatically excluded. Download the PDF, give it to your staff to review before merging.</div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px;">
-        <button class="btn btn-primary" id="rpt-scan-btn">
-          <span class="spinner" style="display:none" id="rpt-spin"></span>
-          🔍 Scan Students
-        </button>
-        <span id="rpt-status" style="font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;"></span>
-      </div>
-      <div class="progress-bar" style="display:none" id="rpt-progress-wrap">
-        <div class="progress-fill" id="rpt-progress" style="width:0%"></div>
-      </div>
-    </div>
-
-    <div id="rpt-results" style="display:none">
-
-      <div class="stats">
-        <div class="stat"><div class="stat-val blue" id="rpt-stat-total">–</div><div class="stat-label">Total Students</div></div>
-        <div class="stat"><div class="stat-val red" id="rpt-stat-high">–</div><div class="stat-label">Very Likely Same</div></div>
-        <div class="stat"><div class="stat-val amber" id="rpt-stat-med">–</div><div class="stat-label">Possibly Same</div></div>
-        <div class="stat"><div class="stat-val blue" id="rpt-stat-low">–</div><div class="stat-label">Worth Checking</div></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-title">Suspicious Groups</div>
-
-        <div class="search-row">
-          <input type="search" class="s-input" id="rpt-filter" placeholder="Filter by name or phone…" style="max-width:280px;">
-          <select class="s-input" id="rpt-conf-filter" style="max-width:200px;">
-            <option value="all">All confidence levels</option>
-            <option value="high">🔴 Very Likely Same Child</option>
-            <option value="medium">🟡 Possibly Same Child</option>
-            <option value="low">🔵 Worth Checking</option>
-          </select>
-          <div style="margin-left:auto;display:flex;gap:8px;">
-            <button class="btn btn-orange" id="download-pdf-btn">⬇ Download PDF</button>
-            <button class="btn btn-ghost" id="rpt-rescan-btn">Re-scan</button>
-          </div>
-        </div>
-
-        <div id="rpt-group-list"></div>
-      </div>
-
-    </div>
-  </main>
-  </div>
 
   <!-- ═══════════════════════════════════════════════════════
        TAB 2: FIX PARENTS
@@ -465,13 +394,16 @@ auth.onAuthStateChanged(u=>{
   document.getElementById('tool-wrap').style.display = u ? 'block' : 'none';
   document.getElementById('logout-btn').style.display = u ? 'flex' : 'none';
 });
-document.getElementById('auth-btn').onclick=async()=>{
+async function doSignIn(){
   const e=document.getElementById('auth-email').value.trim();
   const p=document.getElementById('auth-pass').value;
   const err=document.getElementById('auth-error');
   err.textContent='';
+  if(!e||!p){err.textContent='Please enter email and password.';return;}
   try{await auth.signInWithEmailAndPassword(e,p);}catch(ex){err.textContent=ex.message;}
-};
+}
+document.getElementById('auth-btn').onclick=doSignIn;
+document.getElementById('auth-form').addEventListener('submit',function(ev){ev.preventDefault();doSignIn();});
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
 // ─── TABS ──────────────────────────────────────────────────────────────────────
