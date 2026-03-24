@@ -262,6 +262,17 @@ function isPlacementTestEligible(grade) {
     return !isNaN(num) && num >= 3 && num <= 12;
 }
 
+// Returns true when a transitioning student has been assigned for 14+ days.
+// Under 14 days → auto-filled fee-confirmation only; 14+ days → full report form.
+function isTransitioningEligibleForReport(student) {
+    if (!student.isTransitioning) return false;
+    const raw = student.createdAt;
+    if (!raw) return false;
+    const created = raw.toDate ? raw.toDate() : new Date(raw);
+    if (isNaN(created.getTime())) return false;
+    return (Date.now() - created.getTime()) >= 14 * 24 * 60 * 60 * 1000;
+}
+
 // ----- COUNTRY FROM PHONE NUMBER (detects country via dialing code) -----
 function getCountryFromPhone(phone) {
     if (!phone) return '';
@@ -5766,11 +5777,18 @@ async function renderStudentDatabase(container, tutor) {
                     }
                 }
 
-                // ── SETTING 3: Report Submission (only blocked by hasSubmitted + summerBreak, not by other settings) ──
+                // ── SETTING 3: Report Submission ──
                 if (!hasSubmitted && !student.summerBreak) {
-                    if (isSubmissionEffectivelyEnabled()) {
-                        if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
+                    const transitioningTooNew = student.isTransitioning && !isTransitioningEligibleForReport(student);
+                    if (transitioningTooNew) {
+                        // Under 14 days — not yet eligible for a real report
+                        actionsHTML += `<span class="text-gray-400 text-xs">📋 Report eligible after 2 weeks</span>`;
+                    } else if (isSubmissionEffectivelyEnabled()) {
+                        // Transitioning >= 14 days must always use the modal (full form).
+                        // Single-student fast-path only applies to non-transitioning students.
+                        const useSingleFlow = approvedStudents.length === 1 && !student.isTransitioning;
+                        if (useSingleFlow) {
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="false">Submit Report</button>`;
                         } else {
                             actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
@@ -5849,8 +5867,19 @@ async function renderStudentDatabase(container, tutor) {
                 studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee:</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
             }
             if (approvedStudents.length > 1 && isSubmissionEffectivelyEnabled()) {
-                const submittable = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
-                const allSaved = Object.keys(savedReports).length === submittable && submittable > 0;
+                // Submittable = not on break, not already submitted, and not a
+                // transitioning student who has been here less than 14 days.
+                const submittableStudents = approvedStudents.filter(s =>
+                    !s.summerBreak &&
+                    !submittedStudentIds.has(s.id) &&
+                    !(s.isTransitioning && !isTransitioningEligibleForReport(s))
+                );
+                const submittable = submittableStudents.length;
+                // Compare only saved reports whose student is in this cycle's submittable
+                // set — stale keys from previously submitted students must not inflate the count.
+                const submittableIds = new Set(submittableStudents.map(s => s.id));
+                const savedForSubmittable = Object.keys(savedReports).filter(id => submittableIds.has(id)).length;
+                const allSaved = submittable > 0 && savedForSubmittable === submittable;
                 if (submittable > 0) {
                     studentsHTML += `<div class="mt-6 text-right"><button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allSaved ? 'disabled' : ''}>Submit All Reports</button></div>`;
                 }
@@ -5871,16 +5900,26 @@ async function renderStudentDatabase(container, tutor) {
     // --- MODAL FUNCTIONS (Restored inside Scope) ---
     
     function showReportModal(student) {
-        if (student.isTransitioning) {
+        if (!isSubmissionEffectivelyEnabled()) {
+            showCustomAlert('Report submission is currently disabled.');
+            return;
+        }
+
+        // Transitioning students under 14 days: skip the form, auto-fill, go straight
+        // to fee confirmation. They have not been with the tutor long enough for a full report.
+        if (student.isTransitioning && !isTransitioningEligibleForReport(student)) {
             const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
             const reportData = {
-                studentId: student.id, studentName: student.studentName, grade: student.grade, parentName: student.parentName, parentPhone: student.parentPhone, 
-                normalizedParentPhone: typeof normalizePhoneNumber === 'function' ? normalizePhoneNumber(student.parentPhone) : student.parentPhone,
+                studentId: student.id, studentName: student.studentName, grade: student.grade, parentName: student.parentName, parentPhone: student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
                 reportMonth: currentMonthYear, introduction: "Transitioning student", topics: "Transitioning student", progress: "Transitioning student", strengthsWeaknesses: "Transitioning student", recommendations: "Transitioning student", generalComments: "Transitioning student", isTransitioning: true
             };
             showFeeConfirmationModal(student, reportData);
             return;
         }
+
+        // All other students — including transitioning >= 14 days — get the full form.
+        // isTransitioning is preserved on reportData so downstream can identify them.
 
         const existingReport = savedReports[student.id] || {};
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
@@ -6002,7 +6041,7 @@ async function renderStudentDatabase(container, tutor) {
             const reportData = {
                 studentId: student.id, studentName: student.studentName, grade: student.grade, parentName: student.parentName, 
                 parentPhone: student.parentPhone, 
-                normalizedParentPhone: typeof normalizePhoneNumber === 'function' ? normalizePhoneNumber(student.parentPhone) : student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
                 reportMonth: currentMonthYear,
                 introduction:        document.getElementById('report-intro').value,
                 topics:              document.getElementById('report-topics').value,
