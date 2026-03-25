@@ -5778,13 +5778,12 @@ async function renderStudentDatabase(container, tutor) {
                 }
 
                 // ── SETTING 3: Report Submission ──
+                // Transitioning students under 14 days still see the Enter Report button —
+                // showReportModal handles them by auto-filling fields and going straight to
+                // the fee confirmation modal, so there is no need to block the button here.
                 if (!hasSubmitted && !student.summerBreak) {
-                    const transitioningTooNew = student.isTransitioning && !isTransitioningEligibleForReport(student);
-                    if (transitioningTooNew) {
-                        // Under 14 days — not yet eligible for a real report
-                        actionsHTML += `<span class="text-gray-400 text-xs">📋 Report eligible after 2 weeks</span>`;
-                    } else if (isSubmissionEffectivelyEnabled()) {
-                        // Transitioning >= 14 days must always use the modal (full form).
+                    if (isSubmissionEffectivelyEnabled()) {
+                        // Transitioning students must always use the modal (full form or auto-fill).
                         // Single-student fast-path only applies to non-transitioning students.
                         const useSingleFlow = approvedStudents.length === 1 && !student.isTransitioning;
                         if (useSingleFlow) {
