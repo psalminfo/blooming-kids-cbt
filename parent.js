@@ -1751,10 +1751,23 @@ async function loadAcademicsData(selectedStudent = null) {
             let homeworkHtml      = '';
 
             if (studentId) {
-                const [sessionTopicsSnapshot, homeworkSnapshot] = await Promise.all([
+                // Query homework by studentId first; if empty also try parentEmail fallback
+                // so homework is never invisible just because studentId lookup failed.
+                const parentEmailForQuery = studentInfo?.data?.parentEmail || '';
+                const [sessionTopicsSnapshot, hwByStudentId, hwByEmail] = await Promise.all([
                     db.collection('daily_topics').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
-                    db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true }))
+                    db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
+                    parentEmailForQuery
+                        ? db.collection('homework_assignments').where('parentEmail', '==', parentEmailForQuery).get().catch(() => ({ empty: true }))
+                        : Promise.resolve({ empty: true })
                 ]);
+
+                // Merge both homework result sets, deduplicated by doc id
+                const hwDocMap = new Map();
+                const mergeHwSnap = (snap) => { if (!snap || snap.empty) return; snap.forEach(d => hwDocMap.set(d.id, d)); };
+                mergeHwSnap(hwByStudentId);
+                mergeHwSnap(hwByEmail);
+                const homeworkSnapshot = { empty: hwDocMap.size === 0, forEach: (fn) => hwDocMap.forEach(fn) };
 
                 sessionTopicsHtml = sessionTopicsSnapshot.empty
                     ? `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">No session topics recorded yet.</p></div>`
@@ -1798,7 +1811,7 @@ async function loadAcademicsData(selectedStudent = null) {
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        <span class="text-sm font-medium text-gray-700">Due: ${formatDetailedDate(new Date(dueTimestamp), true)}</span>
+                                        <span class="text-sm font-medium text-gray-700">Due: ${dueTimestamp ? formatDetailedDate(new Date(dueTimestamp), true) : 'No due date'}</span>
                                     </div>
                                 </div>
                                 <div class="text-gray-700 mb-4">
@@ -1889,26 +1902,35 @@ function setupHomeworkRealTimeListener() {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Cancel any previous listener before creating a new one
     if (window.homeworkListener) {
         window.homeworkListener();
+        window.homeworkListener = null;
     }
 
+    const ids = Array.from(studentIdMap.values()).filter(Boolean);
+    // Firestore 'in' queries are limited to 30 items — skip if empty or too large
+    if (ids.length === 0 || ids.length > 30) return;
+
     window.homeworkListener = db.collection('homework_assignments')
-        .where('studentId', 'in', Array.from(studentIdMap.values()))
+        .where('studentId', 'in', ids)
         .onSnapshot((snapshot) => {
+            let hasRelevantChange = false;
             snapshot.docChanges().forEach((change) => {
-                if (change.type === 'modified') {
-                    const homeworkData = change.doc.data();
-                    const studentId = homeworkData.studentId;
-                    
-                    for (const [studentName, sid] of studentIdMap.entries()) {
-                        if (sid === studentId) {
-                            // You can add update logic here if needed
-                            break;
-                        }
-                    }
+                // React to new homework assigned or existing homework graded/updated
+                if (change.type === 'added' || change.type === 'modified') {
+                    hasRelevantChange = true;
                 }
             });
+            if (hasRelevantChange) {
+                // Invalidate the academics tab cache so next open shows fresh data
+                persistentCache.invalidateTab(user.uid, 'academics');
+                // If the academics tab is currently visible, reload it immediately
+                const academicsContent = document.getElementById('academicsContent');
+                if (academicsContent && academicsContent.offsetParent !== null) {
+                    loadAcademicsData();
+                }
+            }
         }, (error) => {
             console.error('Homework real-time listener error:', error);
         });
@@ -2720,7 +2742,7 @@ async function preloadAllTabs(userId, userData) {
 
 // Fetch academics data and build HTML, save to cache — no DOM touched
 async function _preloadAcademicsCache(userId, parentPhone, email) {
-    if (persistentCache.getTab(userId, 'academics', 30 * 60 * 1000)) return; // already cached
+    if (persistentCache.getTab(userId, 'academics', 2 * 60 * 60 * 1000)) return; // cached for 2 hours
 
     const childrenResult = await comprehensiveFindChildren(parentPhone, email);
     if (childrenResult.studentNames.length === 0) return;
@@ -2747,10 +2769,19 @@ async function _preloadAcademicsCache(userId, parentPhone, email) {
         let sessionTopicsHtml = '', homeworkHtml = '';
 
         if (studentId) {
-            const [topicsSnap, hwSnap] = await Promise.all([
+            const parentEmailForQuery = studentInfo?.data?.parentEmail || '';
+            const [topicsSnap, hwByStudentId, hwByEmail] = await Promise.all([
                 db.collection('daily_topics').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
-                db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true }))
+                db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
+                parentEmailForQuery
+                    ? db.collection('homework_assignments').where('parentEmail', '==', parentEmailForQuery).get().catch(() => ({ empty: true }))
+                    : Promise.resolve({ empty: true })
             ]);
+            // Merge and deduplicate both homework result sets
+            const _hwDocMap = new Map();
+            const _mergeHw = (snap) => { if (!snap || snap.empty) return; snap.forEach(d => _hwDocMap.set(d.id, d)); };
+            _mergeHw(hwByStudentId); _mergeHw(hwByEmail);
+            const hwSnap = { empty: _hwDocMap.size === 0, forEach: (fn) => _hwDocMap.forEach(fn) };
 
             sessionTopicsHtml = topicsSnap.empty
                 ? `<div class="bg-gray-50 border rounded-lg p-6 text-center"><p class="text-gray-500">No session topics recorded yet.</p></div>`
@@ -2782,7 +2813,7 @@ async function _preloadAcademicsCache(userId, parentPhone, email) {
                         <div class="flex justify-between items-start mb-3">
                             <div><h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
                             <div class="mt-1 flex flex-wrap items-center gap-2"><span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusIcon} ${statusText}</span><span class="text-xs text-gray-600">Assigned by: ${tutor}</span></div></div>
-                            <span class="text-sm font-medium text-gray-700">Due: ${formatDetailedDate(new Date(dueTimestamp),true)}</span>
+                            <span class="text-sm font-medium text-gray-700">Due: ${dueTimestamp ? formatDetailedDate(new Date(dueTimestamp), true) : 'No due date'}</span>
                         </div>
                         <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md text-gray-700 mb-4">${safeDesc}</p>
                         <div class="flex justify-between items-center pt-3 border-t border-gray-100">
