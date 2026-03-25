@@ -1,165 +1,39 @@
 {
   "indexes": [
 
-    // ─── students ────────────────────────────────────────────────────────────
-    // tutorEmail + autoRegistered  (auto-registered student lookup)
-    {
-      "collectionGroup": "students",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail",      "order": "ASCENDING" },
-        { "fieldPath": "autoRegistered",  "order": "ASCENDING" }
-      ]
-    },
+    { "collectionGroup": "students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "autoRegistered", "order": "ASCENDING" }] },
+    { "collectionGroup": "pending_students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "autoRegistered", "order": "ASCENDING" }] },
+    { "collectionGroup": "homeworks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "homework_assignments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "tutor_notifications", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "read", "order": "ASCENDING" }] },
+    { "collectionGroup": "tutor_notifications", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "tutor_notifications", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "read", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "tutor_submissions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }] },
+    { "collectionGroup": "tutor_submissions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "type", "order": "ASCENDING" }, { "fieldPath": "parentName", "order": "ASCENDING" }] },
+    { "collectionGroup": "tutor_submissions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "parentName", "order": "ASCENDING" }] },
+    { "collectionGroup": "student_results", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "parentName", "order": "ASCENDING" }] },
+    { "collectionGroup": "recall_requests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "studentId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "tutor_grades", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "month", "order": "ASCENDING" }] },
+    { "collectionGroup": "conversations", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tutorEmail", "order": "ASCENDING" }, { "fieldPath": "updatedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "messages", "queryScope": "COLLECTION_GROUP", "fields": [{ "fieldPath": "createdAt", "order": "ASCENDING" }] },
 
-    // ─── pending_students ────────────────────────────────────────────────────
-    // tutorEmail + autoRegistered
-    {
-      "collectionGroup": "pending_students",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail",      "order": "ASCENDING" },
-        { "fieldPath": "autoRegistered",  "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── homeworks ───────────────────────────────────────────────────────────
-    // tutorEmail + status  (active homework alerts)
-    {
-      "collectionGroup": "homeworks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING" },
-        { "fieldPath": "status",     "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── homework_assignments ────────────────────────────────────────────────
-    // tutorEmail + status  (inbox queries)
-    {
-      "collectionGroup": "homework_assignments",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING" },
-        { "fieldPath": "status",     "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── tutor_notifications ─────────────────────────────────────────────────
-    // tutorEmail + read  (unread badge count)
-    {
-      "collectionGroup": "tutor_notifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING" },
-        { "fieldPath": "read",       "order": "ASCENDING" }
-      ]
-    },
-    // tutorEmail + createdAt desc  (notifications list, limit 50)
-    {
-      "collectionGroup": "tutor_notifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING"  },
-        { "fieldPath": "createdAt",  "order": "DESCENDING" }
-      ]
-    },
-    // tutorEmail + read + createdAt desc  (unread sorted — covers both queries above)
-    {
-      "collectionGroup": "tutor_notifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING"  },
-        { "fieldPath": "read",       "order": "ASCENDING"  },
-        { "fieldPath": "createdAt",  "order": "DESCENDING" }
-      ]
-    },
-
-    // ─── tutor_submissions ───────────────────────────────────────────────────
-    // tutorEmail + type  (creative writing dashboard query)
-    {
-      "collectionGroup": "tutor_submissions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING" },
-        { "fieldPath": "type",       "order": "ASCENDING" }
-      ]
-    },
-    // tutorEmail + type + parentName  (filtered creative writing by parent)
-    {
-      "collectionGroup": "tutor_submissions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail",  "order": "ASCENDING" },
-        { "fieldPath": "type",        "order": "ASCENDING" },
-        { "fieldPath": "parentName",  "order": "ASCENDING" }
-      ]
-    },
-    // tutorEmail + parentName  (submissions filtered by parent)
-    {
-      "collectionGroup": "tutor_submissions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail",  "order": "ASCENDING" },
-        { "fieldPath": "parentName",  "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── student_results ─────────────────────────────────────────────────────
-    // tutorEmail + parentName  (assessment dashboard filtered by parent)
-    {
-      "collectionGroup": "student_results",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail",  "order": "ASCENDING" },
-        { "fieldPath": "parentName",  "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── recall_requests ─────────────────────────────────────────────────────
-    // studentId + status  (pending/approved recall lookup)
-    {
-      "collectionGroup": "recall_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "studentId", "order": "ASCENDING" },
-        { "fieldPath": "status",    "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── tutor_grades ────────────────────────────────────────────────────────
-    // tutorEmail + month  (gamification listener per tutor per month)
-    {
-      "collectionGroup": "tutor_grades",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING" },
-        { "fieldPath": "month",      "order": "ASCENDING" }
-      ]
-    },
-
-    // ─── conversations ───────────────────────────────────────────────────────
-    // tutorEmail + updatedAt desc  (inbox conversation list sorted by recent)
-    {
-      "collectionGroup": "conversations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tutorEmail", "order": "ASCENDING"  },
-        { "fieldPath": "updatedAt",  "order": "DESCENDING" }
-      ]
-    },
-
-    // ─── conversations/{id}/messages (subcollection) ─────────────────────────
-    // createdAt asc  (chat history in order)
-    {
-      "collectionGroup": "messages",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "ASCENDING" }
-      ]
-    }
+    { "collectionGroup": "students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentEmail", "order": "ASCENDING" }] },
+    { "collectionGroup": "students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "normalizedParentPhone", "order": "ASCENDING" }] },
+    { "collectionGroup": "students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentPhone", "order": "ASCENDING" }] },
+    { "collectionGroup": "pending_students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentEmail", "order": "ASCENDING" }] },
+    { "collectionGroup": "pending_students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "normalizedParentPhone", "order": "ASCENDING" }] },
+    { "collectionGroup": "pending_students", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentPhone", "order": "ASCENDING" }] },
+    { "collectionGroup": "homework_assignments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "homework_assignments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentEmail", "order": "ASCENDING" }] },
+    { "collectionGroup": "homework_assignments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "studentId", "order": "ASCENDING" }, { "fieldPath": "title", "order": "ASCENDING" }] },
+    { "collectionGroup": "daily_topics", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "studentId", "order": "ASCENDING" }] },
+    { "collectionGroup": "student_results", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentEmail", "order": "ASCENDING" }] },
+    { "collectionGroup": "student_results", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "timestamp", "order": "DESCENDING" }] },
+    { "collectionGroup": "tutor_submissions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentEmail", "order": "ASCENDING" }] },
+    { "collectionGroup": "tutor_submissions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "timestamp", "order": "DESCENDING" }] },
+    { "collectionGroup": "referral_transactions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "ownerUid", "order": "ASCENDING" }] },
+    { "collectionGroup": "parent_feedback", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "parentUid", "order": "ASCENDING" }] }
 
   ],
-
   "fieldOverrides": []
 }
