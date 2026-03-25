@@ -86,9 +86,9 @@ function isWithinReportWindow() {
     const hour = now.getHours();
     const minute = now.getMinutes();
     const currentMinutes = day * 24 * 60 + hour * 60 + minute;
-    // 19th at 23:59 → day 19, 23:59
-    const windowStart = 19 * 24 * 60 + 23 * 60 + 59;
-    // 25th at 23:59 → day 25, 23:59
+    // 19th at 00:00 → window opens at the very start of the 19th
+    const windowStart = 19 * 24 * 60;
+    // 25th at 23:59 → window closes at the very end of the 25th
     const windowEnd = 25 * 24 * 60 + 23 * 60 + 59;
     return currentMinutes >= windowStart && currentMinutes <= windowEnd;
 }
@@ -262,15 +262,37 @@ function isPlacementTestEligible(grade) {
     return !isNaN(num) && num >= 3 && num <= 12;
 }
 
-// Returns true when a transitioning student has been assigned for 14+ days.
-// Under 14 days → auto-filled fee-confirmation only; 14+ days → full report form.
+// Returns true when a transitioning student is eligible for a full report.
+// Three routes to eligibility (checked in order):
+//   1. allowReportsDuringTransition === true  → management explicitly enabled it
+//   2. transitionEndDate - transitionStartDate >= 14 days  → long transition planned
+//   3. Fallback: time since transitionStartDate (or createdAt) >= 14 days
 function isTransitioningEligibleForReport(student) {
     if (!student.isTransitioning) return false;
-    const raw = student.createdAt;
-    if (!raw) return false;
-    const created = raw.toDate ? raw.toDate() : new Date(raw);
-    if (isNaN(created.getTime())) return false;
-    return (Date.now() - created.getTime()) >= 14 * 24 * 60 * 60 * 1000;
+
+    // Route 1: Management explicitly allowed reports for this transition
+    if (student.allowReportsDuringTransition === true) return true;
+
+    // Route 2: Planned transition duration is 14+ days regardless of when we are now
+    const rawStart = student.transitionStartDate;
+    const rawEnd   = student.transitionEndDate;
+    if (rawStart && rawEnd) {
+        const start = rawStart.toDate ? rawStart.toDate() : new Date(rawStart);
+        const end   = rawEnd.toDate   ? rawEnd.toDate()   : new Date(rawEnd);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const plannedDuration = end.getTime() - start.getTime();
+            if (plannedDuration >= 14 * 24 * 60 * 60 * 1000) return true;
+        }
+    }
+
+    // Route 3: Fallback — how long the student has actually been with this tutor
+    // Uses transitionStartDate if available, otherwise falls back to createdAt
+    // (covers legacy students added before transitionStartDate field existed)
+    const rawFallback = student.transitionStartDate || student.createdAt;
+    if (!rawFallback) return false;
+    const fallbackDate = rawFallback.toDate ? rawFallback.toDate() : new Date(rawFallback);
+    if (isNaN(fallbackDate.getTime())) return false;
+    return (Date.now() - fallbackDate.getTime()) >= 14 * 24 * 60 * 60 * 1000;
 }
 
 // ----- COUNTRY FROM PHONE NUMBER (detects country via dialing code) -----
