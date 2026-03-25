@@ -85,7 +85,7 @@ export async function renderAcademicFollowUpPanel(container) {
         hwSnap.docs.forEach(d => {
             const data = d.data();
             const email = data.tutorEmail || '';
-            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
+            const raw = data.assignedAt || data.assignedDate || data.createdAt || data.uploadedAt;
             const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
             if (isNaN(date.getTime())) return;
             const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
