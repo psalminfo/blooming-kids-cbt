@@ -6951,11 +6951,13 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const td = window.tutorData || {};
     const qaScore      = breakdown.qaScore       ?? td.qaScore       ?? null;
     const qcScore      = breakdown.qcScore       ?? td.qcScore       ?? null;
-    // Strip ALL occurrences of [Staff Name]: or [Staff Name] - inserted by graders.
-    // Notes from multiple QA graders are concatenated so the pattern can appear
-    // anywhere in the string, not just at the start.
+    // Strip ALL [Staff Name]: patterns anywhere in the string (multiple graders
+    // are concatenated so the pattern can appear mid-string too).
     function stripGraderName(text) {
-        return (text || '').replace(/\[.*?\]\s*[:\-]\s*/gi, '').trim();
+        return (text || '')
+            .replace(/\[.*?\]\s*[:\-]?\s*/gi, '')  // remove [Name]: or [Name] anywhere
+            .replace(/\s{2,}/g, ' ')                    // collapse double spaces
+            .trim();
     }
     const qaAdvice     = stripGraderName(breakdown.qaAdvice      ?? td.qaAdvice      ?? '');
     const qcAdvice     = stripGraderName(breakdown.qcAdvice      ?? td.qcAdvice      ?? '');
@@ -6996,16 +6998,13 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
             </div>`;
     }
 
-    const notesHTML = [
-        qaAdvice ? `<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;">
-            <div style="font-size:.7rem;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">💬 QA Feedback</div>
-            <div style="font-size:.8rem;color:#4c1d95;line-height:1.5;">"${escapeHtml(qaAdvice)}"</div>
-        </div>` : '',
-        qcAdvice ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;">
-            <div style="font-size:.7rem;font-weight:800;color:#b45309;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">💬 QC Feedback</div>
-            <div style="font-size:.8rem;color:#78350f;line-height:1.5;">"${escapeHtml(qcAdvice)}"</div>
-        </div>` : ''
-    ].filter(Boolean).join('');
+    // Merge all notes into one plain block — no QA/QC labels, no staff names
+    const allNotes = [qaAdvice, qcAdvice].filter(Boolean).join(' ').trim();
+    const notesHTML = allNotes
+        ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+            <div style="font-size:.8rem;color:#374151;line-height:1.6;">"${escapeHtml(allNotes)}"</div>
+          </div>`
+        : '';
 
     scoreWidget.innerHTML = `
         <div style="background:#fff;border-radius:18px;box-shadow:0 1px 6px rgba(0,0,0,.08);border:1px solid #f1f5f9;overflow:hidden;">
@@ -7036,9 +7035,7 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
             </div>
             <!-- Expandable notes -->
             <div id="perf-breakdown" style="display:none;border-top:1px solid #f1f5f9;padding:14px 16px;background:#fafafa;">
-                <div style="font-size:.7rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Grader Notes</div>
                 ${notesHTML || '<div style="font-size:.8rem;color:#cbd5e1;text-align:center;padding:8px 0;">No notes provided yet.</div>'}
-                <div style="margin-top:10px;font-size:.68rem;color:#cbd5e1;text-align:center;">Score = average of all QA grades and QC grade (out of 100)</div>
             </div>
         </div>
     `;
