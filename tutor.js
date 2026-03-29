@@ -6826,10 +6826,14 @@ async function initGamification(tutorId) {
                 });
             }
 
-            let combined = 0;
-            if (qaScore !== null && qcScore !== null) combined = qaScore + qcScore;
-            else if (qaScore !== null) combined = qaScore;
-            else if (qcScore !== null) combined = qcScore;
+            // Use the pre-calculated combined score saved by masterPortal.js.
+            // Formula: avg of all QA entries (0-100) averaged with QC score (0-100) = 0-100.
+            // Stored as performanceScore on the tutor doc. Fall back only if absent.
+            let combined = data.performanceScore
+                ?? (qaScore !== null && qcScore !== null ? Math.round((qaScore + qcScore) / 2)
+                    : qaScore !== null ? qaScore
+                    : qcScore !== null ? qcScore
+                    : 0);
 
             currentTutorScore = combined;
             updateScoreDisplay(combined, {
@@ -6938,31 +6942,29 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
 
-    // Also update the header stat card
+    // Also update the header stat card — use the same pre-calculated totalScore
     const statScoreEl = document.getElementById('performanceScore');
     if (statScoreEl) {
-        const td2 = window.tutorData || {};
-        const qa2 = breakdown.qaScore ?? td2.qaScore ?? null;
-        const qc2 = breakdown.qcScore ?? td2.qcScore ?? null;
-        let hdrScore = 0;
-        if (qa2 !== null && qc2 !== null) hdrScore = qa2 + qc2;
-        else if (qa2 !== null) hdrScore = qa2;
-        else if (qc2 !== null) hdrScore = qc2;
-        statScoreEl.textContent = hdrScore > 0 ? hdrScore : '–';
+        statScoreEl.textContent = totalScore > 0 ? totalScore : '–';
     }
 
     const td = window.tutorData || {};
     const qaScore      = breakdown.qaScore       ?? td.qaScore       ?? null;
     const qcScore      = breakdown.qcScore       ?? td.qcScore       ?? null;
-    const qaAdvice     = breakdown.qaAdvice      ?? td.qaAdvice      ?? '';
-    const qcAdvice     = breakdown.qcAdvice      ?? td.qcAdvice      ?? '';
+    // Strip any leading [Staff Name]: or [Staff Name] - prefix inserted by graders
+    function stripGraderName(text) {
+        return (text || '').replace(/^\[.*?\]\s*[:\-]\s*/i, '').trim();
+    }
+    const qaAdvice     = stripGraderName(breakdown.qaAdvice      ?? td.qaAdvice      ?? '');
+    const qcAdvice     = stripGraderName(breakdown.qcAdvice      ?? td.qcAdvice      ?? '');
     const qaGraderName = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
     const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
     const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
 
     // QA max = 35, QC max = 55, total max = 90
-    const QA_MAX = 35, QC_MAX = 55, TOTAL_MAX = 90;
-    const pct = Math.round(Math.min((totalScore / TOTAL_MAX) * 100, 100));
+    // Score is 0-100 (avg of avg-QA and QC, both 0-100 scales)
+    const TOTAL_MAX = 100;
+    const pct = Math.min(totalScore, 100);
 
     let scoreColor, barGrad, scoreLbl, badgeBg;
     if (totalScore < 45)      { scoreColor='#ef4444'; barGrad='#f87171,#ef4444'; scoreLbl='⚠️ Needs Improvement'; badgeBg='#fee2e2'; }
@@ -7019,7 +7021,7 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
                     <div style="font-size:3.5rem;font-weight:900;color:${scoreColor};line-height:1;">${totalScore}</div>
                     <div style="margin-bottom:8px;line-height:1.3;">
                         <div style="font-size:.8rem;color:#94a3b8;font-weight:600;">pts</div>
-                        <div style="font-size:.68rem;color:#cbd5e1;">max ${TOTAL_MAX}</div>
+                        <div style="font-size:.68rem;color:#cbd5e1;">/ 100</div>
                     </div>
                     <div style="flex:1;"></div>
                     <div style="background:${badgeBg};color:${scoreColor};font-size:.78rem;font-weight:800;padding:4px 12px;border-radius:999px;margin-bottom:6px;">${pct}%</div>
@@ -7027,17 +7029,14 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
                 <div style="background:#f1f5f9;border-radius:999px;height:8px;overflow:hidden;margin-bottom:14px;">
                     <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,${barGrad});width:${pct}%;transition:width 1.2s ease;"></div>
                 </div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    ${subBar(qaScore,'QA – Session Quality',QA_MAX,qaGraderName,'#7c3aed','#f5f3ff')}
-                    ${subBar(qcScore,'QC – Lesson Plan Quality',QC_MAX,qcGraderName,'#d97706','#fffbeb')}
-                </div>` : `
+                ` : `
                 <div style="text-align:center;padding:24px 0;color:#94a3b8;font-size:.875rem;">No performance grades yet this month.</div>`}
             </div>
             <!-- Expandable notes -->
             <div id="perf-breakdown" style="display:none;border-top:1px solid #f1f5f9;padding:14px 16px;background:#fafafa;">
                 <div style="font-size:.7rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Grader Notes</div>
                 ${notesHTML || '<div style="font-size:.8rem;color:#cbd5e1;text-align:center;padding:8px 0;">No notes provided yet.</div>'}
-                <div style="margin-top:10px;font-size:.68rem;color:#cbd5e1;text-align:center;">QA (${QA_MAX} pts) + QC (${QC_MAX} pts) = ${TOTAL_MAX} pts total</div>
+                <div style="margin-top:10px;font-size:.68rem;color:#cbd5e1;text-align:center;">Score = average of all QA grades and QC grade (out of 100)</div>
             </div>
         </div>
     `;
