@@ -6951,9 +6951,11 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const td = window.tutorData || {};
     const qaScore      = breakdown.qaScore       ?? td.qaScore       ?? null;
     const qcScore      = breakdown.qcScore       ?? td.qcScore       ?? null;
-    // Strip any leading [Staff Name]: or [Staff Name] - prefix inserted by graders
+    // Strip ALL occurrences of [Staff Name]: or [Staff Name] - inserted by graders.
+    // Notes from multiple QA graders are concatenated so the pattern can appear
+    // anywhere in the string, not just at the start.
     function stripGraderName(text) {
-        return (text || '').replace(/^\[.*?\]\s*[:\-]\s*/i, '').trim();
+        return (text || '').replace(/\[.*?\]\s*[:\-]\s*/gi, '').trim();
     }
     const qaAdvice     = stripGraderName(breakdown.qaAdvice      ?? td.qaAdvice      ?? '');
     const qcAdvice     = stripGraderName(breakdown.qcAdvice      ?? td.qcAdvice      ?? '');
