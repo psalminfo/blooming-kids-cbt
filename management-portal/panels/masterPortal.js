@@ -435,7 +435,19 @@ export async function renderMasterPortalPanel(container) {
             getDoc(doc(db, 'gamification', 'current_cycle'))
         ]);
 
-        const tutors = tutorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Exclude tutors who are on leave or explicitly inactive.
+        // Some tutors retain status:'active' but carry a secondary flag
+        // (onLeave, leaveStatus, isActive) — filter those out here so
+        // they never appear in the portal, leaderboard, or QA rotation.
+        const tutors = tutorsSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(t =>
+                t.status === 'active' &&
+                !t.onLeave &&
+                t.leaveStatus !== 'on_leave' &&
+                t.leaveStatus !== 'leave' &&
+                t.isActive !== false
+            );
         const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const grades = {};
         gradesSnap.docs.forEach(d => { grades[d.data().tutorId || d.data().tutorEmail] = { id: d.id, ...d.data() }; });
@@ -970,11 +982,21 @@ export async function renderGradingActivityTab(container) {
             });
         }
 
-        // Build tutorId → name map
+        // Build tutorId → name map — exclude on-leave / inactive tutors so they
+        // never appear in grading activity or get added to QA assignment rotations.
         const tutorNameById  = {};
         const allTutorIds    = [];
         tutorsSnap.docs.forEach(d => {
-            tutorNameById[d.id] = d.data().name || d.data().email || d.id;
+            const data = d.data();
+            // Skip tutors that are on leave or otherwise not fully active
+            if (
+                data.status !== 'active' ||
+                data.onLeave ||
+                data.leaveStatus === 'on_leave' ||
+                data.leaveStatus === 'leave' ||
+                data.isActive === false
+            ) return;
+            tutorNameById[d.id] = data.name || data.email || d.id;
             allTutorIds.push(d.id);
         });
 
@@ -1512,9 +1534,10 @@ export function openGradeModal(type, dataset, grades, monthKey) {
                     const freshQcDoc  = !freshQcSnap.empty ? freshQcSnap.docs[0].data() : currentDoc;
                     const qaScore     = avgQaScore;
                     const qcScore     = freshQcDoc.qc?.score ?? null;
-                    const combined    = qcScore !== null
+                    // Guard: only average when BOTH scores are present to avoid NaN
+                    const combined    = (qaScore !== null && qcScore !== null)
                         ? Math.round((qaScore + qcScore) / 2)
-                        : qaScore;
+                        : (qaScore !== null ? qaScore : (qcScore !== null ? qcScore : null));
                     await updateDoc(doc(db, 'tutors', tutorId), {
                         performanceScore:  combined,
                         qaScore:           qaScore,
