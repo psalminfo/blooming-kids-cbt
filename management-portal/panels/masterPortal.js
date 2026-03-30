@@ -1251,9 +1251,10 @@ function renderUngradedPanel(panel, plan, tutorNameById, gradesSnap, weekStart, 
             const ids = (week.assignments || {})[staff.email] || [];
             ids.forEach(id => assignedSoFar.add(id));
         }
-        // Subtract already graded
+        // Subtract already graded, and strip any tutor not in the active map
+        // (covers on-leave / inactive tutors baked into an older plan in Firestore)
         const ungraded = [...assignedSoFar].filter(
-            tid => !gradedPairs.has(`${staff.email}::${tid}`)
+            tid => !gradedPairs.has(`${staff.email}::${tid}`) && tutorNameById[tid]
         );
         return { staff, ungraded };
     }).filter(x => x.ungraded.length > 0);
