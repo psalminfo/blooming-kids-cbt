@@ -56,6 +56,7 @@ export async function renderManagementTutorView(container) {
                     <button id="transition-student-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 z-10">Transition Student</button>
                     <button id="create-group-class-btn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Create Group Class</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
+                    <button id="add-tutor-to-student-btn" class="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700">Add Tutor to Student</button>
                     <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
@@ -115,6 +116,14 @@ export async function renderManagementTutorView(container) {
 
         document.getElementById('reassign-student-btn').addEventListener('click', () => {
             showEnhancedReassignStudentModal();
+        });
+
+        document.getElementById('add-tutor-to-student-btn').addEventListener('click', () => {
+            if (window.showAddTutorToStudentModal) {
+                window.showAddTutorToStudentModal();
+            } else {
+                alert('Add Tutor modal not loaded. Please refresh.');
+            }
         });
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
