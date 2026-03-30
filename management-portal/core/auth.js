@@ -34,6 +34,7 @@ import { renderManagementMessagingPanel } from '../panels/messaging.js';
 import '../panels/tutorHistory.js';
 import '../panels/actionHandlers.js';
 import '../modals/assignStudent.js';
+import '../modals/addTutorToStudent.js';
 import '../modals/quickActions.js';
 import '../modals/transitions.js';
 import '../modals/groupClass.js';
