@@ -9,7 +9,7 @@
 
 # ========== PORTAL PAGES ==========
 /student* /student.html        200
-/tutor* /tutor.html          200
+/tutor* https://bloomingkidshouse.org 301
 /parent* /parent.html         200
 /management* /management.html     200
 /admin* /admin.html          200
