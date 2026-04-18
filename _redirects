@@ -1,17 +1,18 @@
 # ========== AUTH PAGES ==========
-/student-signup* /signup.html         200
+/student-signup* https://bloomingkidshouse.org 301!
+/student-auth* https://bloomingkidshouse.org 301!
 /tutor-auth* https://bloomingkidshouse.org 301!
-/parent-auth* /parent-auth.html    200
-/management-auth* /management-auth.html 200
+/parent-auth* https://bloomingkidshouse.org 301!
+/management-auth* https://bloomingkidshouse.org 301!
 /admin-auth* /admin-auth.html     200
 /enrollment* /enrollment.html     200
 /enrollment-portal /enrollment.html     200
 
 # ========== PORTAL PAGES ==========
-/student* /student.html        200
+/student* https://bloomingkidshouse.org 301!
 /tutor* https://bloomingkidshouse.org 301!
-/parent* /parent.html         200
-/management* /management.html     200
+/parent* https://bloomingkidshouse.org 301!
+/management* https://bloomingkidshouse.org 301!
 /admin* /admin.html          200
 
 # ========== STATIC FILES ==========
