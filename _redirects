@@ -1,6 +1,6 @@
 # ========== AUTH PAGES ==========
 /student-signup* /signup.html         200
-/tutor-auth* https://bloomingkidshouse.org 301
+/tutor-auth* https://bloomingkidshouse.org 301!
 /parent-auth* /parent-auth.html    200
 /management-auth* /management-auth.html 200
 /admin-auth* /admin-auth.html     200
@@ -9,7 +9,7 @@
 
 # ========== PORTAL PAGES ==========
 /student* /student.html        200
-/tutor* https://bloomingkidshouse.org 301
+/tutor* https://bloomingkidshouse.org 301!
 /parent* /parent.html         200
 /management* /management.html     200
 /admin* /admin.html          200
